@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root { color: #151515; background: #f6f6f5; font-family: Arial, Helvetica, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, textarea { font: inherit; }
+button { border: 1px solid #8c8c8c; background: #fff; padding: 6px 9px; border-radius: 4px; cursor: pointer; }
+button:hover:not(:disabled), button.active { background: #e7e7e7; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+main { max-width: 1500px; margin: 0 auto; padding: 22px; }
+header { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; gap: 20px; }
+h1 { margin: 0; font-size: 26px; } .eyebrow { margin: 0 0 3px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #555; }
+.status { margin: 0; max-width: 520px; text-align: right; color: #444; font-size: 14px; }
+.toolbox { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 10px; }
+.toolbox > div, .graph-controls { border: 1px solid #c9c9c9; background: #fff; padding: 10px; border-radius: 5px; }
+.toolbox strong { display: block; font-size: 13px; margin-bottom: 7px; }.toolbox button { margin: 0 5px 5px 0; font-size: 13px; }
+.graph-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 12px; }
+.graph-controls label { display: grid; gap: 3px; font-size: 12px; }.graph-controls input { width: 160px; border: 1px solid #999; border-radius: 3px; padding: 5px; }
+.workspace { display: grid; grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr); gap: 14px; min-height: 560px; }
+.canvas-wrap { border: 1px solid #979797; border-radius: 5px; overflow: hidden; background: #fff; }.canvas-wrap svg { display: block; width: 100%; height: auto; min-height: 560px; touch-action: none; cursor: crosshair; }
+aside { min-width: 0; display: grid; grid-template-rows: auto 1fr; gap: 8px; }.code-actions { display: flex; align-items: center; justify-content: end; flex-wrap: wrap; gap: 8px; font-size: 13px; }.code-actions label { margin-right: auto; }
+textarea { min-height: 500px; width: 100%; resize: vertical; border: 1px solid #979797; border-radius: 5px; background: #fff; padding: 12px; font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.45; white-space: pre; }
+footer { margin: 14px 0 0; color: #555; font-size: 12px; }
+@media (max-width: 1000px) { .toolbox { grid-template-columns: repeat(2, 1fr); }.workspace { grid-template-columns: 1fr; }.canvas-wrap svg { min-height: auto; } textarea { min-height: 320px; } }
+@media (max-width: 600px) { main { padding: 12px; } header { align-items: start; flex-direction: column; }.status { text-align: left; }.toolbox { grid-template-columns: 1fr; } }
