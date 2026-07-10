@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
 import { documentFor, objectToLatex } from "../app/lib/latex";
 
 test("converts circuit connectors using circuitikz", () => {
@@ -18,4 +19,19 @@ test("returns a self-contained document with required STEM packages", () => {
   assert.match(output, /\\usepackage\{circuitikz\}/);
   assert.match(output, /\\usepackage\{pgfplots\}/);
   assert.match(output, /\\begin\{tikzpicture\}/);
+});
+
+test("emits LaTeX for every MPSI component exposed in the toolbar", () => {
+  const exposedKinds = toolboxGroups.flatMap((group) => group.kinds).filter((kind): kind is ObjectKind => kind !== "select");
+  assert.equal(new Set(exposedKinds).size, exposedKinds.length);
+  const objects: CanvasObject[] = exposedKinds.map((kind, index) => {
+    const x = 20 + index * 3;
+    if (connectorKinds.includes(kind)) return { id: kind, kind, x, y: 30, x2: x + 60, y2: 30 };
+    if (kind === "freehand") return { id: kind, kind, x, y: 30, points: [{ x, y: 30 }, { x: x + 20, y: 20 }, { x: x + 50, y: 40 }] };
+    if (kind === "axes") return { id: kind, kind, x, y: 30, width: 180, height: 120, graph: { expression: "x", xMin: -2, xMax: 2 } };
+    if (kind === "text") return { id: kind, kind, x, y: 30, text: "MPSI" };
+    if (stampKinds.includes(kind)) return { id: kind, kind, x, y: 30, ...stampSize(kind) };
+    return { id: kind, kind, x, y: 30, width: 40, height: 40 };
+  });
+  for (const object of objects) assert.notEqual(objectToLatex(object).trim(), "", object.kind);
 });
