@@ -48,6 +48,20 @@ test("keeps complex generated symbols while applying editable LaTeX", () => {
   assert.deepEqual(result.objects, objects);
 });
 
+test("applies editable metadata for every generated canvas property", () => {
+  const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120, rotation: 0 }];
+  const edited = documentFor(objects).replace('"x":30', '"x":180').replace('"rotation":0', '"rotation":35');
+  const result = objectsFromLatex(edited, objects);
+  assert.equal(result.applied, 1);
+  assert.deepEqual(result.objects[0], { id: "lens-1", kind: "lens", x: 180, y: 40, width: 60, height: 120, rotation: 35 });
+});
+
+test("adds a complete object written in a generated LaTeX semantic block", () => {
+  const source = "\\begin{tikzpicture}\n% sketch2latex id=new-arrow\n% @sketch2latex {\"id\":\"new-arrow\",\"kind\":\"arrow\",\"x\":20,\"y\":30,\"x2\":180,\"y2\":90}\n\\draw[-{Latex}] (0.40,-0.60) -- (3.60,-1.80);\n\\end{tikzpicture}";
+  const result = objectsFromLatex(source, []);
+  assert.deepEqual(result.objects, [{ id: "new-arrow", kind: "arrow", x: 20, y: 30, x2: 180, y2: 90 }]);
+});
+
 test("returns a self-contained document with required STEM packages", () => {
   const output = documentFor([{ id: "b1", kind: "bond-double", x: 0, y: 0, x2: 50, y2: 0 }]);
   assert.match(output, /\\usepackage\{circuitikz\}/);

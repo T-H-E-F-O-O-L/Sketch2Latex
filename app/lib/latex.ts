@@ -1,4 +1,4 @@
-import { connectorKinds, type CanvasObject, type Point } from "./canvas-types";
+import { connectorKinds, labels, type CanvasObject, type Point } from "./canvas-types";
 
 const SCALE = 50;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -151,7 +151,7 @@ export function objectToLatex(object: CanvasObject): string {
 export function documentFor(objects: CanvasObject[], snippetOnly = false): string {
   const body = objects.flatMap((object) => {
     const rendered = objectToLatex(object);
-    return rendered ? [`% sketch2latex id=${object.id}\n  ${rendered}`] : [];
+    return rendered ? [`% sketch2latex id=${object.id}\n% @sketch2latex ${JSON.stringify(object)}\n  ${rendered}`] : [];
   }).join("\n\n  ");
   const picture = `\\begin{tikzpicture}[x=1cm,y=1cm]\n  ${body}\n\\end{tikzpicture}`;
   if (snippetOnly) return picture;
@@ -170,6 +170,33 @@ ${picture}
 type LatexSyncResult = { objects: CanvasObject[]; applied: number; preserved: number };
 
 const numericCoordinate = /\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/g;
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+function isCanvasObject(value: unknown): value is CanvasObject {
+  if (!value || typeof value !== "object") return false;
+  const object = value as Record<string, unknown>;
+  if (typeof object.id !== "string" || typeof object.kind !== "string" || !Object.hasOwn(labels, object.kind) || !isFiniteNumber(object.x) || !isFiniteNumber(object.y)) return false;
+  for (const key of ["x2", "y2", "width", "height", "scale", "scaleX", "scaleY", "rotation"] as const) if (object[key] !== undefined && !isFiniteNumber(object[key])) return false;
+  if (object.text !== undefined && typeof object.text !== "string") return false;
+  if (object.points !== undefined && (!Array.isArray(object.points) || object.points.some((point) => !point || typeof point !== "object" || !isFiniteNumber((point as Point).x) || !isFiniteNumber((point as Point).y)))) return false;
+  if (object.graph !== undefined) {
+    if (!object.graph || typeof object.graph !== "object") return false;
+    const graph = object.graph as { expression?: unknown; xMin?: unknown; xMax?: unknown };
+    if (typeof graph.expression !== "string" || !isFiniteNumber(graph.xMin) || !isFiniteNumber(graph.xMax)) return false;
+  }
+  return true;
+}
+
+function metadataFromLatexBlock(block: string): CanvasObject | undefined {
+  const metadata = block.match(/^\s*%+\s*@sketch2latex\s+(.+)$/m);
+  if (!metadata) return undefined;
+  try {
+    const object: unknown = JSON.parse(metadata[1]);
+    if (!isCanvasObject(object)) throw new Error("invalid");
+    return object;
+  } catch { throw new Error("Le bloc @sketch2latex contient des données invalides. Corrigez son JSON puis réessayez."); }
+}
 
 function pointsFromLatex(source: string) {
   return [...source.matchAll(numericCoordinate)].map((match) => {
@@ -206,14 +233,31 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
   return original;
 }
 
+function mergeTikzEdits(metadata: CanvasObject, visual: CanvasObject, original: CanvasObject): CanvasObject {
+  const next = { ...metadata } as Record<string, unknown>;
+  for (const key of ["x", "y", "x2", "y2", "width", "height", "text", "graph"] as const) {
+    if (JSON.stringify(visual[key]) !== JSON.stringify(original[key])) next[key] = visual[key];
+  }
+  return next as CanvasObject;
+}
+
 export function objectsFromLatex(source: string, currentObjects: CanvasObject[]): LatexSyncResult {
   const markers = [...source.matchAll(/^\s*%+\s*sketch2latex\s+id=([^\s]+)\s*$/gim)];
   if (!markers.length) throw new Error("Conservez les commentaires % sketch2latex id=… pour appliquer le LaTeX au canevas.");
-  const originals = new Map(currentObjects.map((object) => [object.id, object])); const seen = new Set<string>(); const objects: CanvasObject[] = [];
+  const originals = new Map(currentObjects.map((object) => [object.id, object])); const seen = new Set<string>(); const resultIds = new Set<string>(); const objects: CanvasObject[] = [];
   let applied = 0; let preserved = 0;
   markers.forEach((marker, index) => {
-    const id = marker[1]; const original = originals.get(id); if (!original || seen.has(id)) return;
-    seen.add(id); const blockStart = (marker.index ?? 0) + marker[0].length; const blockEnd = markers[index + 1]?.index ?? source.length; const next = objectFromLatexBlock(original, source.slice(blockStart, blockEnd));
+    const id = marker[1]; const original = originals.get(id); if (seen.has(id)) throw new Error(`L’identifiant ${id} est présent plusieurs fois dans le LaTeX.`);
+    seen.add(id); const blockStart = (marker.index ?? 0) + marker[0].length; const blockEnd = markers[index + 1]?.index ?? source.length; const block = source.slice(blockStart, blockEnd); const metadata = metadataFromLatexBlock(block);
+    if (!original) {
+      if (!metadata) throw new Error(`Le nouvel objet ${id} doit inclure un bloc @sketch2latex valide.`);
+      if (resultIds.has(metadata.id)) throw new Error(`L’identifiant ${metadata.id} est présent plusieurs fois dans le LaTeX.`);
+      resultIds.add(metadata.id); objects.push(metadata); applied += 1; return;
+    }
+    const visual = objectFromLatexBlock(original, block);
+    const next = metadata && JSON.stringify(metadata) !== JSON.stringify(original) ? mergeTikzEdits(metadata, visual, original) : visual;
+    if (resultIds.has(next.id)) throw new Error(`L’identifiant ${next.id} est présent plusieurs fois dans le LaTeX.`);
+    resultIds.add(next.id);
     if (next === original) preserved += 1; else applied += 1;
     objects.push(next);
   });
