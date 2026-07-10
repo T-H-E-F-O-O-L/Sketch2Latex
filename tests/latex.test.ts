@@ -21,6 +21,11 @@ test("keeps selected-object rotation and size in the exported LaTeX", () => {
   assert.match(output, /\\end\{scope\}$/);
 });
 
+test("keeps independent selected-object width and height in the exported LaTeX", () => {
+  const output = objectToLatex({ id: "box", kind: "rect", x: 0, y: 0, width: 100, height: 50, scaleX: 2, scaleY: 0.5 });
+  assert.match(output, /cm=\{2,0,0,0\.5,/);
+});
+
 test("returns a self-contained document with required STEM packages", () => {
   const output = documentFor([{ id: "b1", kind: "bond-double", x: 0, y: 0, x2: 50, y2: 0 }]);
   assert.match(output, /\\usepackage\{circuitikz\}/);

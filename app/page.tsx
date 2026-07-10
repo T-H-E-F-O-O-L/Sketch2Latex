@@ -7,6 +7,7 @@ import { documentFor } from "./lib/latex";
 const canvasWidth = 900;
 const canvasHeight = 560;
 const objectId = () => Math.random().toString(36).slice(2, 10);
+const standardDrawingTools: ObjectKind[] = ["line", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"];
 
 type HistoryState = { objects: CanvasObject[]; past: CanvasObject[][]; future: CanvasObject[][] };
 type HistoryAction =
@@ -39,6 +40,8 @@ const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement): Po
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const scaleXFor = (object: CanvasObject) => object.scaleX ?? object.scale ?? 1;
+const scaleYFor = (object: CanvasObject) => object.scaleY ?? object.scale ?? 1;
 
 function boundsFor(object: CanvasObject): CanvasBounds {
   if (connectorKinds.includes(object.kind)) {
@@ -63,10 +66,29 @@ function objectCenter(object: CanvasObject): Point {
 }
 
 function transformFor(object: CanvasObject) {
-  const rotation = object.rotation ?? 0; const scale = object.scale ?? 1;
-  if (rotation === 0 && scale === 1) return undefined;
+  const rotation = object.rotation ?? 0; const scaleX = scaleXFor(object); const scaleY = scaleYFor(object);
+  if (rotation === 0 && scaleX === 1 && scaleY === 1) return undefined;
   const center = objectCenter(object);
-  return `translate(${center.x} ${center.y}) rotate(${rotation}) scale(${scale}) translate(${-center.x} ${-center.y})`;
+  return `translate(${center.x} ${center.y}) rotate(${rotation}) scale(${scaleX} ${scaleY}) translate(${-center.x} ${-center.y})`;
+}
+
+function transformedPoint(object: CanvasObject, point: Point): Point {
+  const center = objectCenter(object); const rotation = ((object.rotation ?? 0) * Math.PI) / 180;
+  const dx = (point.x - center.x) * scaleXFor(object); const dy = (point.y - center.y) * scaleYFor(object);
+  return { x: center.x + dx * Math.cos(rotation) - dy * Math.sin(rotation), y: center.y + dx * Math.sin(rotation) + dy * Math.cos(rotation) };
+}
+
+function cornerObjectAt(objects: CanvasObject[], point: Point) {
+  for (const object of [...objects].reverse()) {
+    const bounds = boundsFor(object);
+    const corners = [[bounds.x, bounds.y], [bounds.x + bounds.width, bounds.y], [bounds.x, bounds.y + bounds.height], [bounds.x + bounds.width, bounds.y + bounds.height]];
+    if (corners.some(([x, y]) => Math.hypot(transformedPoint(object, { x, y }).x - point.x, transformedPoint(object, { x, y }).y - point.y) <= 12)) return object;
+  }
+}
+
+function localOffset(point: Point, center: Point, rotation: number): Point {
+  const dx = point.x - center.x; const dy = point.y - center.y; const angle = (-rotation * Math.PI) / 180;
+  return { x: dx * Math.cos(angle) - dy * Math.sin(angle), y: dx * Math.sin(angle) + dy * Math.cos(angle) };
 }
 
 async function canvasPdfImage(svg: SVGSVGElement) {
@@ -134,13 +156,13 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "gbf") return <g {...common}><circle cx={cx} cy={cy} r={w*.36} /><path d={`M ${x+w*.22} ${cy} q ${w*.07} ${-h*.16} ${w*.14} 0 q ${w*.07} ${h*.16} ${w*.14} 0 q ${w*.07} ${-h*.16} ${w*.14} 0`} />{text("GBF", cx, y+h*.78)}</g>;
   if (object.kind === "oscilloscope") return <g {...common}><rect x={x} y={y} width={w} height={h} rx="4" /><path d={`M ${x+w*.15} ${cy} q ${w*.12} ${-h*.2} ${w*.24} 0 q ${w*.12} ${h*.2} ${w*.24} 0 q ${w*.12} ${-h*.2} ${w*.24} 0`} />{text("oscillo", cx, y+h*.88)}</g>;
   if (object.kind === "mass") return <g {...common}><rect x={x+5} y={y+8} width={w-10} height={h-16} fill="white" />{text("m")}</g>;
-  if (object.kind === "inclined-plane") return <g {...common}><path d={`M ${x+5} ${y+h-5} L ${x+w-5} ${y+h-5} L ${x+w-5} ${y+8} Z`} /><rect x={x+w*.18} y={y+h*.58} width={w*.3} height={h*.18} transform={`rotate(${-Math.atan2(h*.6,w*.75)*180/Math.PI} ${x+w*.33} ${y+h*.67})`} fill="white" /></g>;
-  if (object.kind === "pulley") return <g {...common}><circle cx={cx} cy={cy} r={w*.32} /><circle cx={cx} cy={cy} r="4" fill="#111" /><line x1={x+4} y1={y+8} x2={x+w-4} y2={y+8} /></g>;
+  if (object.kind === "pulley") return <g {...common}><circle cx={cx} cy={cy} r={w*.32} /><circle cx={cx} cy={cy} r="4" fill="#111" /></g>;
   if (object.kind === "pendulum") return <g {...common}><line x1={cx} y1={y+6} x2={cx} y2={y+h*.72} /><circle cx={cx} cy={y+h*.82} r={w*.17} fill="white" /><line x1={cx-w*.25} y1={y+6} x2={cx+w*.25} y2={y+6} /></g>;
   if (object.kind === "reference-frame") return <g {...common}><line x1={x+w*.2} y1={y+h*.78} x2={x+w*.84} y2={y+h*.78} markerEnd="url(#arrowhead)" /><line x1={x+w*.2} y1={y+h*.78} x2={x+w*.2} y2={y+h*.18} markerEnd="url(#arrowhead)" />{text("O", x+w*.15, y+h*.92)}{text("x", x+w*.91, y+h*.86)}{text("y", x+w*.13, y+h*.15)}</g>;
   if (object.kind === "circular-trajectory") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.35} markerEnd="url(#arrowhead)" /><circle cx={cx} cy={cy} r="3" fill="#111" />{text("O", cx, cy+18)}</g>;
   if (object.kind === "gravity-field") return <g {...common}>{[.2,.5,.8].map((p) => <line key={p} x1={x+w*p} y1={y+h*.15} x2={x+w*p} y2={y+h*.78} markerEnd="url(#arrowhead)" />)}{text("g", x+w*.9, cy)}</g>;
-  if (object.kind === "lens" || object.kind === "diverging-lens") return <g {...common}><path d={object.kind === "lens" ? `M ${cx} ${y+5} Q ${x+w*.72} ${cy} ${cx} ${y+h-5} Q ${x+w*.28} ${cy} ${cx} ${y+5}` : `M ${cx-w*.12} ${y+5} Q ${cx+w*.12} ${cy} ${cx-w*.12} ${y+h-5} M ${cx+w*.12} ${y+5} Q ${cx-w*.12} ${cy} ${cx+w*.12} ${y+h-5}`} /><line x1={x} y1={cy} x2={x+w} y2={cy} strokeDasharray="4 3" /></g>;
+  if (object.kind === "lens") return <g {...common}><line x1={x} y1={cy} x2={x+w} y2={cy} strokeWidth="1.5" /><line x1={cx} y1={y+h*.1} x2={cx} y2={y+h*.9} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><circle cx={cx} cy={cy} r="2.5" fill="#111" />{text("O", cx + 9, cy + 16)}</g>;
+  if (object.kind === "diverging-lens") return <g {...common}><line x1={x} y1={cy} x2={x+w} y2={cy} strokeWidth="1.5" /><line x1={cx} y1={y+h*.1} x2={cx} y2={y+h*.43} markerEnd="url(#arrowhead)" /><line x1={cx} y1={y+h*.9} x2={cx} y2={y+h*.57} markerEnd="url(#arrowhead)" /><circle cx={cx} cy={cy} r="2.5" fill="#111" />{text("O", cx + 9, cy + 16)}</g>;
   if (object.kind === "plane-mirror" || object.kind === "screen") return <g {...common}><line x1={cx} y1={y+4} x2={cx} y2={y+h-4} strokeWidth="4" />{Array.from({length:5},(_,i)=><line key={i} x1={cx} y1={y+12+i*h*.17} x2={cx+(object.kind === "plane-mirror" ? 10 : -10)} y2={y+18+i*h*.17} />)}</g>;
   if (object.kind === "prism") return <path {...common} d={`M ${x+6} ${y+h-6} L ${x+w-6} ${y+h-6} L ${cx} ${y+7} Z`} />;
   if (object.kind === "fiber") return <g {...common}><path d={`M ${x+4} ${y+h*.3} C ${x+w*.35} ${y+h*.2}, ${x+w*.62} ${y+h*.83}, ${x+w-5} ${y+h*.62}`} /><path d={`M ${x+4} ${y+h*.52} C ${x+w*.35} ${y+h*.42}, ${x+w*.62} ${y+h*1.03}, ${x+w-5} ${y+h*.84}`} /></g>;
@@ -153,18 +175,26 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "piston-cylinder") return <g {...common}><path d={`M ${x+w*.18} ${y+h*.9} L ${x+w*.18} ${y+h*.12} L ${x+w*.82} ${y+h*.12} L ${x+w*.82} ${y+h*.9}`} /><line x1={x+w*.14} y1={y+h*.38} x2={x+w*.86} y2={y+h*.38} strokeWidth="4" /><line x1={cx} y1={y+h*.38} x2={cx} y2={y+3} />{text("P, V, T", cx, y+h*.73)}</g>;
   if (object.kind === "thermal-reservoir") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.4} />{text("T")}</g>;
   if (object.kind === "heat-engine") return <g {...common}><rect x={x+w*.2} y={y+h*.28} width={w*.6} height={h*.42} fill="white" />{text("machine", cx, cy+5)}<line x1={cx} y1={y+3} x2={cx} y2={y+h*.25} markerEnd="url(#arrowhead)" /><line x1={cx} y1={y+h*.72} x2={cx} y2={y+h-3} markerEnd="url(#arrowhead)" /><line x1={x+w*.82} y1={cy} x2={x+w-3} y2={cy} markerEnd="url(#arrowhead)" />{text("Qₕ", cx+10, y+h*.18)}{text("Q𝚌", cx+10, y+h*.94)}{text("W", x+w*.92, cy-5)}</g>;
-  if (["phase-diagram", "clapeyron-diagram", "energy-diagram"].includes(object.kind)) return <g {...common}><line x1={x+w*.16} y1={y+h*.85} x2={x+w*.16} y2={y+h*.12} markerEnd="url(#arrowhead)" /><line x1={x+w*.16} y1={y+h*.85} x2={x+w*.88} y2={y+h*.85} markerEnd="url(#arrowhead)" /><path d={object.kind === "energy-diagram" ? `M ${x+w*.25} ${y+h*.25} Q ${cx} ${y+h*.72} ${x+w*.8} ${y+h*.28}` : `M ${x+w*.23} ${y+h*.25} Q ${x+w*.42} ${y+h*.75} ${x+w*.76} ${y+h*.38}`} />{text(object.kind === "phase-diagram" ? "P,T" : object.kind === "clapeyron-diagram" ? "P,v" : "Eₚ", x+w*.3, y+h*.16)}</g>;
   if (object.kind === "ion") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.34} />{text("ion")}</g>;
   if (object.kind === "lone-pair") return <g><circle cx={cx-7} cy={cy} r="3" fill="#111" /><circle cx={cx+7} cy={cy} r="3" fill="#111" /></g>;
   if (object.kind === "crystal-fcc") return <g {...common}><rect x={x+w*.14} y={y+h*.28} width={w*.58} height={h*.55} /><path d={`M ${x+w*.14} ${y+h*.28} L ${x+w*.36} ${y+h*.1} L ${x+w*.94} ${y+h*.1} L ${x+w*.72} ${y+h*.28} M ${x+w*.72} ${y+h*.28} L ${x+w*.94} ${y+h*.1} L ${x+w*.94} ${y+h*.65} L ${x+w*.72} ${y+h*.83}`} />{[[.14,.28],[.72,.28],[.14,.83],[.72,.83],[.36,.1],[.94,.1],[.94,.65],[.43,.55]].map(([a,b],i)=><circle key={i} cx={x+w*a} cy={y+h*b} r="4" fill="#111" />)}</g>;
   if (object.kind === "precipitate") return <g {...common}><path d={`M ${x+w*.12} ${y+h*.1} L ${x+w*.22} ${y+h*.88} L ${x+w*.78} ${y+h*.88} L ${x+w*.88} ${y+h*.1}`} /><path d={`M ${x+w*.22} ${y+h*.88} L ${x+w*.78} ${y+h*.88} L ${x+w*.73} ${y+h*.67} L ${x+w*.27} ${y+h*.67} Z`} fill="#c7c7c7" stroke="#111" /></g>;
-  if (object.kind === "electrochemical-cell") return <g {...common}><path d={`M ${x+w*.06} ${y+h*.18} L ${x+w*.13} ${y+h*.82} L ${x+w*.37} ${y+h*.82} L ${x+w*.44} ${y+h*.18} M ${x+w*.56} ${y+h*.18} L ${x+w*.63} ${y+h*.82} L ${x+w*.87} ${y+h*.82} L ${x+w*.94} ${y+h*.18}`} /><line x1={x+w*.25} y1={y+h*.1} x2={x+w*.25} y2={y+h*.62} /><line x1={x+w*.75} y1={y+h*.1} x2={x+w*.75} y2={y+h*.62} /><path d={`M ${x+w*.44} ${y+h*.28} Q ${cx} ${y+h*.02} ${x+w*.56} ${y+h*.28}`} />{text("anode", x+w*.25, y+h*.96)}{text("cathode", x+w*.75, y+h*.96)}</g>;
-  if (object.kind === "beaker") return <g {...common}><path d={`M ${x+w*.12} ${y+h*.08} L ${x+w*.22} ${y+h*.9} L ${x+w*.78} ${y+h*.9} L ${x+w*.88} ${y+h*.08}`} /><line x1={x+w*.15} y1={y+h*.52} x2={x+w*.85} y2={y+h*.52} /></g>;
-  if (object.kind === "flask" || object.kind === "volumetric-flask") return <g {...common}><path d={`M ${x+w*.4} ${y+h*.05} L ${x+w*.4} ${y+h*.38} C ${x+w*.08} ${y+h*.65}, ${x+w*.16} ${y+h*.94}, ${cx} ${y+h*.94} C ${x+w*.84} ${y+h*.94}, ${x+w*.92} ${y+h*.65}, ${x+w*.6} ${y+h*.38} L ${x+w*.6} ${y+h*.05}`} /><line x1={x+w*.36} y1={y+h*.28} x2={x+w*.64} y2={y+h*.28} /></g>;
-  if (object.kind === "test-tube") return <path {...common} d={`M ${x+w*.36} ${y+h*.06} L ${x+w*.36} ${y+h*.72} A ${w*.14} ${h*.16} 0 0 0 ${x+w*.64} ${y+h*.72} L ${x+w*.64} ${y+h*.06}`} />;
-  if (object.kind === "burette") return <g {...common}><rect x={x+w*.32} y={y+4} width={w*.36} height={h*.72} /><line x1={x+w*.16} y1={y+h*.76} x2={x+w*.84} y2={y+h*.76} /><line x1={cx} y1={y+h*.76} x2={cx} y2={y+h*.96} /></g>;
-  if (object.kind === "separatory-funnel") return <g {...common}><path d={`M ${cx} ${y+4} L ${cx} ${y+h*.3} L ${x+w*.78} ${y+h*.52} L ${cx} ${y+h*.77} L ${x+w*.22} ${y+h*.52} L ${cx} ${y+h*.3}`} /><line x1={x+w*.35} y1={y+h*.76} x2={x+w*.65} y2={y+h*.76} /></g>;
-  if (object.kind === "pipette") return <g {...common}><line x1={x+3} y1={cy} x2={x+w*.3} y2={cy} /><ellipse cx={cx} cy={cy} rx={w*.2} ry={h*.3} /><line x1={x+w*.7} y1={cy} x2={x+w-3} y2={cy} /></g>;
+  if (object.kind === "electrochemical-cell") return <g {...common}><path d={`M ${x+w*.06} ${y+h*.2} L ${x+w*.12} ${y+h*.84} L ${x+w*.39} ${y+h*.84} L ${x+w*.45} ${y+h*.2} M ${x+w*.55} ${y+h*.2} L ${x+w*.61} ${y+h*.84} L ${x+w*.88} ${y+h*.84} L ${x+w*.94} ${y+h*.2}`} /><path d={`M ${x+w*.1} ${y+h*.59} L ${x+w*.13} ${y+h*.81} L ${x+w*.38} ${y+h*.81} L ${x+w*.41} ${y+h*.59} Z M ${x+w*.59} ${y+h*.59} L ${x+w*.62} ${y+h*.81} L ${x+w*.87} ${y+h*.81} L ${x+w*.9} ${y+h*.59} Z`} fill="#dcecff" stroke="none" /><line x1={x+w*.25} y1={y+h*.12} x2={x+w*.25} y2={y+h*.72} strokeWidth="4" /><line x1={x+w*.75} y1={y+h*.12} x2={x+w*.75} y2={y+h*.72} strokeWidth="4" /><path d={`M ${x+w*.31} ${y+h*.66} L ${x+w*.31} ${y+h*.35} Q ${cx} ${y+h*.08} ${x+w*.69} ${y+h*.35} L ${x+w*.69} ${y+h*.66}`} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><path d={`M ${x+w*.25} ${y+h*.12} L ${x+w*.75} ${y+h*.12}`} strokeDasharray="4 3" />{text("anode (−)", x+w*.25, y+h*.96)}{text("cathode (+)", x+w*.75, y+h*.96)}{text("pont salin", cx, y+h*.25)}</g>;
+  if (object.kind === "beaker") return <g {...common}><path d={`M ${x+w*.14} ${y+h*.1} L ${x+w*.2} ${y+h*.9} L ${x+w*.8} ${y+h*.9} L ${x+w*.86} ${y+h*.1}`} /><path d={`M ${x+w*.18} ${y+h*.58} L ${x+w*.22} ${y+h*.86} L ${x+w*.78} ${y+h*.86} L ${x+w*.82} ${y+h*.58} Z`} fill="#dcecff" stroke="none" />{[.32,.44,.56].map((p) => <line key={p} x1={x+w*.29} y1={y+h*p} x2={x+w*.38} y2={y+h*p} />)}</g>;
+  if (object.kind === "flask") return <g {...common}><path d={`M ${x+w*.42} ${y+h*.06} L ${x+w*.42} ${y+h*.32} L ${x+w*.14} ${y+h*.9} L ${x+w*.86} ${y+h*.9} L ${x+w*.58} ${y+h*.32} L ${x+w*.58} ${y+h*.06} Z`} /><path d={`M ${x+w*.24} ${y+h*.7} L ${x+w*.16} ${y+h*.87} L ${x+w*.84} ${y+h*.87} L ${x+w*.76} ${y+h*.7} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "round-bottom-flask") return <g {...common}><line x1={x+w*.42} y1={y+h*.06} x2={x+w*.42} y2={y+h*.31} /><line x1={x+w*.58} y1={y+h*.06} x2={x+w*.58} y2={y+h*.31} /><circle cx={cx} cy={y+h*.61} r={Math.min(w,h)*.35} /><path d={`M ${x+w*.2} ${y+h*.68} Q ${cx} ${y+h*.84} ${x+w*.8} ${y+h*.68} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "distillation-flask") return <g {...common}><line x1={x+w*.39} y1={y+h*.07} x2={x+w*.39} y2={y+h*.31} /><line x1={x+w*.55} y1={y+h*.07} x2={x+w*.55} y2={y+h*.31} /><circle cx={x+w*.47} cy={y+h*.62} r={Math.min(w,h)*.31} /><path d={`M ${x+w*.67} ${y+h*.48} L ${x+w*.94} ${y+h*.34} L ${x+w*.96} ${y+h*.45} L ${x+w*.7} ${y+h*.57}`} /><path d={`M ${x+w*.24} ${y+h*.68} Q ${x+w*.47} ${y+h*.81} ${x+w*.7} ${y+h*.68} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "test-tube") return <g {...common}><path d={`M ${x+w*.36} ${y+h*.06} L ${x+w*.36} ${y+h*.72} A ${w*.14} ${h*.16} 0 0 0 ${x+w*.64} ${y+h*.72} L ${x+w*.64} ${y+h*.06}`} /><path d={`M ${x+w*.38} ${y+h*.63} L ${x+w*.38} ${y+h*.72} A ${w*.12} ${h*.13} 0 0 0 ${x+w*.62} ${y+h*.72} L ${x+w*.62} ${y+h*.63} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "graduated-cylinder") return <g {...common}><path d={`M ${x+w*.32} ${y+h*.05} L ${x+w*.32} ${y+h*.82} Q ${cx} ${y+h*.9} ${x+w*.68} ${y+h*.82} L ${x+w*.68} ${y+h*.05} M ${x+w*.12} ${y+h*.91} L ${x+w*.88} ${y+h*.91} M ${x+w*.36} ${y+h*.91} L ${x+w*.26} ${y+h*.99} M ${x+w*.64} ${y+h*.91} L ${x+w*.74} ${y+h*.99}`} />{[.2,.3,.4,.5,.6,.7].map((p, index) => <line key={p} x1={x+w*.34} y1={y+h*p} x2={x+w*(index % 2 ? .44 : .51)} y2={y+h*p} />)}<path d={`M ${x+w*.34} ${y+h*.62} L ${x+w*.34} ${y+h*.8} Q ${cx} ${y+h*.85} ${x+w*.66} ${y+h*.8} L ${x+w*.66} ${y+h*.62} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "burette") return <g {...common}><rect x={x+w*.34} y={y+h*.04} width={w*.32} height={h*.68} /><line x1={x+w*.18} y1={y+h*.73} x2={x+w*.82} y2={y+h*.73} /><circle cx={cx} cy={y+h*.73} r={w*.11} fill="white" /><line x1={cx} y1={y+h*.73} x2={cx} y2={y+h*.94} /><path d={`M ${cx} ${y+h*.94} L ${cx-w*.05} ${y+h*.88} L ${cx+w*.05} ${y+h*.88} Z`} fill="#111" />{[.12,.2,.28,.36,.44,.52,.6].map((p) => <line key={p} x1={x+w*.36} y1={y+h*p} x2={x+w*.47} y2={y+h*p} />)}</g>;
+  if (object.kind === "volumetric-flask") return <g {...common}><path d={`M ${x+w*.43} ${y+h*.05} L ${x+w*.43} ${y+h*.37} C ${x+w*.13} ${y+h*.57}, ${x+w*.18} ${y+h*.9}, ${cx} ${y+h*.92} C ${x+w*.82} ${y+h*.9}, ${x+w*.87} ${y+h*.57}, ${x+w*.57} ${y+h*.37} L ${x+w*.57} ${y+h*.05}`} /><line x1={x+w*.39} y1={y+h*.27} x2={x+w*.61} y2={y+h*.27} strokeWidth="3" /><path d={`M ${x+w*.23} ${y+h*.67} Q ${cx} ${y+h*.82} ${x+w*.77} ${y+h*.67} L ${x+w*.73} ${y+h*.82} Q ${cx} ${y+h*.9} ${x+w*.27} ${y+h*.82} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "separatory-funnel") return <g {...common}><rect x={x+w*.41} y={y+h*.03} width={w*.18} height={h*.11} /><path d={`M ${cx} ${y+h*.14} L ${x+w*.79} ${y+h*.44} Q ${x+w*.68} ${y+h*.72} ${cx} ${y+h*.77} Q ${x+w*.32} ${y+h*.72} ${x+w*.21} ${y+h*.44} Z`} /><path d={`M ${x+w*.3} ${y+h*.56} Q ${cx} ${y+h*.7} ${x+w*.7} ${y+h*.56} Q ${x+w*.64} ${y+h*.7} ${cx} ${y+h*.73} Q ${x+w*.36} ${y+h*.7} ${x+w*.3} ${y+h*.56} Z`} fill="#dcecff" stroke="none" /><line x1={x+w*.34} y1={y+h*.78} x2={x+w*.66} y2={y+h*.78} /><circle cx={cx} cy={y+h*.78} r={w*.09} fill="white" /><line x1={cx} y1={y+h*.78} x2={cx} y2={y+h*.96} /></g>;
+  if (object.kind === "pipette") return <g {...common}><line x1={cx} y1={y+h*.04} x2={cx} y2={y+h*.3} /><ellipse cx={cx} cy={y+h*.48} rx={w*.18} ry={h*.2} /><line x1={cx} y1={y+h*.68} x2={cx} y2={y+h*.92} /><path d={`M ${cx} ${y+h*.97} L ${cx-w*.06} ${y+h*.9} L ${cx+w*.06} ${y+h*.9} Z`} fill="#111" /><line x1={x+w*.36} y1={y+h*.23} x2={x+w*.64} y2={y+h*.23} /></g>;
+  if (object.kind === "filter-funnel") return <g {...common}><path d={`M ${x+w*.12} ${y+h*.1} L ${x+w*.88} ${y+h*.1} L ${cx} ${y+h*.55} Z`} /><path d={`M ${x+w*.24} ${y+h*.16} L ${x+w*.76} ${y+h*.16} L ${cx} ${y+h*.47} Z`} fill="#f1f1f1" /><line x1={cx} y1={y+h*.55} x2={cx} y2={y+h*.96} /></g>;
+  if (object.kind === "wash-bottle") return <g {...common}><path d={`M ${x+w*.25} ${y+h*.28} Q ${x+w*.18} ${y+h*.42} ${x+w*.18} ${y+h*.84} Q ${cx} ${y+h*.95} ${x+w*.82} ${y+h*.84} Q ${x+w*.82} ${y+h*.42} ${x+w*.7} ${y+h*.28} Z`} /><path d={`M ${x+w*.43} ${y+h*.28} L ${x+w*.43} ${y+h*.1} Q ${x+w*.56} ${y+h*.03} ${x+w*.72} ${y+h*.14} L ${x+w*.88} ${y+h*.08}`} /><path d={`M ${x+w*.23} ${y+h*.65} Q ${cx} ${y+h*.78} ${x+w*.77} ${y+h*.65} L ${x+w*.76} ${y+h*.83} Q ${cx} ${y+h*.9} ${x+w*.24} ${y+h*.83} Z`} fill="#dcecff" stroke="none" /></g>;
+  if (object.kind === "liebig-condenser") return <g {...common}><rect x={x+w*.08} y={y+h*.32} width={w*.84} height={h*.36} rx={h*.1} /><line x1={x+w*.02} y1={cy} x2={x+w*.98} y2={cy} /><line x1={x+w*.22} y1={y+h*.32} x2={x+w*.14} y2={y+h*.14} /><line x1={x+w*.78} y1={y+h*.68} x2={x+w*.86} y2={y+h*.86} /></g>;
+  if (object.kind === "support-stand") return <g {...common}><rect x={x+w*.1} y={y+h*.88} width={w*.8} height={h*.08} rx="3" fill="#f1f1f1" /><line x1={x+w*.28} y1={y+h*.88} x2={x+w*.28} y2={y+h*.08} strokeWidth="4" /><rect x={x+w*.24} y={y+h*.38} width={w*.16} height={h*.08} fill="white" /><line x1={x+w*.4} y1={y+h*.42} x2={x+w*.78} y2={y+h*.42} /><path d={`M ${x+w*.72} ${y+h*.42} q ${w*.08} ${h*.03} 0 ${h*.12}`} /></g>;
+  if (object.kind === "magnetic-stirrer") return <g {...common}><rect x={x+w*.08} y={y+h*.72} width={w*.84} height={h*.18} rx="6" fill="#f1f1f1" /><circle cx={x+w*.22} cy={y+h*.81} r={w*.045} fill="white" /><path d={`M ${x+w*.3} ${y+h*.72} L ${x+w*.35} ${y+h*.25} L ${x+w*.65} ${y+h*.25} L ${x+w*.7} ${y+h*.72}`} /><path d={`M ${x+w*.34} ${y+h*.57} L ${x+w*.36} ${y+h*.68} L ${x+w*.64} ${y+h*.68} L ${x+w*.66} ${y+h*.57} Z`} fill="#dcecff" stroke="none" /><ellipse cx={cx} cy={y+h*.62} rx={w*.1} ry={h*.018} fill="#111" stroke="none" /></g>;
   if (object.kind === "thermometer") return <g {...common}><rect x={x+w*.4} y={y+4} width={w*.2} height={h*.68} rx="4" /><circle cx={cx} cy={y+h*.82} r={w*.18} fill="#f8a4a4" /><line x1={cx} y1={y+h*.62} x2={cx} y2={y+h*.18} stroke="#d11" strokeWidth="3" /></g>;
   if (object.kind === "bunsen-burner") return <g {...common}><rect x={x+w*.15} y={y+h*.75} width={w*.7} height={h*.15} /><rect x={x+w*.4} y={y+h*.28} width={w*.2} height={h*.47} /><path d={`M ${cx} ${y+h*.28} Q ${x+w*.27} ${y+h*.08} ${cx} ${y+2} Q ${x+w*.73} ${y+h*.08} ${cx} ${y+h*.28}`} fill="#ffe09a" /></g>;
   return <g {...common}><rect x={x} y={y} width={w} height={h} />{text(labels[object.kind])}</g>;
@@ -188,7 +218,7 @@ function selectionOverlay(object: CanvasObject) {
     <rect className="selection-frame" x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} />
     <line className="selection-stem" x1={bounds.x + bounds.width / 2} y1={bounds.y} x2={bounds.x + bounds.width / 2} y2={rotateY + 7} />
     <circle className="rotation-handle" data-handle="rotate" cx={bounds.x + bounds.width / 2} cy={rotateY} r="7" aria-label="Tourner l’objet" />
-    <rect className="resize-handle" data-handle="resize" x={bounds.x + bounds.width - 6} y={bounds.y + bounds.height - 6} width="12" height="12" rx="2" aria-label="Redimensionner l’objet" />
+    {[[bounds.x, bounds.y], [bounds.x + bounds.width, bounds.y], [bounds.x, bounds.y + bounds.height], [bounds.x + bounds.width, bounds.y + bounds.height]].map(([x, y], index) => <rect key={index} className="resize-handle" data-handle="resize" x={x - 6} y={y - 6} width="12" height="12" rx="2" aria-label="Redimensionner l’objet" />)}
   </g>;
 }
 
@@ -206,6 +236,11 @@ export default function Home() {
   const [range, setRange] = useState("-5:5");
   const latex = useMemo(() => documentFor(objects, snippetOnly), [objects, snippetOnly]);
   const selected = objects.find((object) => object.id === selectedId);
+  const selectedBounds = selected ? boundsFor(selected) : undefined;
+  const selectedScaleX = selected ? scaleXFor(selected) : 1;
+  const selectedScaleY = selected ? scaleYFor(selected) : 1;
+  const selectedWidth = selectedBounds ? Math.round(selectedBounds.width * selectedScaleX) : 0;
+  const selectedHeight = selectedBounds ? Math.round(selectedBounds.height * selectedScaleY) : 0;
   const commitObjects = useCallback((next: CanvasObject[]) => dispatchHistory({ type: "commit", objects: next }), []);
   const undo = useCallback(() => { dispatchHistory({ type: "undo" }); setSelectedId(undefined); }, []);
   const redo = useCallback(() => { dispatchHistory({ type: "redo" }); setSelectedId(undefined); }, []);
@@ -213,18 +248,23 @@ export default function Home() {
     if (!selectedId) return;
     commitObjects(objects.map((object) => object.id === selectedId ? { ...object, ...change } : object));
   }, [commitObjects, objects, selectedId]);
+  const deleteSelected = useCallback(() => {
+    if (!selectedId) return;
+    commitObjects(objects.filter((object) => object.id !== selectedId)); setSelectedId(undefined); setNotice("Objet supprimé.");
+  }, [commitObjects, objects, selectedId]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
       if ((event.target as HTMLElement | null)?.closest("input, textarea")) return;
+      if (event.key === "Delete") { if (selectedId) { event.preventDefault(); deleteSelected(); } return; }
+      if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
       if (key === "y") { event.preventDefault(); redo(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [redo, undo]);
+  }, [deleteSelected, redo, selectedId, undo]);
 
   const makeObject = (p: Point): CanvasObject => {
     const kind = tool as ObjectKind;
@@ -240,6 +280,10 @@ export default function Home() {
     const svg = svgRef.current; if (!svg) return;
     const p = canvasPoint(event, svg); const element = event.target as Element; const target = element.closest("[data-id]")?.getAttribute("data-id");
     const handle = element.closest("[data-handle]")?.getAttribute("data-handle");
+    const cornerObject = handle ? undefined : cornerObjectAt(objects, p);
+    if (cornerObject) {
+      dragChangedRef.current = false; setTool("select"); setSelectedId(cornerObject.id); setDrag({ id: cornerObject.id, start: p, original: cornerObject, snapshot: objects, mode: "resize" }); event.currentTarget.setPointerCapture(event.pointerId); return;
+    }
     if (tool === "select" && target) {
       const original = objects.find((o) => o.id === target); if (!original) return;
       const mode: DragMode = handle === "resize" ? "resize" : handle === "rotate" ? "rotate" : "move";
@@ -247,7 +291,7 @@ export default function Home() {
     }
     if (tool === "select") { setSelectedId(undefined); return; }
     const created = makeObject(p);
-    if (stampKinds.includes(created.kind) || created.kind === "text" || created.kind === "axes") { commitObjects([...objects, created]); setSelectedId(created.id); return; }
+    if (stampKinds.includes(created.kind) || created.kind === "text" || created.kind === "axes") { commitObjects([...objects, created]); setSelectedId(created.id); if (!standardDrawingTools.includes(created.kind)) setTool("select"); return; }
     setDraft(created); event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
@@ -256,8 +300,9 @@ export default function Home() {
       dragChangedRef.current = true;
       const dx = p.x - drag.start.x; const dy = p.y - drag.start.y; const o = drag.original;
       const center = objectCenter(o);
+      const startOffset = localOffset(drag.start, center, o.rotation ?? 0); const currentOffset = localOffset(p, center, o.rotation ?? 0);
       const next = drag.mode === "resize"
-        ? { ...o, scale: clamp((o.scale ?? 1) * (Math.hypot(p.x - center.x, p.y - center.y) / Math.max(1, Math.hypot(drag.start.x - center.x, drag.start.y - center.y))), 0.25, 3) }
+        ? { ...o, scale: undefined, scaleX: clamp(scaleXFor(o) * Math.abs(currentOffset.x / (startOffset.x || 1)), 0.25, 3), scaleY: clamp(scaleYFor(o) * Math.abs(currentOffset.y / (startOffset.y || 1)), 0.25, 3) }
         : drag.mode === "rotate"
           ? { ...o, rotation: Math.round(((o.rotation ?? 0) + (Math.atan2(p.y - center.y, p.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 }
           : connectorKinds.includes(o.kind)
@@ -272,7 +317,7 @@ export default function Home() {
     else setDraft({ ...draft, width: p.x - draft.x, height: p.y - draft.y });
   };
   const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
-    if (draft) { commitObjects([...objects, draft]); setSelectedId(draft.id); setDraft(undefined); }
+    if (draft) { commitObjects([...objects, draft]); setSelectedId(draft.id); if (!standardDrawingTools.includes(draft.kind)) setTool("select"); setDraft(undefined); }
     else if (drag && dragChangedRef.current) dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
     setDrag(undefined); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
@@ -295,7 +340,6 @@ export default function Home() {
       setNotice("PDF téléchargé.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Impossible de compiler le PDF."); }
   };
-  const deleteSelected = () => { if (!selectedId) return; commitObjects(objects.filter((o) => o.id !== selectedId)); setSelectedId(undefined); };
 
   return <main>
     <header><div><p className="eyebrow">Représentations scientifiques CPGE</p><h1>Sketch2LaTeX — MPSI</h1></div><p className="status" aria-live="polite">{notice}</p></header>
@@ -303,8 +347,8 @@ export default function Home() {
     <section className="toolbox" aria-label="Outils de représentation MPSI">
       {toolboxGroups.map((group) => <div key={group.title}><strong>{group.title}</strong>{group.kinds.map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{kind === "select" ? "Sélectionner / déplacer" : labels[kind]}</button>)}</div>)}
     </section>
-    <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd + Z">↶ Retour</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd + Y ou Ctrl/Cmd + Maj + Z">↷ Avancer</button><button onClick={deleteSelected} disabled={!selectedId}>Supprimer la sélection</button><button onClick={() => { if (!objects.length) return; commitObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button>
-      {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Objet sélectionné</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round((selected.scale ?? 1) * 100)} onChange={(e) => updateSelected({ scale: Number(e.target.value) / 100 })} aria-label="Taille de l’objet" /><output>{Math.round((selected.scale ?? 1) * 100)}%</output></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, rotation: 0 })}>Réinitialiser</button></div>}
+    <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd + Z">↶ Retour</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd + Y ou Ctrl/Cmd + Maj + Z">↷ Avancer</button><button onClick={deleteSelected} disabled={!selectedId} title="Touche Suppr">Supprimer la sélection</button><button onClick={() => { if (!objects.length) return; commitObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button>
+      {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Objet sélectionné</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
     </section>
     <section className="workspace">
       <div className="canvas-wrap"><svg ref={svgRef} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
