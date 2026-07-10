@@ -1,4 +1,4 @@
-import type { CanvasObject, Point } from "./canvas-types";
+import { connectorKinds, type CanvasObject, type Point } from "./canvas-types";
 
 const SCALE = 50;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -149,7 +149,10 @@ export function objectToLatex(object: CanvasObject): string {
 }
 
 export function documentFor(objects: CanvasObject[], snippetOnly = false): string {
-  const body = objects.map(objectToLatex).filter(Boolean).join("\n\n  ");
+  const body = objects.flatMap((object) => {
+    const rendered = objectToLatex(object);
+    return rendered ? [`% sketch2latex id=${object.id}\n  ${rendered}`] : [];
+  }).join("\n\n  ");
   const picture = `\\begin{tikzpicture}[x=1cm,y=1cm]\n  ${body}\n\\end{tikzpicture}`;
   if (snippetOnly) return picture;
   return `\\documentclass[tikz,border=5pt]{standalone}
@@ -162,4 +165,57 @@ export function documentFor(objects: CanvasObject[], snippetOnly = false): strin
 ${picture}
 \\end{document}
 `;
+}
+
+type LatexSyncResult = { objects: CanvasObject[]; applied: number; preserved: number };
+
+const numericCoordinate = /\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/g;
+
+function pointsFromLatex(source: string) {
+  return [...source.matchAll(numericCoordinate)].map((match) => {
+    const x = Number(match[1]) * SCALE; const y = -Number(match[2]) * SCALE;
+    return { x: Object.is(x, -0) ? 0 : x, y: Object.is(y, -0) ? 0 : y };
+  });
+}
+
+function textFromLatex(value: string) {
+  return value.trim().replace(/\\textbackslash\{\}\s?/g, "\\").replace(/\\([#%&_{}])/g, "$1");
+}
+
+function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
+  if (block.includes("\\begin{scope}[cm=")) return original;
+  const points = pointsFromLatex(block);
+  if (connectorKinds.includes(original.kind) && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, x2: points[1].x, y2: points[1].y };
+  if (original.kind === "rect" && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, width: points[1].x - points[0].x, height: points[1].y - points[0].y };
+  if (original.kind === "circle" && points.length) {
+    const radius = block.match(/circle\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)/);
+    if (radius) { const value = Number(radius[1]) * SCALE; return { ...original, x: points[0].x - value, y: points[0].y - value, width: value * 2, height: value * 2 }; }
+  }
+  if (original.kind === "ellipse" && points.length) {
+    const radii = block.match(/ellipse\s*\(\s*(-?\d+(?:\.\d+)?)\s+and\s+(-?\d+(?:\.\d+)?)\s*\)/);
+    if (radii) { const rx = Number(radii[1]) * SCALE; const ry = Number(radii[2]) * SCALE; return { ...original, x: points[0].x - rx, y: points[0].y - ry, width: rx * 2, height: ry * 2 }; }
+  }
+  if (original.kind === "text") {
+    const node = block.match(/\\node\s+at\s+\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([\s\S]*?)\};/);
+    if (node) return { ...original, x: Number(node[1]) * SCALE, y: -Number(node[2]) * SCALE, text: textFromLatex(node[3]) };
+  }
+  if (original.kind === "axes" && points.length) {
+    const width = block.match(/width\s*=\s*(-?\d+(?:\.\d+)?)cm/); const height = block.match(/height\s*=\s*(-?\d+(?:\.\d+)?)cm/); const expression = block.match(/\\addplot\[[^\]]*\]\s*\{([\s\S]*?)\};/);
+    return { ...original, x: points[0].x, y: points[0].y, width: width ? Number(width[1]) * SCALE : original.width, height: height ? Number(height[1]) * SCALE : original.height, graph: original.graph ? { ...original.graph, expression: expression?.[1].trim() || original.graph.expression } : original.graph };
+  }
+  return original;
+}
+
+export function objectsFromLatex(source: string, currentObjects: CanvasObject[]): LatexSyncResult {
+  const markers = [...source.matchAll(/^\s*%+\s*sketch2latex\s+id=([^\s]+)\s*$/gim)];
+  if (!markers.length) throw new Error("Conservez les commentaires % sketch2latex id=… pour appliquer le LaTeX au canevas.");
+  const originals = new Map(currentObjects.map((object) => [object.id, object])); const seen = new Set<string>(); const objects: CanvasObject[] = [];
+  let applied = 0; let preserved = 0;
+  markers.forEach((marker, index) => {
+    const id = marker[1]; const original = originals.get(id); if (!original || seen.has(id)) return;
+    seen.add(id); const blockStart = (marker.index ?? 0) + marker[0].length; const blockEnd = markers[index + 1]?.index ?? source.length; const next = objectFromLatexBlock(original, source.slice(blockStart, blockEnd));
+    if (next === original) preserved += 1; else applied += 1;
+    objects.push(next);
+  });
+  return { objects, applied, preserved };
 }

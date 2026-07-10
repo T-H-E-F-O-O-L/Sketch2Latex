@@ -2,7 +2,7 @@
 
 import { PointerEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { connectorKinds, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind, type Point } from "./lib/canvas-types";
-import { documentFor } from "./lib/latex";
+import { documentFor, objectsFromLatex } from "./lib/latex";
 
 const canvasWidth = 900;
 const canvasHeight = 560;
@@ -151,7 +151,7 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
 function stampPreview(object: CanvasObject, selected: boolean) {
   const common = { stroke: "#111", strokeWidth: selected ? 3 : 2, fill: "none", pointerEvents: "stroke" as const };
   const x = object.x; const y = object.y; const w = object.width ?? 80; const h = object.height ?? 80; const cx = x + w / 2; const cy = y + h / 2;
-  const text = (value: string, tx = cx, ty = cy + 5) => <text x={tx} y={ty} textAnchor="middle" fontSize="13" pointerEvents="all">{value}</text>;
+  const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill="#111" stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
   if (object.kind === "ground") return <g {...common}><line x1={cx} y1={y} x2={cx} y2={y + h * .35} /><path d={`M ${x + 6} ${y + h*.35} L ${x + w - 6} ${y + h*.35} M ${x + 11} ${y + h*.53} L ${x + w - 11} ${y + h*.53} M ${x + 17} ${y + h*.71} L ${x + w - 17} ${y + h*.71}`} /></g>;
   if (object.kind === "gbf") return <g {...common}><circle cx={cx} cy={cy} r={w*.36} /><path d={`M ${x+w*.22} ${cy} q ${w*.07} ${-h*.16} ${w*.14} 0 q ${w*.07} ${h*.16} ${w*.14} 0 q ${w*.07} ${-h*.16} ${w*.14} 0`} />{text("GBF", cx, y+h*.78)}</g>;
   if (object.kind === "oscilloscope") return <g {...common}><rect x={x} y={y} width={w} height={h} rx="4" /><path d={`M ${x+w*.15} ${cy} q ${w*.12} ${-h*.2} ${w*.24} 0 q ${w*.12} ${h*.2} ${w*.24} 0 q ${w*.12} ${-h*.2} ${w*.24} 0`} />{text("oscillo", cx, y+h*.88)}</g>;
@@ -172,14 +172,14 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "coil" || object.kind === "solenoid") return <g {...common}>{Array.from({length: object.kind === "coil" ? 4 : 6},(_,i)=><ellipse key={i} cx={x+w*(.16+i*(object.kind === "coil" ? .22 : .14))} cy={cy} rx={w*(object.kind === "coil" ? .1 : .12)} ry={h*.32} />)}</g>;
   if (object.kind === "laplace-rails") return <g {...common}><line x1={x+5} y1={y+h*.25} x2={x+w-5} y2={y+h*.25} /><line x1={x+5} y1={y+h*.75} x2={x+w-5} y2={y+h*.75} /><line x1={x+w*.55} y1={y+h*.25} x2={x+w*.55} y2={y+h*.75} strokeWidth="4" /><line x1={x+w*.62} y1={cy} x2={x+w*.85} y2={cy} markerEnd="url(#arrowhead)" />{text("v", x+w*.88, cy-6)}</g>;
   if (object.kind === "charged-particle") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.34} fill="white" />{text("q")}</g>;
-  if (object.kind === "piston-cylinder") return <g {...common}><path d={`M ${x+w*.18} ${y+h*.9} L ${x+w*.18} ${y+h*.12} L ${x+w*.82} ${y+h*.12} L ${x+w*.82} ${y+h*.9}`} /><line x1={x+w*.14} y1={y+h*.38} x2={x+w*.86} y2={y+h*.38} strokeWidth="4" /><line x1={cx} y1={y+h*.38} x2={cx} y2={y+3} />{text("P, V, T", cx, y+h*.73)}</g>;
+  if (object.kind === "piston-cylinder") return <g {...common}><path d={`M ${x+w*.18} ${y+h*.9} L ${x+w*.18} ${y+h*.12} L ${x+w*.82} ${y+h*.12} L ${x+w*.82} ${y+h*.9}`} /><line x1={x+w*.14} y1={y+h*.38} x2={x+w*.86} y2={y+h*.38} strokeWidth="4" /><line x1={cx} y1={y+h*.38} x2={cx} y2={y+3} />{text("P, V, T", cx, y+h*.73, 11)}</g>;
   if (object.kind === "thermal-reservoir") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.4} />{text("T")}</g>;
-  if (object.kind === "heat-engine") return <g {...common}><rect x={x+w*.2} y={y+h*.28} width={w*.6} height={h*.42} fill="white" />{text("machine", cx, cy+5)}<line x1={cx} y1={y+3} x2={cx} y2={y+h*.25} markerEnd="url(#arrowhead)" /><line x1={cx} y1={y+h*.72} x2={cx} y2={y+h-3} markerEnd="url(#arrowhead)" /><line x1={x+w*.82} y1={cy} x2={x+w-3} y2={cy} markerEnd="url(#arrowhead)" />{text("Qₕ", cx+10, y+h*.18)}{text("Q𝚌", cx+10, y+h*.94)}{text("W", x+w*.92, cy-5)}</g>;
+  if (object.kind === "heat-engine") return <g {...common}><rect x={x+w*.2} y={y+h*.28} width={w*.6} height={h*.42} fill="white" />{text("machine", cx, cy+5, 11)}<line x1={cx} y1={y+3} x2={cx} y2={y+h*.25} markerEnd="url(#arrowhead)" /><line x1={cx} y1={y+h*.72} x2={cx} y2={y+h-3} markerEnd="url(#arrowhead)" /><line x1={x+w*.82} y1={cy} x2={x+w-3} y2={cy} markerEnd="url(#arrowhead)" />{text("Qh", cx+10, y+h*.18, 11)}{text("Qc", cx+10, y+h*.94, 11)}{text("W", x+w*.92, cy-5, 11)}</g>;
   if (object.kind === "ion") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.34} />{text("ion")}</g>;
   if (object.kind === "lone-pair") return <g><circle cx={cx-7} cy={cy} r="3" fill="#111" /><circle cx={cx+7} cy={cy} r="3" fill="#111" /></g>;
   if (object.kind === "crystal-fcc") return <g {...common}><rect x={x+w*.14} y={y+h*.28} width={w*.58} height={h*.55} /><path d={`M ${x+w*.14} ${y+h*.28} L ${x+w*.36} ${y+h*.1} L ${x+w*.94} ${y+h*.1} L ${x+w*.72} ${y+h*.28} M ${x+w*.72} ${y+h*.28} L ${x+w*.94} ${y+h*.1} L ${x+w*.94} ${y+h*.65} L ${x+w*.72} ${y+h*.83}`} />{[[.14,.28],[.72,.28],[.14,.83],[.72,.83],[.36,.1],[.94,.1],[.94,.65],[.43,.55]].map(([a,b],i)=><circle key={i} cx={x+w*a} cy={y+h*b} r="4" fill="#111" />)}</g>;
   if (object.kind === "precipitate") return <g {...common}><path d={`M ${x+w*.12} ${y+h*.1} L ${x+w*.22} ${y+h*.88} L ${x+w*.78} ${y+h*.88} L ${x+w*.88} ${y+h*.1}`} /><path d={`M ${x+w*.22} ${y+h*.88} L ${x+w*.78} ${y+h*.88} L ${x+w*.73} ${y+h*.67} L ${x+w*.27} ${y+h*.67} Z`} fill="#c7c7c7" stroke="#111" /></g>;
-  if (object.kind === "electrochemical-cell") return <g {...common}><path d={`M ${x+w*.06} ${y+h*.2} L ${x+w*.12} ${y+h*.84} L ${x+w*.39} ${y+h*.84} L ${x+w*.45} ${y+h*.2} M ${x+w*.55} ${y+h*.2} L ${x+w*.61} ${y+h*.84} L ${x+w*.88} ${y+h*.84} L ${x+w*.94} ${y+h*.2}`} /><path d={`M ${x+w*.1} ${y+h*.59} L ${x+w*.13} ${y+h*.81} L ${x+w*.38} ${y+h*.81} L ${x+w*.41} ${y+h*.59} Z M ${x+w*.59} ${y+h*.59} L ${x+w*.62} ${y+h*.81} L ${x+w*.87} ${y+h*.81} L ${x+w*.9} ${y+h*.59} Z`} fill="#dcecff" stroke="none" /><line x1={x+w*.25} y1={y+h*.12} x2={x+w*.25} y2={y+h*.72} strokeWidth="4" /><line x1={x+w*.75} y1={y+h*.12} x2={x+w*.75} y2={y+h*.72} strokeWidth="4" /><path d={`M ${x+w*.31} ${y+h*.66} L ${x+w*.31} ${y+h*.35} Q ${cx} ${y+h*.08} ${x+w*.69} ${y+h*.35} L ${x+w*.69} ${y+h*.66}`} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><path d={`M ${x+w*.25} ${y+h*.12} L ${x+w*.75} ${y+h*.12}`} strokeDasharray="4 3" />{text("anode (−)", x+w*.25, y+h*.96)}{text("cathode (+)", x+w*.75, y+h*.96)}{text("pont salin", cx, y+h*.25)}</g>;
+  if (object.kind === "electrochemical-cell") return <g {...common}><path d={`M ${x+w*.06} ${y+h*.2} L ${x+w*.12} ${y+h*.84} L ${x+w*.39} ${y+h*.84} L ${x+w*.45} ${y+h*.2} M ${x+w*.55} ${y+h*.2} L ${x+w*.61} ${y+h*.84} L ${x+w*.88} ${y+h*.84} L ${x+w*.94} ${y+h*.2}`} /><path d={`M ${x+w*.1} ${y+h*.59} L ${x+w*.13} ${y+h*.81} L ${x+w*.38} ${y+h*.81} L ${x+w*.41} ${y+h*.59} Z M ${x+w*.59} ${y+h*.59} L ${x+w*.62} ${y+h*.81} L ${x+w*.87} ${y+h*.81} L ${x+w*.9} ${y+h*.59} Z`} fill="#dcecff" stroke="none" /><line x1={x+w*.25} y1={y+h*.12} x2={x+w*.25} y2={y+h*.72} strokeWidth="4" /><line x1={x+w*.75} y1={y+h*.12} x2={x+w*.75} y2={y+h*.72} strokeWidth="4" /><path d={`M ${x+w*.31} ${y+h*.66} L ${x+w*.31} ${y+h*.35} Q ${cx} ${y+h*.08} ${x+w*.69} ${y+h*.35} L ${x+w*.69} ${y+h*.66}`} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><path d={`M ${x+w*.25} ${y+h*.12} L ${x+w*.75} ${y+h*.12}`} strokeDasharray="4 3" />{text("anode (−)", x+w*.25, y+h*.96, 11)}{text("cathode (+)", x+w*.75, y+h*.96, 11)}{text("pont salin", cx, y+h*.25, 11)}</g>;
   if (object.kind === "beaker") return <g {...common}><path d={`M ${x+w*.14} ${y+h*.1} L ${x+w*.2} ${y+h*.9} L ${x+w*.8} ${y+h*.9} L ${x+w*.86} ${y+h*.1}`} /><path d={`M ${x+w*.18} ${y+h*.58} L ${x+w*.22} ${y+h*.86} L ${x+w*.78} ${y+h*.86} L ${x+w*.82} ${y+h*.58} Z`} fill="#dcecff" stroke="none" />{[.32,.44,.56].map((p) => <line key={p} x1={x+w*.29} y1={y+h*p} x2={x+w*.38} y2={y+h*p} />)}</g>;
   if (object.kind === "flask") return <g {...common}><path d={`M ${x+w*.42} ${y+h*.06} L ${x+w*.42} ${y+h*.32} L ${x+w*.14} ${y+h*.9} L ${x+w*.86} ${y+h*.9} L ${x+w*.58} ${y+h*.32} L ${x+w*.58} ${y+h*.06} Z`} /><path d={`M ${x+w*.24} ${y+h*.7} L ${x+w*.16} ${y+h*.87} L ${x+w*.84} ${y+h*.87} L ${x+w*.76} ${y+h*.7} Z`} fill="#dcecff" stroke="none" /></g>;
   if (object.kind === "round-bottom-flask") return <g {...common}><line x1={x+w*.42} y1={y+h*.06} x2={x+w*.42} y2={y+h*.31} /><line x1={x+w*.58} y1={y+h*.06} x2={x+w*.58} y2={y+h*.31} /><circle cx={cx} cy={y+h*.61} r={Math.min(w,h)*.35} /><path d={`M ${x+w*.2} ${y+h*.68} Q ${cx} ${y+h*.84} ${x+w*.8} ${y+h*.68} Z`} fill="#dcecff" stroke="none" /></g>;
@@ -235,6 +235,9 @@ export default function Home() {
   const [expression, setExpression] = useState("sin(deg(x))");
   const [range, setRange] = useState("-5:5");
   const latex = useMemo(() => documentFor(objects, snippetOnly), [objects, snippetOnly]);
+  const [latexDraft, setLatexDraft] = useState<string>();
+  const latexSource = latexDraft ?? latex;
+  const latexDirty = latexDraft !== undefined;
   const selected = objects.find((object) => object.id === selectedId);
   const selectedBounds = selected ? boundsFor(selected) : undefined;
   const selectedScaleX = selected ? scaleXFor(selected) : 1;
@@ -255,15 +258,16 @@ export default function Home() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement | null)?.closest("input, textarea")) return;
-      if (event.key === "Delete") { if (selectedId) { event.preventDefault(); deleteSelected(); } return; }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea")) return;
+      if (event.key === "Delete" || event.key === "Del" || event.code === "Delete") { if (selectedId) { event.preventDefault(); event.stopPropagation(); deleteSelected(); } return; }
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
       if (key === "y") { event.preventDefault(); redo(); }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [deleteSelected, redo, selectedId, undo]);
 
   const makeObject = (p: Point): CanvasObject => {
@@ -301,8 +305,11 @@ export default function Home() {
       const dx = p.x - drag.start.x; const dy = p.y - drag.start.y; const o = drag.original;
       const center = objectCenter(o);
       const startOffset = localOffset(drag.start, center, o.rotation ?? 0); const currentOffset = localOffset(p, center, o.rotation ?? 0);
+      const proportionalScale = Math.hypot(currentOffset.x, currentOffset.y) / Math.max(1, Math.hypot(startOffset.x, startOffset.y));
       const next = drag.mode === "resize"
-        ? { ...o, scale: undefined, scaleX: clamp(scaleXFor(o) * Math.abs(currentOffset.x / (startOffset.x || 1)), 0.25, 3), scaleY: clamp(scaleYFor(o) * Math.abs(currentOffset.y / (startOffset.y || 1)), 0.25, 3) }
+        ? event.shiftKey
+          ? { ...o, scale: undefined, scaleX: clamp(scaleXFor(o) * proportionalScale, 0.25, 3), scaleY: clamp(scaleYFor(o) * proportionalScale, 0.25, 3) }
+          : { ...o, scale: undefined, scaleX: clamp(scaleXFor(o) * Math.abs(currentOffset.x / (startOffset.x || 1)), 0.25, 3), scaleY: clamp(scaleYFor(o) * Math.abs(currentOffset.y / (startOffset.y || 1)), 0.25, 3) }
         : drag.mode === "rotate"
           ? { ...o, rotation: Math.round(((o.rotation ?? 0) + (Math.atan2(p.y - center.y, p.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 }
           : connectorKinds.includes(o.kind)
@@ -327,7 +334,15 @@ export default function Home() {
     const next = { id: objectId(), kind: "axes" as const, x: 40, y: 350, width: 250, height: 180, graph: { expression, xMin, xMax } };
     commitObjects([...objects, next]); setSelectedId(next.id); setNotice("Graphe ajouté au canevas.");
   };
-  const copy = async () => { await navigator.clipboard.writeText(latex); setNotice("LaTeX copié dans le presse-papiers."); };
+  const applyLatexToCanvas = () => {
+    try {
+      const result = objectsFromLatex(latexSource, objects);
+      commitObjects(result.objects); setSelectedId(undefined); setLatexDraft(undefined);
+      setNotice(`${result.applied} objet${result.applied > 1 ? "s" : ""} mis à jour depuis le LaTeX${result.preserved ? ` ; ${result.preserved} conservé${result.preserved > 1 ? "s" : ""}` : ""}.`);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Impossible d’appliquer le LaTeX au canevas."); }
+  };
+  const resetLatexDraft = () => { setLatexDraft(undefined); setNotice("Modifications LaTeX annulées."); };
+  const copy = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copié dans le presse-papiers."); };
   const exportPdf = async () => {
     const svg = svgRef.current;
     if (!svg) { setNotice("Le canevas n’est pas disponible."); return; }
@@ -348,7 +363,7 @@ export default function Home() {
       {toolboxGroups.map((group) => <div key={group.title}><strong>{group.title}</strong>{group.kinds.map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{kind === "select" ? "Sélectionner / déplacer" : labels[kind]}</button>)}</div>)}
     </section>
     <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd + Z">↶ Retour</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd + Y ou Ctrl/Cmd + Maj + Z">↷ Avancer</button><button onClick={deleteSelected} disabled={!selectedId} title="Touche Suppr">Supprimer la sélection</button><button onClick={() => { if (!objects.length) return; commitObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button>
-      {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Objet sélectionné</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
+      {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Objet sélectionné · Maj = proportions</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
     </section>
     <section className="workspace">
       <div className="canvas-wrap"><svg ref={svgRef} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
@@ -358,7 +373,7 @@ export default function Home() {
         {selected && selectionOverlay(selected)}
         {draft && <g opacity=".65" transform={transformFor(draft)}>{preview(draft, true)}</g>}
       </svg></div>
-      <aside><div className="code-actions"><label><input type="checkbox" checked={snippetOnly} onChange={(e) => setSnippetOnly(e.target.checked)} /> Extrait TikZ seul</label><button onClick={copy}>Copier le LaTeX</button><button onClick={exportPdf}>Exporter le PDF</button></div><textarea readOnly value={latex} aria-label="Aperçu LaTeX généré" spellCheck="false" /></aside>
+      <aside><div className="code-actions"><label><input type="checkbox" checked={snippetOnly} onChange={(e) => setSnippetOnly(e.target.checked)} /> Extrait TikZ seul</label><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={resetLatexDraft} disabled={!latexDirty}>Annuler l’édition</button><button onClick={copy}>Copier le LaTeX</button><button onClick={exportPdf}>Exporter le PDF</button></div><p className="latex-help">Le LaTeX est éditable : modifiez les coordonnées, formes ou textes, puis choisissez « Appliquer au canevas ». Conservez les lignes <code>% sketch2latex</code>.</p><textarea value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} aria-label="LaTeX éditable synchronisé avec le canevas" spellCheck="false" /></aside>
     </section>
     <footer>Chaque objet est vectoriel, typé et converti de façon déterministe. Les coordonnées du canevas utilisent 50 px = 1 unité TikZ et l’axe vertical est retourné à l’export.</footer>
   </main>;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
-import { documentFor, objectToLatex } from "../app/lib/latex";
+import { documentFor, objectsFromLatex, objectToLatex } from "../app/lib/latex";
 
 test("converts circuit connectors using circuitikz", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
@@ -24,6 +24,28 @@ test("keeps selected-object rotation and size in the exported LaTeX", () => {
 test("keeps independent selected-object width and height in the exported LaTeX", () => {
   const output = objectToLatex({ id: "box", kind: "rect", x: 0, y: 0, width: 100, height: 50, scaleX: 2, scaleY: 0.5 });
   assert.match(output, /cm=\{2,0,0,0\.5,/);
+});
+
+test("applies editable generated LaTeX coordinates back to the canvas", () => {
+  const objects: CanvasObject[] = [{ id: "line-1", kind: "line", x: 0, y: 0, x2: 100, y2: 0 }];
+  const edited = documentFor(objects).replace("(2.00,0.00);", "(4.00,-1.00);");
+  const result = objectsFromLatex(edited, objects);
+  assert.equal(result.applied, 1);
+  assert.deepEqual(result.objects[0], { id: "line-1", kind: "line", x: 0, y: 0, x2: 200, y2: 50 });
+});
+
+test("applies editable generated LaTeX text back to the canvas", () => {
+  const objects: CanvasObject[] = [{ id: "text-1", kind: "text", x: 50, y: 50, text: "Avant" }];
+  const edited = documentFor(objects).replace("Avant", "Après").replace("(1.00,-1.00)", "(2.00,-2.00)");
+  const result = objectsFromLatex(edited, objects);
+  assert.deepEqual(result.objects[0], { id: "text-1", kind: "text", x: 100, y: 100, text: "Après" });
+});
+
+test("keeps complex generated symbols while applying editable LaTeX", () => {
+  const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120 }];
+  const result = objectsFromLatex(documentFor(objects), objects);
+  assert.equal(result.applied, 0);
+  assert.deepEqual(result.objects, objects);
 });
 
 test("returns a self-contained document with required STEM packages", () => {
