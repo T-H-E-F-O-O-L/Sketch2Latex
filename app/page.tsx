@@ -35,6 +35,35 @@ const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement): Po
   return { x: ((event.clientX - rect.left) / rect.width) * canvasWidth, y: ((event.clientY - rect.top) / rect.height) * canvasHeight };
 };
 
+async function canvasPdfImage(svg: SVGSVGElement) {
+  const copy = svg.cloneNode(true) as SVGSVGElement;
+  copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  copy.setAttribute("width", String(canvasWidth));
+  copy.setAttribute("height", String(canvasHeight));
+  const source = new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(source);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const next = new Image();
+      next.onload = () => resolve(next);
+      next.onerror = () => reject(new Error("Impossible de préparer le dessin pour le PDF."));
+      next.src = objectUrl;
+    });
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasWidth * scale;
+    canvas.height = canvasHeight * scale;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Le navigateur ne peut pas créer le PDF.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function connectorPreview(object: CanvasObject, selected: boolean) {
   const common = { stroke: "#111", strokeWidth: selected ? 3 : 2, fill: "none", pointerEvents: "stroke" as const };
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y;
@@ -193,11 +222,15 @@ export default function Home() {
   };
   const copy = async () => { await navigator.clipboard.writeText(latex); setNotice("LaTeX copié dans le presse-papiers."); };
   const exportPdf = async () => {
-    setNotice("Compilation LaTeX en cours…");
+    const svg = svgRef.current;
+    if (!svg) { setNotice("Le canevas n’est pas disponible."); return; }
+    setNotice("Création du PDF du schéma…");
     try {
-      const response = await fetch("/api/compile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ latex: documentFor(objects) }) });
-      if (!response.ok) { const data = await response.json(); throw new Error(data.error || "La compilation a échoué."); }
-      const url = URL.createObjectURL(await response.blob()); const a = document.createElement("a"); a.href = url; a.download = "schema-mpsi.pdf"; a.click(); URL.revokeObjectURL(url); setNotice("PDF téléchargé.");
+      const [{ jsPDF }, image] = await Promise.all([import("jspdf"), canvasPdfImage(svg)]);
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [canvasWidth, canvasHeight] });
+      pdf.addImage(image, "PNG", 0, 0, canvasWidth, canvasHeight, undefined, "FAST");
+      pdf.save("schema-mpsi.pdf");
+      setNotice("PDF téléchargé.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Impossible de compiler le PDF."); }
   };
   const deleteSelected = () => { if (!selectedId) return; commitObjects(objects.filter((o) => o.id !== selectedId)); setSelectedId(undefined); };
