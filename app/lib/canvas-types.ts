@@ -34,7 +34,7 @@ export type CanvasObject = {
 
 const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = {
   voltmeter: { main: "V" }, ammeter: { main: "A" }, gbf: { main: "GBF" }, oscilloscope: { main: "oscillo" }, mass: { main: "m" },
-  "reference-frame": { x: "x", y: "y", origin: "O" }, "circular-trajectory": { origin: "O" }, "gravity-field": { main: "g" }, lens: { origin: "O" }, "diverging-lens": { origin: "O" },
+  "reference-frame": { x: "x", y: "y", origin: "O" }, "circular-trajectory": { origin: "O" }, "gravity-field": { main: "g" },
   "electric-field": { main: "E" }, "bar-magnet": { north: "N", south: "S" }, "laplace-rails": { velocity: "v" }, "charged-particle": { main: "q" },
   "heat-arrow": { main: "Q" }, "work-arrow": { main: "W" }, dipole: { main: "μ" }, "piston-cylinder": { main: "P, V, T" }, "thermal-reservoir": { main: "T" },
   "heat-engine": { main: "machine", hot: "Qh", cold: "Qc", work: "W" }, ion: { main: "ion" },

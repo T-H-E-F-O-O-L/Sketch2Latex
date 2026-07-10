@@ -56,6 +56,14 @@ test("keeps complex generated symbols while applying editable LaTeX", () => {
   assert.deepEqual(result.objects, objects);
 });
 
+test("uses the CPGE chevron notation for converging and diverging lenses", () => {
+  const converging = objectToLatex({ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120 });
+  const diverging = objectToLatex({ id: "lens-2", kind: "diverging-lens", x: 30, y: 40, width: 60, height: 120 });
+  assert.match(converging, /\(-0\.08,0\.62\) -- \(0,0\.72\) -- \(0\.08,0\.62\)/);
+  assert.match(diverging, /\(-0\.08,0\.72\) -- \(0,0\.62\) -- \(0\.08,0\.72\)/);
+  assert.doesNotMatch(converging, /Latex|node\[below right\]/);
+});
+
 test("applies editable metadata for every generated canvas property", () => {
   const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120, rotation: 0 }];
   const edited = documentFor(objects).replace('"x":30', '"x":180').replace('"rotation":0', '"rotation":35');

@@ -46,8 +46,8 @@ function stamp(object: CanvasObject) {
     case "reference-frame": return frame(`\\draw[-{Latex}] (0,0) -- (0.9,0) node[right] {${a("x", "x")}}; \\draw[-{Latex}] (0,0) -- (0,0.72) node[above] {${a("y", "y")}}; \\fill (0,0) circle (0.035) node[below left] {${a("origin", "O")}};`, 100);
     case "circular-trajectory": return frame(`\\draw[-{Latex}] (0,0) circle (0.48); \\fill (0,0) circle (0.04) node[below] {${a("origin", "O")}};`, 90);
     case "gravity-field": return frame(`\\foreach \\x in {-0.5,0,0.5} \\draw[-{Latex}] (\\x,0.45) -- (\\x,-0.45); \\node[right] at (0.5,0) {${a("main", "g")}};`, 95);
-    case "lens": return frame(`\\draw (-0.95,0) -- (0.95,0); \\draw[{Latex}-{Latex}] (0,-0.72) -- (0,0.72); \\fill (0,0) circle (0.025) node[below right] {${a("origin", "O")}};`, 60);
-    case "diverging-lens": return frame(`\\draw (-0.95,0) -- (0.95,0); \\draw[-{Latex}] (0,0.72) -- (0,0.18); \\draw[-{Latex}] (0,-0.72) -- (0,-0.18); \\fill (0,0) circle (0.025) node[below right] {${a("origin", "O")}};`, 60);
+    case "lens": return frame("\\draw (0,-0.72) -- (0,0.72); \\draw (-0.08,0.62) -- (0,0.72) -- (0.08,0.62); \\draw (-0.08,-0.62) -- (0,-0.72) -- (0.08,-0.62);", 60);
+    case "diverging-lens": return frame("\\draw (0,-0.72) -- (0,0.72); \\draw (-0.08,0.72) -- (0,0.62) -- (0.08,0.72); \\draw (-0.08,-0.72) -- (0,-0.62) -- (0.08,-0.72);", 60);
     case "plane-mirror": return frame("\\draw[thick] (0,-0.78) -- (0,0.78); \\foreach \\y in {-0.65,-0.35,-0.05,0.25,0.55} \\draw (0,\\y) -- (0.16,\\y+0.12);", 34);
     case "screen": return frame("\\draw[very thick] (0,-0.78) -- (0,0.78); \\foreach \\y in {-0.65,-0.35,-0.05,0.25,0.55} \\draw (0,\\y) -- (0.16,\\y-0.12);", 34);
     case "prism": return frame("\\draw (-0.65,-0.48) -- (0.65,-0.48) -- (0,0.62) -- cycle;", 90);
