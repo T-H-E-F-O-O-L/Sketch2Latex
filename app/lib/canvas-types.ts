@@ -20,6 +20,7 @@ export type CanvasObject = {
   y2?: number;
   width?: number;
   height?: number;
+  scale?: number;
   rotation?: number;
   points?: Point[];
   text?: string;

@@ -14,6 +14,13 @@ test("flips canvas y coordinates and anchors graph bounds", () => {
   assert.match(output, /\\addplot\[domain=-5:5, samples=100, smooth\] \{x\^2\};/);
 });
 
+test("keeps selected-object rotation and size in the exported LaTeX", () => {
+  const output = objectToLatex({ id: "box", kind: "rect", x: 0, y: 0, width: 100, height: 50, scale: 1.5, rotation: 90 });
+  assert.match(output, /\\begin\{scope\}\[cm=\{/);
+  assert.match(output, /\\draw \(0\.00,0\.00\) rectangle \(2\.00,-1\.00\);/);
+  assert.match(output, /\\end\{scope\}$/);
+});
+
 test("returns a self-contained document with required STEM packages", () => {
   const output = documentFor([{ id: "b1", kind: "bond-double", x: 0, y: 0, x2: 50, y2: 0 }]);
   assert.match(output, /\\usepackage\{circuitikz\}/);

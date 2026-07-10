@@ -34,8 +34,7 @@ function bondLines(object: CanvasObject, count: number) {
 function stamp(object: CanvasObject) {
   const width = object.width ?? 80; const height = object.height ?? 80;
   const x = n(object.x + width / 2); const y = n(-(object.y + height / 2));
-  const rotation = object.rotation ?? 0;
-  const frame = (body: string, baseWidth = 80) => `\\begin{scope}[shift={(${x},${y})}, scale=${(Math.round((width / baseWidth) * 100) / 100).toFixed(2)}, rotate=${rotation}]\n${body}\n\\end{scope}`;
+  const frame = (body: string, baseWidth = 80) => `\\begin{scope}[shift={(${x},${y})}, scale=${(Math.round((width / baseWidth) * 100) / 100).toFixed(2)}]\n${body}\n\\end{scope}`;
   switch (object.kind) {
     case "ground": return frame("\\draw (0,0) node[ground] {};", 44);
     case "gbf": return frame("\\draw (0,0) circle (0.45); \\node at (0,0) {\\scriptsize GBF}; \\draw (-0.28,0) sin (-0.14,0.16) cos (0,0) sin (0.14,-0.16) cos (0.28,0);", 70);
@@ -85,7 +84,7 @@ function stamp(object: CanvasObject) {
   }
 }
 
-export function objectToLatex(object: CanvasObject): string {
+function objectToLatexBase(object: CanvasObject): string {
   const origin = point(object.x, object.y); const stroke = object.style?.strokeWidth && object.style.strokeWidth > 2 ? ", thick" : "";
   switch (object.kind) {
     case "line": return `\\draw${stroke} ${origin} -- ${end(object)};`;
@@ -120,6 +119,29 @@ export function objectToLatex(object: CanvasObject): string {
     }
     default: return stamp(object);
   }
+}
+
+function objectCenter(object: CanvasObject) {
+  if (object.x2 !== undefined || object.y2 !== undefined) return { x: ((object.x2 ?? object.x) + object.x) / 2, y: ((object.y2 ?? object.y) + object.y) / 2 };
+  if (object.kind === "freehand" && object.points?.length) {
+    const xs = object.points.map((point) => point.x); const ys = object.points.map((point) => point.y);
+    return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+  }
+  if (object.kind === "text") return { x: object.x, y: object.y };
+  return { x: object.x + (object.width ?? 0) / 2, y: object.y + (object.height ?? 0) / 2 };
+}
+
+const matrixNumber = (value: number) => (Math.round(value * 100000) / 100000).toString();
+
+export function objectToLatex(object: CanvasObject): string {
+  const body = objectToLatexBase(object);
+  const scale = object.scale ?? 1; const rotation = object.rotation ?? 0;
+  if (!body || (scale === 1 && rotation === 0)) return body;
+  const center = objectCenter(object); const cx = center.x / SCALE; const cy = -center.y / SCALE;
+  const angle = (-rotation * Math.PI) / 180;
+  const a = scale * Math.cos(angle); const b = scale * Math.sin(angle); const c = -scale * Math.sin(angle); const d = scale * Math.cos(angle);
+  const tx = cx - a * cx - c * cy; const ty = cy - b * cx - d * cy;
+  return `\\begin{scope}[cm={${matrixNumber(a)},${matrixNumber(b)},${matrixNumber(c)},${matrixNumber(d)},(${matrixNumber(tx)},${matrixNumber(ty)})}]\n${body}\n\\end{scope}`;
 }
 
 export function documentFor(objects: CanvasObject[], snippetOnly = false): string {
