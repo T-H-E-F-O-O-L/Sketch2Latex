@@ -34,6 +34,14 @@ test("applies editable generated LaTeX coordinates back to the canvas", () => {
   assert.deepEqual(result.objects[0], { id: "line-1", kind: "line", x: 0, y: 0, x2: 200, y2: 50 });
 });
 
+test("exports and applies editable Bézier curves", () => {
+  const objects: CanvasObject[] = [{ id: "curve-1", kind: "curve", x: 0, y: 0, x2: 100, y2: 100, control: { x: 80, y: 0 } }];
+  assert.match(objectToLatex(objects[0]), /controls \(1\.60,0\.00\) and \(1\.60,0\.00\)/);
+  const edited = documentFor(objects).replace("(1.60,0.00) and (1.60,0.00)", "(2.00,-1.00) and (2.00,-1.00)");
+  const result = objectsFromLatex(edited, objects);
+  assert.deepEqual(result.objects[0], { id: "curve-1", kind: "curve", x: 0, y: 0, x2: 100, y2: 100, control: { x: 100, y: 50 } });
+});
+
 test("applies editable generated LaTeX text back to the canvas", () => {
   const objects: CanvasObject[] = [{ id: "text-1", kind: "text", x: 50, y: 50, text: "Avant" }];
   const edited = documentFor(objects).replace("Avant", "Après").replace("(1.00,-1.00)", "(2.00,-2.00)");

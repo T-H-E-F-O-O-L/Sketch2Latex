@@ -7,7 +7,7 @@ import { documentFor, objectsFromLatex } from "./lib/latex";
 const canvasWidth = 900;
 const canvasHeight = 560;
 const objectId = () => Math.random().toString(36).slice(2, 10);
-const standardDrawingTools: ObjectKind[] = ["line", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"];
+const standardDrawingTools: ObjectKind[] = ["line", "curve", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"];
 
 type HistoryState = { objects: CanvasObject[]; past: CanvasObject[][]; future: CanvasObject[][] };
 type HistoryAction =
@@ -46,8 +46,10 @@ const scaleYFor = (object: CanvasObject) => object.scaleY ?? object.scale ?? 1;
 function boundsFor(object: CanvasObject): CanvasBounds {
   if (connectorKinds.includes(object.kind)) {
     const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y;
-    const x = Math.min(object.x, x2); const y = Math.min(object.y, y2);
-    return { x: x - 8, y: y - 8, width: Math.max(16, Math.abs(x2 - object.x) + 16), height: Math.max(16, Math.abs(y2 - object.y) + 16) };
+    const control = object.kind === "curve" ? object.control ?? { x: (object.x + x2) / 2, y: (object.y + y2) / 2 } : undefined;
+    const xs = control ? [object.x, x2, control.x] : [object.x, x2]; const ys = control ? [object.y, y2, control.y] : [object.y, y2];
+    const x = Math.min(...xs); const y = Math.min(...ys);
+    return { x: x - 8, y: y - 8, width: Math.max(16, Math.max(...xs) - x + 16), height: Math.max(16, Math.max(...ys) - y + 16) };
   }
   if (object.kind === "freehand" && object.points?.length) {
     const xs = object.points.map((point) => point.x); const ys = object.points.map((point) => point.y);
@@ -135,6 +137,10 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   const dx = x2 - object.x; const dy = y2 - object.y; const length = Math.hypot(dx, dy) || 1;
   const ux = dx / length; const uy = dy / length; const px = -uy; const py = ux;
   const rotation = Math.atan2(dy, dx) * 180 / Math.PI;
+  if (object.kind === "curve") {
+    const control = object.control ?? { x: midX, y: midY };
+    return <path {...common} d={`M ${object.x} ${object.y} Q ${control.x} ${control.y} ${x2} ${y2}`} />;
+  }
   if (object.kind === "resistor") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><rect x={midX - 18 * ux - 8 * px} y={midY - 18 * uy - 8 * py} width="36" height="16" transform={`rotate(${rotation} ${midX} ${midY})`} fill="white" stroke="#111" /></g>;
   if (object.kind === "battery" || object.kind === "capacitor") {
     const wide = object.kind === "battery" ? 15 : 12; const narrow = object.kind === "battery" ? 9 : 12;
@@ -238,6 +244,7 @@ export default function Home() {
   const [{ objects, past, future }, dispatchHistory] = useReducer(historyReducer, { objects: [], past: [], future: [] });
   const [selectedId, setSelectedId] = useState<string>();
   const [draft, setDraft] = useState<CanvasObject>();
+  const [curveAnchor, setCurveAnchor] = useState<{ start: Point; end?: Point }>();
   const [drag, setDrag] = useState<{ id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode }>();
   const [snippetOnly, setSnippetOnly] = useState(false);
   const [notice, setNotice] = useState("Choisissez un outil puis dessinez sur le canevas.");
@@ -269,6 +276,7 @@ export default function Home() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest?.("input, textarea")) return;
+      if (event.key === "Escape" && tool === "curve") { setCurveAnchor(undefined); setDraft(undefined); setNotice("Création de courbe annulée."); return; }
       if (event.key === "Delete" || event.key === "Del" || event.code === "Delete") { if (selectedId) { event.preventDefault(); event.stopPropagation(); deleteSelected(); } return; }
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
@@ -277,7 +285,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [deleteSelected, redo, selectedId, undo]);
+  }, [deleteSelected, redo, selectedId, tool, undo]);
 
   const makeObject = (p: Point): CanvasObject => {
     const kind = tool as ObjectKind;
@@ -294,6 +302,19 @@ export default function Home() {
     event.currentTarget.focus({ preventScroll: true });
     const p = canvasPoint(event, svg); const element = event.target as Element; const target = element.closest("[data-id]")?.getAttribute("data-id");
     const handle = element.closest("[data-handle]")?.getAttribute("data-handle");
+    if (tool === "curve") {
+      if (!curveAnchor) { setCurveAnchor({ start: p }); setDraft(undefined); setNotice("Cliquez le point d’arrivée de la courbe."); return; }
+      if (!curveAnchor.end) {
+        const control = { x: (curveAnchor.start.x + p.x) / 2, y: (curveAnchor.start.y + p.y) / 2 };
+        setCurveAnchor({ ...curveAnchor, end: p });
+        setDraft({ id: objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: p.x, y2: p.y, control });
+        setNotice("Placez le point de courbure, puis cliquez pour terminer.");
+        return;
+      }
+      const completed: CanvasObject = { id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: p };
+      commitObjects([...objects, completed]); setSelectedId(completed.id); setDraft(undefined); setCurveAnchor(undefined); setTool("select"); setNotice("Courbe ajoutée au canevas.");
+      return;
+    }
     const cornerObject = handle ? undefined : cornerObjectAt(objects, p);
     if (cornerObject) {
       dragChangedRef.current = false; setTool("select"); setSelectedId(cornerObject.id); setDrag({ id: cornerObject.id, start: p, original: cornerObject, snapshot: objects, mode: "resize" }); event.currentTarget.setPointerCapture(event.pointerId); return;
@@ -323,9 +344,16 @@ export default function Home() {
         : drag.mode === "rotate"
           ? { ...o, rotation: Math.round(((o.rotation ?? 0) + (Math.atan2(p.y - center.y, p.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 }
           : connectorKinds.includes(o.kind)
-            ? { ...o, x: o.x + dx, y: o.y + dy, x2: (o.x2 ?? o.x) + dx, y2: (o.y2 ?? o.y) + dy }
+            ? { ...o, x: o.x + dx, y: o.y + dy, x2: (o.x2 ?? o.x) + dx, y2: (o.y2 ?? o.y) + dy, control: o.control ? { x: o.control.x + dx, y: o.control.y + dy } : undefined }
             : { ...o, x: o.x + dx, y: o.y + dy, points: o.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })) };
       dispatchHistory({ type: "transient", objects: objects.map((item) => item.id !== o.id ? item : next) });
+      return;
+    }
+    if (tool === "curve" && curveAnchor) {
+      if (!curveAnchor.end) {
+        const control = { x: (curveAnchor.start.x + p.x) / 2, y: (curveAnchor.start.y + p.y) / 2 };
+        setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: p.x, y2: p.y, control });
+      } else setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: p });
       return;
     }
     if (!draft) return;
@@ -337,6 +365,7 @@ export default function Home() {
     else setDraft({ ...draft, width: p.x - draft.x, height: p.y - draft.y });
   };
   const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    if (tool === "curve") { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); return; }
     if (draft) {
       const releasePoint = canvasPoint(event, svgRef.current ?? event.currentTarget);
       const finalDraft = event.shiftKey && (draft.kind === "line" || draft.kind === "arrow") ? { ...draft, ...(() => { const endpoint = straightEndpoint({ x: draft.x, y: draft.y }, releasePoint); return { x2: endpoint.x, y2: endpoint.y }; })() } : draft;
@@ -389,6 +418,7 @@ export default function Home() {
         {objects.map((object) => <g key={object.id} data-id={object.id} transform={transformFor(object)}>{preview(object, object.id === selectedId)}</g>)}
         {selected && selectionOverlay(selected)}
         {draft && <g opacity=".65" transform={transformFor(draft)}>{preview(draft, true)}</g>}
+        {draft?.kind === "curve" && draft.control && <g pointerEvents="none" opacity=".75"><line x1={draft.x} y1={draft.y} x2={draft.control.x} y2={draft.control.y} stroke="#2176ae" strokeDasharray="4 4" /><line x1={draft.control.x} y1={draft.control.y} x2={draft.x2} y2={draft.y2} stroke="#2176ae" strokeDasharray="4 4" /><circle cx={draft.control.x} cy={draft.control.y} r="5" fill="#2176ae" /></g>}
       </svg></div>
       <aside><div className="code-actions"><label><input type="checkbox" checked={snippetOnly} onChange={(e) => setSnippetOnly(e.target.checked)} /> Extrait TikZ seul</label><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={resetLatexDraft} disabled={!latexDirty}>Annuler l’édition</button><button onClick={copy}>Copier le LaTeX</button><button onClick={exportPdf}>Exporter le PDF</button></div><p className="latex-help">Chaque objet comporte un bloc <code>% @sketch2latex &#123;…&#125;</code> éditable. Exemple pour un ion : remplacez <code>&quot;main&quot;:&quot;ion&quot;</code> par <code>&quot;main&quot;:&quot;Na+&quot;</code>, puis choisissez « Appliquer au canevas ». Les libellés visibles et les coordonnées TikZ des formes simples restent aussi synchronisés.</p><textarea value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} aria-label="LaTeX éditable synchronisé avec le canevas" spellCheck="false" /></aside>
     </section>

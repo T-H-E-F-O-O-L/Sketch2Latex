@@ -93,6 +93,7 @@ function objectToLatexBase(object: CanvasObject): string {
   const origin = point(object.x, object.y); const stroke = object.style?.strokeWidth && object.style.strokeWidth > 2 ? ", thick" : "";
   switch (object.kind) {
     case "line": return `\\draw${stroke} ${origin} -- ${end(object)};`;
+    case "curve": { const control = object.control ?? { x: (object.x + (object.x2 ?? object.x)) / 2, y: (object.y + (object.y2 ?? object.y)) / 2 }; return `\\draw${stroke} ${origin} .. controls ${point(control.x, control.y)} and ${point(control.x, control.y)} .. ${end(object)};`; }
     case "arrow": case "force": case "light-ray": return `\\draw[-{Latex}${stroke}] ${origin} -- ${end(object)};`;
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": return `\\draw ${origin} to[R] ${end(object)};`;
@@ -127,6 +128,10 @@ function objectToLatexBase(object: CanvasObject): string {
 }
 
 function objectCenter(object: CanvasObject) {
+  if (object.kind === "curve" && object.control) {
+    const xs = [object.x, object.x2 ?? object.x, object.control.x]; const ys = [object.y, object.y2 ?? object.y, object.control.y];
+    return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+  }
   if (object.x2 !== undefined || object.y2 !== undefined) return { x: ((object.x2 ?? object.x) + object.x) / 2, y: ((object.y2 ?? object.y) + object.y) / 2 };
   if (object.kind === "freehand" && object.points?.length) {
     const xs = object.points.map((point) => point.x); const ys = object.points.map((point) => point.y);
@@ -182,6 +187,7 @@ function isCanvasObject(value: unknown): value is CanvasObject {
   if (object.text !== undefined && typeof object.text !== "string") return false;
   if (object.annotations !== undefined && (!object.annotations || typeof object.annotations !== "object" || Object.values(object.annotations as Record<string, unknown>).some((annotation) => typeof annotation !== "string"))) return false;
   if (object.points !== undefined && (!Array.isArray(object.points) || object.points.some((point) => !point || typeof point !== "object" || !isFiniteNumber((point as Point).x) || !isFiniteNumber((point as Point).y)))) return false;
+  if (object.control !== undefined && (!object.control || typeof object.control !== "object" || !isFiniteNumber((object.control as Point).x) || !isFiniteNumber((object.control as Point).y))) return false;
   if (object.graph !== undefined) {
     if (!object.graph || typeof object.graph !== "object") return false;
     const graph = object.graph as { expression?: unknown; xMin?: unknown; xMax?: unknown };
@@ -225,6 +231,7 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
   const withAnnotations = annotationsFromLatexBlock(original, block);
   if (block.includes("\\begin{scope}[cm=")) return withAnnotations;
   const points = pointsFromLatex(block);
+  if (original.kind === "curve" && points.length >= 4) return { ...withAnnotations, x: points[0].x, y: points[0].y, control: points[1], x2: points[3].x, y2: points[3].y };
   if (connectorKinds.includes(original.kind) && points.length >= 2) return { ...withAnnotations, x: points[0].x, y: points[0].y, x2: points[1].x, y2: points[1].y };
   if (original.kind === "rect" && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, width: points[1].x - points[0].x, height: points[1].y - points[0].y };
   if (original.kind === "circle" && points.length) {
@@ -248,7 +255,7 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
 
 function mergeTikzEdits(metadata: CanvasObject, visual: CanvasObject, original: CanvasObject): CanvasObject {
   const next = { ...metadata } as Record<string, unknown>;
-  for (const key of ["x", "y", "x2", "y2", "width", "height", "text", "annotations", "graph"] as const) {
+  for (const key of ["x", "y", "x2", "y2", "width", "height", "control", "text", "annotations", "graph"] as const) {
     if (JSON.stringify(visual[key]) !== JSON.stringify(original[key])) next[key] = visual[key];
   }
   return next as CanvasObject;

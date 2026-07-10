@@ -1,5 +1,5 @@
 export type ObjectKind =
-  | "freehand" | "line" | "arrow" | "rect" | "circle" | "ellipse" | "text" | "axes"
+  | "freehand" | "line" | "curve" | "arrow" | "rect" | "circle" | "ellipse" | "text" | "axes"
   | "wire" | "resistor" | "capacitor" | "inductor" | "battery" | "switch" | "ground"
   | "voltmeter" | "ammeter" | "gbf" | "oscilloscope"
   | "spring" | "force" | "mass" | "pulley" | "pendulum" | "reference-frame" | "circular-trajectory" | "gravity-field"
@@ -25,6 +25,7 @@ export type CanvasObject = {
   scaleY?: number;
   rotation?: number;
   points?: Point[];
+  control?: Point;
   text?: string;
   annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; fill?: string };
@@ -48,7 +49,7 @@ export function defaultAnnotations(kind: ObjectKind) {
 export const annotation = (object: CanvasObject, key: string, fallback: string) => object.annotations?.[key] ?? fallback;
 
 export const connectorKinds: ObjectKind[] = [
-  "line", "arrow", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
+  "line", "curve", "arrow", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
   "spring", "force", "light-ray", "wave", "heat-arrow", "work-arrow", "bond-single", "bond-double", "bond-triple",
   "reaction-arrow", "equilibrium-arrow", "hydrogen-bond", "dipole",
 ];
@@ -61,7 +62,7 @@ export const stampKinds: ObjectKind[] = [
 ];
 
 export const labels: Record<ObjectKind, string> = {
-  freehand: "Main levée", line: "Segment", arrow: "Flèche", rect: "Rectangle", circle: "Cercle", ellipse: "Ellipse", text: "Texte", axes: "Repère / graphe",
+  freehand: "Main levée", line: "Segment", curve: "Courbe de Bézier", arrow: "Flèche", rect: "Rectangle", circle: "Cercle", ellipse: "Ellipse", text: "Texte", axes: "Repère / graphe",
   wire: "Fil", resistor: "Résistance R", capacitor: "Condensateur C", inductor: "Bobine L", battery: "Générateur", switch: "Interrupteur", ground: "Masse / terre", voltmeter: "Voltmètre", ammeter: "Ampèremètre", gbf: "GBF", oscilloscope: "Oscilloscope",
   spring: "Ressort", force: "Vecteur force", mass: "Masse m", pulley: "Poulie", pendulum: "Pendule", "reference-frame": "Repère (O,x,y)", "circular-trajectory": "Trajectoire circulaire", "gravity-field": "Champ de pesanteur",
   lens: "Lentille convergente", "diverging-lens": "Lentille divergente", "plane-mirror": "Miroir plan", screen: "Écran", prism: "Prisme", fiber: "Fibre optique", "light-ray": "Rayon lumineux", wave: "Onde progressive",
@@ -74,7 +75,7 @@ export const labels: Record<ObjectKind, string> = {
 export type ToolboxGroup = { title: string; kinds: Array<ObjectKind | "select"> };
 
 export const toolboxGroups: ToolboxGroup[] = [
-  { title: "Outils", kinds: ["select", "line", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"] },
+  { title: "Outils", kinds: ["select", "line", "curve", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"] },
   { title: "Électricité & signaux", kinds: ["wire", "resistor", "capacitor", "inductor", "battery", "switch", "ground", "voltmeter", "ammeter", "gbf", "oscilloscope"] },
   { title: "Optique & ondes", kinds: ["lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "light-ray", "wave"] },
   { title: "Mécanique", kinds: ["force", "spring", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field"] },
