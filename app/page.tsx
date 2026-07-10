@@ -100,6 +100,8 @@ function straightEndpoint(start: Point, end: Point): Point {
   return { x: start.x + Math.cos(angle) * length, y: start.y + Math.sin(angle) * length };
 }
 
+const straightCurveControl = (start: Point, end: Point): Point => ({ x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 });
+
 async function canvasPdfImage(svg: SVGSVGElement) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -305,13 +307,14 @@ export default function Home() {
     if (tool === "curve") {
       if (!curveAnchor) { setCurveAnchor({ start: p }); setDraft(undefined); setNotice("Cliquez le point d’arrivée de la courbe."); return; }
       if (!curveAnchor.end) {
-        const control = { x: (curveAnchor.start.x + p.x) / 2, y: (curveAnchor.start.y + p.y) / 2 };
-        setCurveAnchor({ ...curveAnchor, end: p });
-        setDraft({ id: objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: p.x, y2: p.y, control });
+        const end = event.shiftKey ? straightEndpoint(curveAnchor.start, p) : p;
+        const control = straightCurveControl(curveAnchor.start, end);
+        setCurveAnchor({ ...curveAnchor, end });
+        setDraft({ id: objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control });
         setNotice("Placez le point de courbure, puis cliquez pour terminer.");
         return;
       }
-      const completed: CanvasObject = { id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: p };
+      const completed: CanvasObject = { id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : p };
       commitObjects([...objects, completed]); setSelectedId(completed.id); setDraft(undefined); setCurveAnchor(undefined); setTool("select"); setNotice("Courbe ajoutée au canevas.");
       return;
     }
@@ -351,15 +354,18 @@ export default function Home() {
     }
     if (tool === "curve" && curveAnchor) {
       if (!curveAnchor.end) {
-        const control = { x: (curveAnchor.start.x + p.x) / 2, y: (curveAnchor.start.y + p.y) / 2 };
-        setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: p.x, y2: p.y, control });
-      } else setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: p });
+        const end = event.shiftKey ? straightEndpoint(curveAnchor.start, p) : p;
+        setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control: straightCurveControl(curveAnchor.start, end) });
+      } else setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : p });
       return;
     }
     if (!draft) return;
-    if (draft.kind === "freehand") setDraft({ ...draft, points: [...(draft.points ?? []), p] });
+    if (draft.kind === "freehand") {
+      const endpoint = event.shiftKey ? straightEndpoint({ x: draft.x, y: draft.y }, p) : p;
+      setDraft({ ...draft, points: event.shiftKey ? [{ x: draft.x, y: draft.y }, endpoint] : [...(draft.points ?? []), endpoint] });
+    }
     else if (connectorKinds.includes(draft.kind)) {
-      const endpoint = event.shiftKey && (draft.kind === "line" || draft.kind === "arrow") ? straightEndpoint({ x: draft.x, y: draft.y }, p) : p;
+      const endpoint = event.shiftKey ? straightEndpoint({ x: draft.x, y: draft.y }, p) : p;
       setDraft({ ...draft, x2: endpoint.x, y2: endpoint.y });
     }
     else setDraft({ ...draft, width: p.x - draft.x, height: p.y - draft.y });
@@ -368,7 +374,11 @@ export default function Home() {
     if (tool === "curve") { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); return; }
     if (draft) {
       const releasePoint = canvasPoint(event, svgRef.current ?? event.currentTarget);
-      const finalDraft = event.shiftKey && (draft.kind === "line" || draft.kind === "arrow") ? { ...draft, ...(() => { const endpoint = straightEndpoint({ x: draft.x, y: draft.y }, releasePoint); return { x2: endpoint.x, y2: endpoint.y }; })() } : draft;
+      const finalDraft = event.shiftKey && connectorKinds.includes(draft.kind)
+        ? { ...draft, ...(() => { const endpoint = straightEndpoint({ x: draft.x, y: draft.y }, releasePoint); return { x2: endpoint.x, y2: endpoint.y }; })() }
+        : event.shiftKey && draft.kind === "freehand"
+          ? { ...draft, points: [{ x: draft.x, y: draft.y }, straightEndpoint({ x: draft.x, y: draft.y }, releasePoint)] }
+          : draft;
       commitObjects([...objects, finalDraft]); setSelectedId(finalDraft.id); if (!standardDrawingTools.includes(finalDraft.kind)) setTool("select"); setDraft(undefined);
     }
     else if (drag && dragChangedRef.current) dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
