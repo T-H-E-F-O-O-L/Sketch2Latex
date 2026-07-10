@@ -91,6 +91,13 @@ function localOffset(point: Point, center: Point, rotation: number): Point {
   return { x: dx * Math.cos(angle) - dy * Math.sin(angle), y: dx * Math.sin(angle) + dy * Math.cos(angle) };
 }
 
+function straightEndpoint(start: Point, end: Point): Point {
+  const dx = end.x - start.x; const dy = end.y - start.y; const length = Math.hypot(dx, dy);
+  if (!length) return end;
+  const step = Math.PI / 4; const angle = Math.round(Math.atan2(dy, dx) / step) * step;
+  return { x: start.x + Math.cos(angle) * length, y: start.y + Math.sin(angle) * length };
+}
+
 async function canvasPdfImage(svg: SVGSVGElement) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -282,6 +289,7 @@ export default function Home() {
 
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current; if (!svg) return;
+    event.currentTarget.focus({ preventScroll: true });
     const p = canvasPoint(event, svg); const element = event.target as Element; const target = element.closest("[data-id]")?.getAttribute("data-id");
     const handle = element.closest("[data-handle]")?.getAttribute("data-handle");
     const cornerObject = handle ? undefined : cornerObjectAt(objects, p);
@@ -320,11 +328,18 @@ export default function Home() {
     }
     if (!draft) return;
     if (draft.kind === "freehand") setDraft({ ...draft, points: [...(draft.points ?? []), p] });
-    else if (connectorKinds.includes(draft.kind)) setDraft({ ...draft, x2: p.x, y2: p.y });
+    else if (connectorKinds.includes(draft.kind)) {
+      const endpoint = event.shiftKey && (draft.kind === "line" || draft.kind === "arrow") ? straightEndpoint({ x: draft.x, y: draft.y }, p) : p;
+      setDraft({ ...draft, x2: endpoint.x, y2: endpoint.y });
+    }
     else setDraft({ ...draft, width: p.x - draft.x, height: p.y - draft.y });
   };
   const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
-    if (draft) { commitObjects([...objects, draft]); setSelectedId(draft.id); if (!standardDrawingTools.includes(draft.kind)) setTool("select"); setDraft(undefined); }
+    if (draft) {
+      const releasePoint = canvasPoint(event, svgRef.current ?? event.currentTarget);
+      const finalDraft = event.shiftKey && (draft.kind === "line" || draft.kind === "arrow") ? { ...draft, ...(() => { const endpoint = straightEndpoint({ x: draft.x, y: draft.y }, releasePoint); return { x2: endpoint.x, y2: endpoint.y }; })() } : draft;
+      commitObjects([...objects, finalDraft]); setSelectedId(finalDraft.id); if (!standardDrawingTools.includes(finalDraft.kind)) setTool("select"); setDraft(undefined);
+    }
     else if (drag && dragChangedRef.current) dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
     setDrag(undefined); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
@@ -366,7 +381,7 @@ export default function Home() {
       {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Objet sélectionné · Maj = proportions</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
     </section>
     <section className="workspace">
-      <div className="canvas-wrap"><svg ref={svgRef} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
+      <div className="canvas-wrap"><svg ref={svgRef} tabIndex={0} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
         <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#111" /></marker></defs>
         <rect width={canvasWidth} height={canvasHeight} fill="white" />
         {objects.map((object) => <g key={object.id} data-id={object.id} transform={transformFor(object)}>{preview(object, object.id === selectedId)}</g>)}
