@@ -81,7 +81,7 @@ export function objectToLatex(object: CanvasObject): string {
       const width = n(object.width ?? 250); const height = n(object.height ?? 180);
       const expression = object.graph?.expression?.trim();
       const domain = `${object.graph?.xMin ?? -5}:${object.graph?.xMax ?? 5}`;
-      return `\\begin{axis}[at={${origin}}, anchor=south west, width=${width}cm, height=${height}cm, axis lines=middle, grid=both, xlabel={$x$}, ylabel={$y$}]\n${expression ? `  \\addplot[domain=${domain}, samples=100, smooth] {${expression}};` : ""}\n\\end{axis}`;
+      return `\\begin{axis}[at={${origin}}, anchor=north west, width=${width}cm, height=${height}cm, xmin=-5, xmax=5, ymin=-5, ymax=5, axis lines=middle, grid=both, xlabel={$x$}, ylabel={$y$}]\n${expression ? `  \\addplot[domain=${domain}, samples=100, smooth] {${expression}};` : ""}\n\\end{axis}`;
     }
     case "beaker": case "flask": case "test-tube": case "pulley": case "lens": return stamp(object);
     default: return "";

@@ -7,6 +7,17 @@ import { promisify } from "node:util";
 export const runtime = "nodejs";
 
 const run = promisify(execFile);
+const missingExecutable = (error: unknown) =>
+  typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+
+async function compile(tex: string, dir: string) {
+  try {
+    await run(process.env.TECTONIC_BIN ?? "tectonic", ["--keep-logs", "--outdir", dir, tex], { timeout: 45_000, windowsHide: true });
+  } catch (tectonicError) {
+    if (!missingExecutable(tectonicError)) throw tectonicError;
+    await run(process.env.PDFLATEX_BIN ?? "pdflatex", ["-interaction=nonstopmode", "-halt-on-error", `-output-directory=${dir}`, tex], { timeout: 45_000, windowsHide: true });
+  }
+}
 
 export async function POST(request: Request) {
   const { latex } = await request.json() as { latex?: string };
@@ -15,13 +26,13 @@ export async function POST(request: Request) {
   const tex = join(dir, "diagram.tex");
   try {
     await writeFile(tex, latex, "utf8");
-    await run("tectonic", ["--keep-logs", "--outdir", dir, tex], { timeout: 45_000, windowsHide: true });
+    await compile(tex, dir);
     const pdf = await readFile(join(dir, "diagram.pdf"));
     return new Response(pdf, { headers: { "Content-Type": "application/pdf", "Content-Disposition": "attachment; filename=sketch2latex.pdf" } });
   } catch (error) {
     const log = await readFile(join(dir, "diagram.log"), "utf8").catch(() => "");
     const message = error instanceof Error && /ENOENT/.test(error.message)
-      ? "Tectonic is not installed or not on PATH. Install Tectonic, then retry export."
+      ? "Neither Tectonic nor pdfLaTeX is available on PATH. Install one, then retry export."
       : log || (error instanceof Error ? error.message : "LaTeX compilation failed.");
     return Response.json({ error: message }, { status: 422 });
   } finally {
