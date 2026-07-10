@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
+import { graphPathFor } from "../app/lib/graph";
 import { documentFor, objectsFromLatex, objectToLatex } from "../app/lib/latex";
 
 test("converts circuit connectors using circuitikz", () => {
@@ -12,6 +13,12 @@ test("flips canvas y coordinates and anchors graph bounds", () => {
   const output = objectToLatex({ id: "g1", kind: "axes", x: 50, y: 350, width: 250, height: 180, graph: { expression: "x^2", xMin: -5, xMax: 5 } });
   assert.match(output, /at=\{\(1\.00,-7\.00\)\}, anchor=north west/);
   assert.match(output, /\\addplot\[domain=-5:5, samples=100, smooth\] \{x\^2\};/);
+});
+
+test("creates a visible canvas path for supported graph expressions", () => {
+  const graph: CanvasObject = { id: "graph-1", kind: "axes", x: 0, y: 0, width: 250, height: 180, graph: { expression: "sin(deg(x))", xMin: -5, xMax: 5 } };
+  assert.match(graphPathFor(graph) ?? "", /^M/);
+  assert.equal(graphPathFor({ ...graph, graph: { ...graph.graph!, expression: "window.alert(1)" } }), undefined);
 });
 
 test("keeps selected-object rotation and size in the exported LaTeX", () => {

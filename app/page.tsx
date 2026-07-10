@@ -2,6 +2,7 @@
 
 import { PointerEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { annotation, connectorKinds, defaultAnnotations, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind, type Point } from "./lib/canvas-types";
+import { graphPathFor } from "./lib/graph";
 import { documentFor, objectsFromLatex } from "./lib/latex";
 
 const canvasWidth = 900;
@@ -225,7 +226,11 @@ function preview(object: CanvasObject, selected: boolean) {
   if (object.kind === "ellipse") return <ellipse {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} rx={Math.abs(object.width ?? 0) / 2} ry={Math.abs(object.height ?? 0) / 2} />;
   if (object.kind === "freehand") return <polyline {...common} points={(object.points ?? []).map((p) => `${p.x},${p.y}`).join(" ")} />;
   if (object.kind === "text") return <text x={object.x} y={object.y} fill="#111" fontSize="17" pointerEvents="all">{object.text}</text>;
-  if (object.kind === "axes") return <g><rect {...common} x={object.x} y={object.y} width={object.width} height={object.height} strokeDasharray="3 3" /><line {...common} x1={object.x} y1={object.y + (object.height ?? 0) / 2} x2={object.x + (object.width ?? 0)} y2={object.y + (object.height ?? 0) / 2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x + (object.width ?? 0) / 2} y1={object.y + (object.height ?? 0)} x2={object.x + (object.width ?? 0) / 2} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14">{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
+  if (object.kind === "axes") {
+    const width = object.width ?? 0; const height = object.height ?? 0; const xMin = object.graph?.xMin ?? -5; const xMax = object.graph?.xMax ?? 5;
+    const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const graphPath = graphPathFor(object); const clipId = `graph-clip-${object.id}`;
+    return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{graphPath && <path d={graphPath} fill="none" stroke="#1476ad" strokeWidth="2.5" clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={object.y + height / 2} x2={object.x + width} y2={object.y + height / 2} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14">{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
+  }
   return stampPreview(object, selected);
 }
 
@@ -388,6 +393,7 @@ export default function Home() {
     const [xMin, xMax] = range.split(":").map(Number);
     if (!expression.trim() || !Number.isFinite(xMin) || !Number.isFinite(xMax)) { setNotice("Utilisez une expression et un intervalle, par exemple -5:5."); return; }
     const next = { id: objectId(), kind: "axes" as const, x: 40, y: 350, width: 250, height: 180, graph: { expression, xMin, xMax } };
+    if (!graphPathFor(next)) { setNotice("Expression non reconnue. Utilisez par exemple sin(deg(x)), x^2, exp(x), sqrt(x) ou abs(x)."); return; }
     commitObjects([...objects, next]); setSelectedId(next.id); setNotice("Graphe ajouté au canevas.");
   };
   const applyLatexToCanvas = () => {
