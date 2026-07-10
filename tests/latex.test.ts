@@ -62,6 +62,20 @@ test("adds a complete object written in a generated LaTeX semantic block", () =>
   assert.deepEqual(result.objects, [{ id: "new-arrow", kind: "arrow", x: 20, y: 30, x2: 180, y2: 90 }]);
 });
 
+test("applies an edited ion label from the generated LaTeX metadata", () => {
+  const objects: CanvasObject[] = [{ id: "ion-1", kind: "ion", x: 40, y: 40, width: 52, height: 52, annotations: { main: "ion" } }];
+  const edited = documentFor(objects).replace('"main":"ion"', '"main":"Na+"');
+  const result = objectsFromLatex(edited, objects);
+  assert.deepEqual(result.objects[0].annotations, { main: "Na+" });
+});
+
+test("applies an edited ion label from the visible generated TikZ node", () => {
+  const objects: CanvasObject[] = [{ id: "ion-1", kind: "ion", x: 40, y: 40, width: 52, height: 52, annotations: { main: "ion" } }];
+  const edited = documentFor(objects).replace("{ion};", "{Cl−};");
+  const result = objectsFromLatex(edited, objects);
+  assert.deepEqual(result.objects[0].annotations, { main: "Cl−" });
+});
+
 test("returns a self-contained document with required STEM packages", () => {
   const output = documentFor([{ id: "b1", kind: "bond-double", x: 0, y: 0, x2: 50, y2: 0 }]);
   assert.match(output, /\\usepackage\{circuitikz\}/);

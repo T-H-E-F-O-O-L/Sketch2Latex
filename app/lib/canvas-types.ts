@@ -26,9 +26,26 @@ export type CanvasObject = {
   rotation?: number;
   points?: Point[];
   text?: string;
+  annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; fill?: string };
   graph?: { expression: string; xMin: number; xMax: number };
 };
+
+const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = {
+  voltmeter: { main: "V" }, ammeter: { main: "A" }, gbf: { main: "GBF" }, oscilloscope: { main: "oscillo" }, mass: { main: "m" },
+  "reference-frame": { x: "x", y: "y", origin: "O" }, "circular-trajectory": { origin: "O" }, "gravity-field": { main: "g" }, lens: { origin: "O" }, "diverging-lens": { origin: "O" },
+  "electric-field": { main: "E" }, "bar-magnet": { north: "N", south: "S" }, "laplace-rails": { velocity: "v" }, "charged-particle": { main: "q" },
+  "heat-arrow": { main: "Q" }, "work-arrow": { main: "W" }, dipole: { main: "μ" }, "piston-cylinder": { main: "P, V, T" }, "thermal-reservoir": { main: "T" },
+  "heat-engine": { main: "machine", hot: "Qh", cold: "Qc", work: "W" }, ion: { main: "ion" },
+  "electrochemical-cell": { anode: "anode (−)", cathode: "cathode (+)", bridge: "pont salin" },
+};
+
+export function defaultAnnotations(kind: ObjectKind) {
+  const annotations = annotationDefaults[kind];
+  return annotations ? { ...annotations } : undefined;
+}
+
+export const annotation = (object: CanvasObject, key: string, fallback: string) => object.annotations?.[key] ?? fallback;
 
 export const connectorKinds: ObjectKind[] = [
   "line", "arrow", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",

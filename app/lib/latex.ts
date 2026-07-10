@@ -1,4 +1,4 @@
-import { connectorKinds, labels, type CanvasObject, type Point } from "./canvas-types";
+import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type Point } from "./canvas-types";
 
 const SCALE = 50;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -34,39 +34,40 @@ function bondLines(object: CanvasObject, count: number) {
 function stamp(object: CanvasObject) {
   const width = object.width ?? 80; const height = object.height ?? 80;
   const x = n(object.x + width / 2); const y = n(-(object.y + height / 2));
+  const a = (key: string, fallback: string) => safeText(annotation(object, key, fallback));
   const frame = (body: string, baseWidth = 80) => `\\begin{scope}[shift={(${x},${y})}, scale=${(Math.round((width / baseWidth) * 100) / 100).toFixed(2)}]\n${body}\n\\end{scope}`;
   switch (object.kind) {
     case "ground": return frame("\\draw (0,0) node[ground] {};", 44);
-    case "gbf": return frame("\\draw (0,0) circle (0.45); \\node at (0,0) {\\scriptsize GBF}; \\draw (-0.28,0) sin (-0.14,0.16) cos (0,0) sin (0.14,-0.16) cos (0.28,0);", 70);
-    case "oscilloscope": return frame("\\draw (-0.7,-0.45) rectangle (0.7,0.45); \\draw (-0.5,0) sin (-0.25,0.2) cos (0,0) sin (0.25,-0.2) cos (0.5,0); \\node[below] at (0,-0.45) {\\scriptsize oscillo};", 100);
-    case "mass": return frame("\\draw (-0.45,-0.3) rectangle (0.45,0.3); \\node at (0,0) {$m$};", 70);
+    case "gbf": return frame(`\\draw (0,0) circle (0.45); \\node at (0,0) {\\scriptsize ${a("main", "GBF")}}; \\draw (-0.28,0) sin (-0.14,0.16) cos (0,0) sin (0.14,-0.16) cos (0.28,0);`, 70);
+    case "oscilloscope": return frame(`\\draw (-0.7,-0.45) rectangle (0.7,0.45); \\draw (-0.5,0) sin (-0.25,0.2) cos (0,0) sin (0.25,-0.2) cos (0.5,0); \\node[below] at (0,-0.45) {\\scriptsize ${a("main", "oscillo")}};`, 100);
+    case "mass": return frame(`\\draw (-0.45,-0.3) rectangle (0.45,0.3); \\node at (0,0) {${a("main", "m")}};`, 70);
     case "pulley": return frame("\\draw (0,0) circle (0.42); \\fill (0,0) circle (0.05);", 85);
     case "pendulum": return frame("\\draw (0,0.65) -- (0,-0.35); \\fill (0,-0.48) circle (0.17); \\draw (-0.22,0.65) -- (0.22,0.65);", 80);
-    case "reference-frame": return frame("\\draw[-{Latex}] (0,0) -- (0.9,0) node[right] {$x$}; \\draw[-{Latex}] (0,0) -- (0,0.72) node[above] {$y$}; \\fill (0,0) circle (0.035) node[below left] {$O$};", 100);
-    case "circular-trajectory": return frame("\\draw[-{Latex}] (0,0) circle (0.48); \\fill (0,0) circle (0.04) node[below] {$O$};", 90);
-    case "gravity-field": return frame("\\foreach \\x in {-0.5,0,0.5} \\draw[-{Latex}] (\\x,0.45) -- (\\x,-0.45); \\node[right] at (0.5,0) {$\\vec g$};", 95);
-    case "lens": return frame("\\draw (-0.95,0) -- (0.95,0); \\draw[{Latex}-{Latex}] (0,-0.72) -- (0,0.72); \\fill (0,0) circle (0.025) node[below right] {$O$};", 60);
-    case "diverging-lens": return frame("\\draw (-0.95,0) -- (0.95,0); \\draw[-{Latex}] (0,0.72) -- (0,0.18); \\draw[-{Latex}] (0,-0.72) -- (0,-0.18); \\fill (0,0) circle (0.025) node[below right] {$O$};", 60);
+    case "reference-frame": return frame(`\\draw[-{Latex}] (0,0) -- (0.9,0) node[right] {${a("x", "x")}}; \\draw[-{Latex}] (0,0) -- (0,0.72) node[above] {${a("y", "y")}}; \\fill (0,0) circle (0.035) node[below left] {${a("origin", "O")}};`, 100);
+    case "circular-trajectory": return frame(`\\draw[-{Latex}] (0,0) circle (0.48); \\fill (0,0) circle (0.04) node[below] {${a("origin", "O")}};`, 90);
+    case "gravity-field": return frame(`\\foreach \\x in {-0.5,0,0.5} \\draw[-{Latex}] (\\x,0.45) -- (\\x,-0.45); \\node[right] at (0.5,0) {${a("main", "g")}};`, 95);
+    case "lens": return frame(`\\draw (-0.95,0) -- (0.95,0); \\draw[{Latex}-{Latex}] (0,-0.72) -- (0,0.72); \\fill (0,0) circle (0.025) node[below right] {${a("origin", "O")}};`, 60);
+    case "diverging-lens": return frame(`\\draw (-0.95,0) -- (0.95,0); \\draw[-{Latex}] (0,0.72) -- (0,0.18); \\draw[-{Latex}] (0,-0.72) -- (0,-0.18); \\fill (0,0) circle (0.025) node[below right] {${a("origin", "O")}};`, 60);
     case "plane-mirror": return frame("\\draw[thick] (0,-0.78) -- (0,0.78); \\foreach \\y in {-0.65,-0.35,-0.05,0.25,0.55} \\draw (0,\\y) -- (0.16,\\y+0.12);", 34);
     case "screen": return frame("\\draw[very thick] (0,-0.78) -- (0,0.78); \\foreach \\y in {-0.65,-0.35,-0.05,0.25,0.55} \\draw (0,\\y) -- (0.16,\\y-0.12);", 34);
     case "prism": return frame("\\draw (-0.65,-0.48) -- (0.65,-0.48) -- (0,0.62) -- cycle;", 90);
     case "fiber": return frame("\\draw[thick] (-0.9,0.25) .. controls (-0.35,0.25) and (0.15,-0.25) .. (0.9,-0.1); \\draw[thick] (-0.9,-0.25) .. controls (-0.35,-0.25) and (0.15,-0.75) .. (0.9,-0.6); \\draw[-{Latex}] (-0.7,0) -- (-0.1,-0.15);", 140);
-    case "electric-field": return frame("\\foreach \\y in {-0.35,0,0.35} \\draw[-{Latex}] (-0.62,\\y) -- (0.62,\\y); \\node[above] at (0,0.35) {$\\vec E$};", 100);
+    case "electric-field": return frame(`\\foreach \\y in {-0.35,0,0.35} \\draw[-{Latex}] (-0.62,\\y) -- (0.62,\\y); \\node[above] at (0,0.35) {${a("main", "E")}};`, 100);
     case "magnetic-field-in": return frame("\\foreach \\x in {-0.42,0,0.42} \\foreach \\y in {-0.3,0.3} \\node at (\\x,\\y) {$\\otimes$}; \\node[below] at (0,-0.55) {$\\vec B$};", 90);
     case "magnetic-field-out": return frame("\\foreach \\x in {-0.42,0,0.42} \\foreach \\y in {-0.3,0.3} \\node at (\\x,\\y) {$\\odot$}; \\node[below] at (0,-0.55) {$\\vec B$};", 90);
-    case "bar-magnet": return frame("\\draw[fill=gray!10] (-0.8,-0.22) rectangle (0.8,0.22); \\node at (-0.43,0) {N}; \\node at (0.43,0) {S};", 110);
+    case "bar-magnet": return frame(`\\draw[fill=gray!10] (-0.8,-0.22) rectangle (0.8,0.22); \\node at (-0.43,0) {${a("north", "N")}}; \\node at (0.43,0) {${a("south", "S")}};`, 110);
     case "coil": return frame("\\draw (-0.7,0) .. controls (-0.55,0.42) and (-0.35,-0.42) .. (-0.2,0) .. controls (-0.05,0.42) and (0.15,-0.42) .. (0.3,0) .. controls (0.45,0.42) and (0.6,-0.2) .. (0.72,0);", 100);
     case "solenoid": return frame("\\foreach \\x in {-0.55,-0.28,0,0.28,0.55} \\draw (\\x,0) ellipse (0.18 and 0.42); \\draw (-0.92,0) -- (-0.73,0); \\draw (0.73,0) -- (0.92,0);", 130);
-    case "laplace-rails": return frame("\\draw (-0.9,0.38) -- (0.9,0.38); \\draw (-0.9,-0.38) -- (0.9,-0.38); \\draw[very thick] (0.2,-0.38) -- (0.2,0.38); \\draw[-{Latex}] (0.35,0) -- (0.75,0) node[right] {$\\vec v$}; \\node at (-0.65,0) {$\\vec B$};", 140);
-    case "charged-particle": return frame("\\draw (0,0) circle (0.35); \\node at (0,0) {$q$};", 50);
-    case "piston-cylinder": return frame("\\draw (-0.52,-0.65) -- (-0.52,0.55) -- (0.52,0.55) -- (0.52,-0.65); \\draw[very thick] (-0.56,0.25) -- (0.56,0.25); \\draw (0,0.25) -- (0,0.72); \\node at (0,-0.22) {$P,V,T$};", 100);
-    case "thermal-reservoir": return frame("\\draw (0,0) circle (0.48); \\node at (0,0) {$T$};", 78);
-    case "heat-engine": return frame("\\draw[fill=gray!8] (-0.55,-0.4) rectangle (0.55,0.4); \\node at (0,0) {machine}; \\draw[-{Latex}] (0,0.95) -- (0,0.42) node[midway,right] {$Q_h$}; \\draw[-{Latex}] (0,-0.42) -- (0,-0.95) node[midway,right] {$Q_c$}; \\draw[-{Latex}] (0.58,0) -- (1.05,0) node[right] {$W$};", 120);
-    case "ion": return frame("\\draw (0,0) circle (0.35); \\node at (0,0) {ion};", 52);
+    case "laplace-rails": return frame(`\\draw (-0.9,0.38) -- (0.9,0.38); \\draw (-0.9,-0.38) -- (0.9,-0.38); \\draw[very thick] (0.2,-0.38) -- (0.2,0.38); \\draw[-{Latex}] (0.35,0) -- (0.75,0) node[right] {${a("velocity", "v")}}; \\node at (-0.65,0) {$\\vec B$};`, 140);
+    case "charged-particle": return frame(`\\draw (0,0) circle (0.35); \\node at (0,0) {${a("main", "q")}};`, 50);
+    case "piston-cylinder": return frame(`\\draw (-0.52,-0.65) -- (-0.52,0.55) -- (0.52,0.55) -- (0.52,-0.65); \\draw[very thick] (-0.56,0.25) -- (0.56,0.25); \\draw (0,0.25) -- (0,0.72); \\node at (0,-0.22) {${a("main", "P,V,T")}};`, 100);
+    case "thermal-reservoir": return frame(`\\draw (0,0) circle (0.48); \\node at (0,0) {${a("main", "T")}};`, 78);
+    case "heat-engine": return frame(`\\draw[fill=gray!8] (-0.55,-0.4) rectangle (0.55,0.4); \\node at (0,0) {${a("main", "machine")}}; \\draw[-{Latex}] (0,0.95) -- (0,0.42) node[midway,right] {${a("hot", "Qh")}}; \\draw[-{Latex}] (0,-0.42) -- (0,-0.95) node[midway,right] {${a("cold", "Qc")}}; \\draw[-{Latex}] (0.58,0) -- (1.05,0) node[right] {${a("work", "W")}};`, 120);
+    case "ion": return frame(`\\draw (0,0) circle (0.35); \\node at (0,0) {${a("main", "ion")}};`, 52);
     case "lone-pair": return frame("\\fill (-0.12,0) circle (0.06); \\fill (0.12,0) circle (0.06);", 42);
     case "crystal-fcc": return frame("\\draw (-0.5,-0.48) rectangle (0.35,0.35); \\draw (-0.5,0.35) -- (-0.18,0.62) -- (0.67,0.62) -- (0.35,0.35); \\draw (0.35,-0.48) -- (0.67,-0.21) -- (0.67,0.62); \\foreach \\p in {(-0.5,-0.48),(0.35,-0.48),(-0.5,0.35),(0.35,0.35),(-0.18,0.62),(0.67,0.62),(0.67,-0.21)} \\fill \\p circle (0.06); \\fill (-0.08,-0.06) circle (0.07);", 110);
     case "precipitate": return frame("\\draw (-0.48,0.55) -- (-0.36,-0.55) -- (0.36,-0.55) -- (0.48,0.55); \\fill[gray!35] (-0.36,-0.55) -- (0.36,-0.55) -- (0.31,-0.35) -- (-0.31,-0.35) -- cycle;", 80);
-    case "electrochemical-cell": return frame("\\draw (-1.12,0.55) -- (-0.98,-0.62) -- (-0.3,-0.62) -- (-0.16,0.55); \\draw (0.16,0.55) -- (0.3,-0.62) -- (0.98,-0.62) -- (1.12,0.55); \\fill[blue!12] (-0.94,-0.12) -- (-0.98,-0.58) -- (-0.3,-0.58) -- (-0.34,-0.12) -- cycle; \\fill[blue!12] (0.34,-0.12) -- (0.3,-0.58) -- (0.98,-0.58) -- (0.94,-0.12) -- cycle; \\draw[very thick] (-0.63,0.72) -- (-0.63,-0.38); \\draw[very thick] (0.63,0.72) -- (0.63,-0.38); \\draw[very thick,rounded corners] (-0.82,-0.23) -- (-0.82,0.35) -- (0,0.78) -- (0.82,0.35) -- (0.82,-0.23); \\draw[dashed] (-0.63,0.72) -- (0.63,0.72); \\node[below] at (-0.63,-0.62) {anode ($-$)}; \\node[below] at (0.63,-0.62) {cathode ($+$)}; \\node at (0,0.37) {\\scriptsize pont salin};", 240);
+    case "electrochemical-cell": return frame(`\\draw (-1.12,0.55) -- (-0.98,-0.62) -- (-0.3,-0.62) -- (-0.16,0.55); \\draw (0.16,0.55) -- (0.3,-0.62) -- (0.98,-0.62) -- (1.12,0.55); \\fill[blue!12] (-0.94,-0.12) -- (-0.98,-0.58) -- (-0.3,-0.58) -- (-0.34,-0.12) -- cycle; \\fill[blue!12] (0.34,-0.12) -- (0.3,-0.58) -- (0.98,-0.58) -- (0.94,-0.12) -- cycle; \\draw[very thick] (-0.63,0.72) -- (-0.63,-0.38); \\draw[very thick] (0.63,0.72) -- (0.63,-0.38); \\draw[very thick,rounded corners] (-0.82,-0.23) -- (-0.82,0.35) -- (0,0.78) -- (0.82,0.35) -- (0.82,-0.23); \\draw[dashed] (-0.63,0.72) -- (0.63,0.72); \\node[below] at (-0.63,-0.62) {${a("anode", "anode (-)")}}; \\node[below] at (0.63,-0.62) {${a("cathode", "cathode (+)")}}; \\node at (0,0.37) {\\scriptsize ${a("bridge", "pont salin")}};`, 240);
     case "beaker": return frame("\\draw (-0.55,0.65) -- (-0.42,-0.65) -- (0.42,-0.65) -- (0.55,0.65); \\fill[blue!12] (-0.47,-0.2) -- (-0.42,-0.6) -- (0.42,-0.6) -- (0.47,-0.2) -- cycle; \\foreach \\y in {0.12,0.25,0.38} \\draw (-0.24,\\y) -- (-0.08,\\y);", 80);
     case "flask": return frame("\\draw (-0.16,0.7) -- (-0.16,0.15) -- (-0.62,-0.65) -- (0.62,-0.65) -- (0.16,0.15) -- (0.16,0.7) -- cycle; \\fill[blue!12] (-0.48,-0.42) -- (-0.6,-0.62) -- (0.6,-0.62) -- (0.48,-0.42) -- cycle;", 85);
     case "round-bottom-flask": return frame("\\draw (-0.14,0.8) -- (-0.14,0.32); \\draw (0.14,0.8) -- (0.14,0.32); \\draw (0,-0.12) circle (0.48); \\fill[blue!12] (-0.38,-0.25) arc (210:330:0.44) -- cycle;", 92);
@@ -99,16 +100,16 @@ function objectToLatexBase(object: CanvasObject): string {
     case "inductor": return `\\draw ${origin} to[L] ${end(object)};`;
     case "battery": return `\\draw ${origin} to[battery1] ${end(object)};`;
     case "switch": return `\\draw ${origin} to[opening switch] ${end(object)};`;
-    case "voltmeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {V};`;
-    case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {A};`;
+    case "voltmeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "V"))}};`;
+    case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "A"))}};`;
     case "spring": return `\\draw[decorate, decoration={coil, aspect=0.3}] ${origin} -- ${end(object)};`;
     case "wave": return `\\draw[decorate, decoration={snake, amplitude=0.08cm, segment length=0.25cm}] ${origin} -- ${end(object)};`;
-    case "heat-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {$Q$};`;
-    case "work-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {$W$};`;
+    case "heat-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${safeText(annotation(object, "main", "Q"))}};`;
+    case "work-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${safeText(annotation(object, "main", "W"))}};`;
     case "reaction-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)};`;
     case "equilibrium-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
     case "hydrogen-bond": return `\\draw[dashed] ${origin} -- ${end(object)};`;
-    case "dipole": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {$\\vec{\\mu}$};`;
+    case "dipole": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${safeText(annotation(object, "main", "μ"))}};`;
     case "bond-single": return bondLines(object, 1);
     case "bond-double": return bondLines(object, 2);
     case "bond-triple": return bondLines(object, 3);
@@ -179,6 +180,7 @@ function isCanvasObject(value: unknown): value is CanvasObject {
   if (typeof object.id !== "string" || typeof object.kind !== "string" || !Object.hasOwn(labels, object.kind) || !isFiniteNumber(object.x) || !isFiniteNumber(object.y)) return false;
   for (const key of ["x2", "y2", "width", "height", "scale", "scaleX", "scaleY", "rotation"] as const) if (object[key] !== undefined && !isFiniteNumber(object[key])) return false;
   if (object.text !== undefined && typeof object.text !== "string") return false;
+  if (object.annotations !== undefined && (!object.annotations || typeof object.annotations !== "object" || Object.values(object.annotations as Record<string, unknown>).some((annotation) => typeof annotation !== "string"))) return false;
   if (object.points !== undefined && (!Array.isArray(object.points) || object.points.some((point) => !point || typeof point !== "object" || !isFiniteNumber((point as Point).x) || !isFiniteNumber((point as Point).y)))) return false;
   if (object.graph !== undefined) {
     if (!object.graph || typeof object.graph !== "object") return false;
@@ -209,10 +211,21 @@ function textFromLatex(value: string) {
   return value.trim().replace(/\\textbackslash\{\}\s?/g, "\\").replace(/\\([#%&_{}])/g, "$1");
 }
 
+function annotationsFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
+  const defaults = original.annotations ?? defaultAnnotations(original.kind); const keys = Object.keys(defaults ?? {});
+  if (!keys.length) return original;
+  const values = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^{};]+)?\s*\{([^{}]*)\}/g)].map((match) => textFromLatex(match[1]));
+  if (values.length < keys.length) return original;
+  const annotations = { ...defaults }; let changed = false;
+  keys.forEach((key, index) => { if (annotations[key] !== values[index]) { annotations[key] = values[index]; changed = true; } });
+  return changed ? { ...original, annotations } : original;
+}
+
 function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
-  if (block.includes("\\begin{scope}[cm=")) return original;
+  const withAnnotations = annotationsFromLatexBlock(original, block);
+  if (block.includes("\\begin{scope}[cm=")) return withAnnotations;
   const points = pointsFromLatex(block);
-  if (connectorKinds.includes(original.kind) && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, x2: points[1].x, y2: points[1].y };
+  if (connectorKinds.includes(original.kind) && points.length >= 2) return { ...withAnnotations, x: points[0].x, y: points[0].y, x2: points[1].x, y2: points[1].y };
   if (original.kind === "rect" && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, width: points[1].x - points[0].x, height: points[1].y - points[0].y };
   if (original.kind === "circle" && points.length) {
     const radius = block.match(/circle\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)/);
@@ -230,12 +243,12 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
     const width = block.match(/width\s*=\s*(-?\d+(?:\.\d+)?)cm/); const height = block.match(/height\s*=\s*(-?\d+(?:\.\d+)?)cm/); const expression = block.match(/\\addplot\[[^\]]*\]\s*\{([\s\S]*?)\};/);
     return { ...original, x: points[0].x, y: points[0].y, width: width ? Number(width[1]) * SCALE : original.width, height: height ? Number(height[1]) * SCALE : original.height, graph: original.graph ? { ...original.graph, expression: expression?.[1].trim() || original.graph.expression } : original.graph };
   }
-  return original;
+  return withAnnotations;
 }
 
 function mergeTikzEdits(metadata: CanvasObject, visual: CanvasObject, original: CanvasObject): CanvasObject {
   const next = { ...metadata } as Record<string, unknown>;
-  for (const key of ["x", "y", "x2", "y2", "width", "height", "text", "graph"] as const) {
+  for (const key of ["x", "y", "x2", "y2", "width", "height", "text", "annotations", "graph"] as const) {
     if (JSON.stringify(visual[key]) !== JSON.stringify(original[key])) next[key] = visual[key];
   }
   return next as CanvasObject;
