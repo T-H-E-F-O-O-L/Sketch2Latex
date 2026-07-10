@@ -1,12 +1,34 @@
 "use client";
 
-import { PointerEvent, useMemo, useRef, useState } from "react";
+import { PointerEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { connectorKinds, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind, type Point } from "./lib/canvas-types";
 import { documentFor } from "./lib/latex";
 
 const canvasWidth = 900;
 const canvasHeight = 560;
 const objectId = () => Math.random().toString(36).slice(2, 10);
+
+type HistoryState = { objects: CanvasObject[]; past: CanvasObject[][]; future: CanvasObject[][] };
+type HistoryAction =
+  | { type: "commit"; objects: CanvasObject[] }
+  | { type: "transient"; objects: CanvasObject[] }
+  | { type: "finishTransient"; snapshot: CanvasObject[] }
+  | { type: "undo" }
+  | { type: "redo" };
+
+const keepHistory = (items: CanvasObject[][]) => items.slice(-100);
+
+function historyReducer(state: HistoryState, action: HistoryAction): HistoryState {
+  if (action.type === "commit") return { objects: action.objects, past: keepHistory([...state.past, state.objects]), future: [] };
+  if (action.type === "transient") return { ...state, objects: action.objects };
+  if (action.type === "finishTransient") return { ...state, past: keepHistory([...state.past, action.snapshot]), future: [] };
+  if (action.type === "undo") {
+    const previous = state.past.at(-1);
+    return previous ? { objects: previous, past: state.past.slice(0, -1), future: [...state.future, state.objects] } : state;
+  }
+  const next = state.future.at(-1);
+  return next ? { objects: next, past: [...state.past, state.objects], future: state.future.slice(0, -1) } : state;
+}
 
 const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement): Point => {
   const rect = svg.getBoundingClientRect();
@@ -99,16 +121,32 @@ function preview(object: CanvasObject, selected: boolean) {
 
 export default function Home() {
   const svgRef = useRef<SVGSVGElement>(null);
+  const dragChangedRef = useRef(false);
   const [tool, setTool] = useState<ObjectKind | "select">("select");
-  const [objects, setObjects] = useState<CanvasObject[]>([]);
+  const [{ objects, past, future }, dispatchHistory] = useReducer(historyReducer, { objects: [], past: [], future: [] });
   const [selectedId, setSelectedId] = useState<string>();
   const [draft, setDraft] = useState<CanvasObject>();
-  const [drag, setDrag] = useState<{ id: string; start: Point; original: CanvasObject }>();
+  const [drag, setDrag] = useState<{ id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[] }>();
   const [snippetOnly, setSnippetOnly] = useState(false);
   const [notice, setNotice] = useState("Choisissez un outil puis dessinez sur le canevas.");
   const [expression, setExpression] = useState("sin(deg(x))");
   const [range, setRange] = useState("-5:5");
   const latex = useMemo(() => documentFor(objects, snippetOnly), [objects, snippetOnly]);
+  const commitObjects = useCallback((next: CanvasObject[]) => dispatchHistory({ type: "commit", objects: next }), []);
+  const undo = useCallback(() => { dispatchHistory({ type: "undo" }); setSelectedId(undefined); }, []);
+  const redo = useCallback(() => { dispatchHistory({ type: "redo" }); setSelectedId(undefined); }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if ((event.target as HTMLElement | null)?.closest("input, textarea")) return;
+      const key = event.key.toLowerCase();
+      if (key === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
+      if (key === "y") { event.preventDefault(); redo(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [redo, undo]);
 
   const makeObject = (p: Point): CanvasObject => {
     const kind = tool as ObjectKind;
@@ -123,17 +161,18 @@ export default function Home() {
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current; if (!svg) return;
     const p = canvasPoint(event, svg); const target = (event.target as Element).closest("[data-id]")?.getAttribute("data-id");
-    if (tool === "select" && target) { const original = objects.find((o) => o.id === target); if (!original) return; setSelectedId(target); setDrag({ id: target, start: p, original }); event.currentTarget.setPointerCapture(event.pointerId); return; }
+    if (tool === "select" && target) { const original = objects.find((o) => o.id === target); if (!original) return; dragChangedRef.current = false; setSelectedId(target); setDrag({ id: target, start: p, original, snapshot: objects }); event.currentTarget.setPointerCapture(event.pointerId); return; }
     if (tool === "select") { setSelectedId(undefined); return; }
     const created = makeObject(p);
-    if (stampKinds.includes(created.kind) || created.kind === "text" || created.kind === "axes") { setObjects((old) => [...old, created]); setSelectedId(created.id); return; }
+    if (stampKinds.includes(created.kind) || created.kind === "text" || created.kind === "axes") { commitObjects([...objects, created]); setSelectedId(created.id); return; }
     setDraft(created); event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current; if (!svg) return; const p = canvasPoint(event, svg);
     if (drag) {
+      dragChangedRef.current = true;
       const dx = p.x - drag.start.x; const dy = p.y - drag.start.y; const o = drag.original;
-      setObjects((old) => old.map((item) => item.id !== o.id ? item : connectorKinds.includes(o.kind) ? { ...o, x: o.x + dx, y: o.y + dy, x2: (o.x2 ?? o.x) + dx, y2: (o.y2 ?? o.y) + dy } : { ...o, x: o.x + dx, y: o.y + dy, points: o.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })) }));
+      dispatchHistory({ type: "transient", objects: objects.map((item) => item.id !== o.id ? item : connectorKinds.includes(o.kind) ? { ...o, x: o.x + dx, y: o.y + dy, x2: (o.x2 ?? o.x) + dx, y2: (o.y2 ?? o.y) + dy } : { ...o, x: o.x + dx, y: o.y + dy, points: o.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })) }) });
       return;
     }
     if (!draft) return;
@@ -142,14 +181,15 @@ export default function Home() {
     else setDraft({ ...draft, width: p.x - draft.x, height: p.y - draft.y });
   };
   const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
-    if (draft) { setObjects((old) => [...old, draft]); setSelectedId(draft.id); setDraft(undefined); }
+    if (draft) { commitObjects([...objects, draft]); setSelectedId(draft.id); setDraft(undefined); }
+    else if (drag && dragChangedRef.current) dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
     setDrag(undefined); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const addFunction = () => {
     const [xMin, xMax] = range.split(":").map(Number);
     if (!expression.trim() || !Number.isFinite(xMin) || !Number.isFinite(xMax)) { setNotice("Utilisez une expression et un intervalle, par exemple -5:5."); return; }
     const next = { id: objectId(), kind: "axes" as const, x: 40, y: 350, width: 250, height: 180, graph: { expression, xMin, xMax } };
-    setObjects((old) => [...old, next]); setSelectedId(next.id); setNotice("Graphe ajouté au canevas.");
+    commitObjects([...objects, next]); setSelectedId(next.id); setNotice("Graphe ajouté au canevas.");
   };
   const copy = async () => { await navigator.clipboard.writeText(latex); setNotice("LaTeX copié dans le presse-papiers."); };
   const exportPdf = async () => {
@@ -160,7 +200,7 @@ export default function Home() {
       const url = URL.createObjectURL(await response.blob()); const a = document.createElement("a"); a.href = url; a.download = "schema-mpsi.pdf"; a.click(); URL.revokeObjectURL(url); setNotice("PDF téléchargé.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Impossible de compiler le PDF."); }
   };
-  const deleteSelected = () => { if (!selectedId) return; setObjects((old) => old.filter((o) => o.id !== selectedId)); setSelectedId(undefined); };
+  const deleteSelected = () => { if (!selectedId) return; commitObjects(objects.filter((o) => o.id !== selectedId)); setSelectedId(undefined); };
 
   return <main>
     <header><div><p className="eyebrow">Représentations scientifiques CPGE</p><h1>Sketch2LaTeX — MPSI</h1></div><p className="status" aria-live="polite">{notice}</p></header>
@@ -168,7 +208,7 @@ export default function Home() {
     <section className="toolbox" aria-label="Outils de représentation MPSI">
       {toolboxGroups.map((group) => <div key={group.title}><strong>{group.title}</strong>{group.kinds.map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{kind === "select" ? "Sélectionner / déplacer" : labels[kind]}</button>)}</div>)}
     </section>
-    <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={deleteSelected} disabled={!selectedId}>Supprimer la sélection</button><button onClick={() => { setObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button></section>
+    <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd + Z">↶ Retour</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd + Y ou Ctrl/Cmd + Maj + Z">↷ Avancer</button><button onClick={deleteSelected} disabled={!selectedId}>Supprimer la sélection</button><button onClick={() => { if (!objects.length) return; commitObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button></section>
     <section className="workspace">
       <div className="canvas-wrap"><svg ref={svgRef} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
         <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#111" /></marker></defs>
