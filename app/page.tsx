@@ -19,7 +19,9 @@ type HistoryAction =
   | { type: "redo" };
 
 type DragMode = "move" | "resize" | "rotate";
+type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 type CanvasBounds = { x: number; y: number; width: number; height: number };
+type DragState = { id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode; corner?: ResizeCorner };
 
 const keepHistory = (items: CanvasObject[][]) => items.slice(-100);
 
@@ -81,12 +83,57 @@ function transformedPoint(object: CanvasObject, point: Point): Point {
   return { x: center.x + dx * Math.cos(rotation) - dy * Math.sin(rotation), y: center.y + dx * Math.sin(rotation) + dy * Math.cos(rotation) };
 }
 
+function cornersFor(bounds: CanvasBounds): Array<[ResizeCorner, Point]> {
+  return [
+    ["top-left", { x: bounds.x, y: bounds.y }], ["top-right", { x: bounds.x + bounds.width, y: bounds.y }],
+    ["bottom-left", { x: bounds.x, y: bounds.y + bounds.height }], ["bottom-right", { x: bounds.x + bounds.width, y: bounds.y + bounds.height }],
+  ];
+}
+
 function cornerObjectAt(objects: CanvasObject[], point: Point) {
   for (const object of [...objects].reverse()) {
     const bounds = boundsFor(object);
-    const corners = [[bounds.x, bounds.y], [bounds.x + bounds.width, bounds.y], [bounds.x, bounds.y + bounds.height], [bounds.x + bounds.width, bounds.y + bounds.height]];
-    if (corners.some(([x, y]) => Math.hypot(transformedPoint(object, { x, y }).x - point.x, transformedPoint(object, { x, y }).y - point.y) <= 12)) return object;
+    const corner = cornersFor(bounds).find(([, localPoint]) => {
+      const transformed = transformedPoint(object, localPoint);
+      return Math.hypot(transformed.x - point.x, transformed.y - point.y) <= 12;
+    });
+    if (corner) return { object, corner: corner[0] };
   }
+}
+
+function translateObject(object: CanvasObject, dx: number, dy: number): CanvasObject {
+  const translated = { ...object, x: object.x + dx, y: object.y + dy };
+  if (connectorKinds.includes(object.kind)) return { ...translated, x2: (object.x2 ?? object.x) + dx, y2: (object.y2 ?? object.y) + dy, control: object.control ? { x: object.control.x + dx, y: object.control.y + dy } : undefined };
+  return { ...translated, points: object.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })) };
+}
+
+function anchoredResizeTranslation(object: CanvasObject, corner: ResizeCorner, scaleX: number, scaleY: number): Point {
+  const oppositeCorner: Record<ResizeCorner, ResizeCorner> = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" };
+  const opposite = cornersFor(boundsFor(object)).find(([name]) => name === oppositeCorner[corner])?.[1];
+  if (!opposite) return { x: 0, y: 0 };
+  const center = objectCenter(object); const localX = opposite.x - center.x; const localY = opposite.y - center.y;
+  const scaledX = (scaleXFor(object) - scaleX) * localX; const scaledY = (scaleYFor(object) - scaleY) * localY; const angle = ((object.rotation ?? 0) * Math.PI) / 180;
+  return { x: scaledX * Math.cos(angle) - scaledY * Math.sin(angle), y: scaledX * Math.sin(angle) + scaledY * Math.cos(angle) };
+}
+
+function resizeFromCorner(object: CanvasObject, corner: ResizeCorner, pointer: Point, proportional: boolean): CanvasObject {
+  const oppositeCorner: Record<ResizeCorner, ResizeCorner> = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" };
+  const signs: Record<ResizeCorner, Point> = { "top-left": { x: -1, y: -1 }, "top-right": { x: 1, y: -1 }, "bottom-left": { x: -1, y: 1 }, "bottom-right": { x: 1, y: 1 } };
+  const bounds = boundsFor(object); const opposite = cornersFor(bounds).find(([name]) => name === oppositeCorner[corner])?.[1];
+  if (!opposite) return object;
+  const fixedPoint = transformedPoint(object, opposite); const pointerOffset = localOffset(pointer, fixedPoint, object.rotation ?? 0); const sign = signs[corner];
+  let scaleX: number; let scaleY: number;
+  if (proportional) {
+    const currentDiagonal = Math.hypot(bounds.width * scaleXFor(object), bounds.height * scaleYFor(object));
+    const factor = Math.hypot(pointerOffset.x, pointerOffset.y) / Math.max(1, currentDiagonal);
+    scaleX = clamp(scaleXFor(object) * factor, 0.25, 3); scaleY = clamp(scaleYFor(object) * factor, 0.25, 3);
+  } else {
+    scaleX = clamp((pointerOffset.x * sign.x) / Math.max(1, bounds.width), 0.25, 3);
+    scaleY = clamp((pointerOffset.y * sign.y) / Math.max(1, bounds.height), 0.25, 3);
+  }
+  const resized = { ...object, scale: undefined, scaleX, scaleY };
+  const translation = anchoredResizeTranslation(object, corner, scaleX, scaleY);
+  return translateObject(resized, translation.x, translation.y);
 }
 
 function localOffset(point: Point, center: Point, rotation: number): Point {
@@ -240,7 +287,7 @@ function selectionOverlay(object: CanvasObject) {
     <rect className="selection-frame" x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} />
     <line className="selection-stem" x1={bounds.x + bounds.width / 2} y1={bounds.y} x2={bounds.x + bounds.width / 2} y2={rotateY + 7} />
     <circle className="rotation-handle" data-handle="rotate" cx={bounds.x + bounds.width / 2} cy={rotateY} r="7" aria-label="Tourner l’objet" />
-    {[[bounds.x, bounds.y], [bounds.x + bounds.width, bounds.y], [bounds.x, bounds.y + bounds.height], [bounds.x + bounds.width, bounds.y + bounds.height]].map(([x, y], index) => <rect key={index} className="resize-handle" data-handle="resize" x={x - 6} y={y - 6} width="12" height="12" rx="2" aria-label="Redimensionner l’objet" />)}
+    {cornersFor(bounds).map(([corner, point]) => <rect key={corner} className="resize-handle" data-handle="resize" data-corner={corner} x={point.x - 6} y={point.y - 6} width="12" height="12" rx="2" aria-label="Redimensionner l’objet" />)}
   </g>;
 }
 
@@ -252,7 +299,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState<string>();
   const [draft, setDraft] = useState<CanvasObject>();
   const [curveAnchor, setCurveAnchor] = useState<{ start: Point; end?: Point }>();
-  const [drag, setDrag] = useState<{ id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode }>();
+  const [drag, setDrag] = useState<DragState>();
   const [snippetOnly, setSnippetOnly] = useState(false);
   const [notice, setNotice] = useState("Choisissez un outil puis dessinez sur le canevas.");
   const [expression, setExpression] = useState("sin(deg(x))");
@@ -309,6 +356,7 @@ export default function Home() {
     event.currentTarget.focus({ preventScroll: true });
     const p = canvasPoint(event, svg); const element = event.target as Element; const target = element.closest("[data-id]")?.getAttribute("data-id");
     const handle = element.closest("[data-handle]")?.getAttribute("data-handle");
+    const resizeCorner = element.closest("[data-corner]")?.getAttribute("data-corner") as ResizeCorner | null;
     if (tool === "curve") {
       if (!curveAnchor) { setCurveAnchor({ start: p }); setDraft(undefined); setNotice("Cliquez le point d’arrivée de la courbe."); return; }
       if (!curveAnchor.end) {
@@ -325,12 +373,13 @@ export default function Home() {
     }
     const cornerObject = handle ? undefined : cornerObjectAt(objects, p);
     if (cornerObject) {
-      dragChangedRef.current = false; setTool("select"); setSelectedId(cornerObject.id); setDrag({ id: cornerObject.id, start: p, original: cornerObject, snapshot: objects, mode: "resize" }); event.currentTarget.setPointerCapture(event.pointerId); return;
+      dragChangedRef.current = false; setTool("select"); setSelectedId(cornerObject.object.id); setDrag({ id: cornerObject.object.id, start: p, original: cornerObject.object, snapshot: objects, mode: "resize", corner: cornerObject.corner }); event.currentTarget.setPointerCapture(event.pointerId); return;
     }
     if (tool === "select" && target) {
       const original = objects.find((o) => o.id === target); if (!original) return;
       const mode: DragMode = handle === "resize" ? "resize" : handle === "rotate" ? "rotate" : "move";
-      dragChangedRef.current = false; setSelectedId(target); setDrag({ id: target, start: p, original, snapshot: objects, mode }); event.currentTarget.setPointerCapture(event.pointerId); return;
+      const corner = mode === "resize" ? resizeCorner ?? cornerObjectAt([original], p)?.corner : undefined;
+      dragChangedRef.current = false; setSelectedId(target); setDrag({ id: target, start: p, original, snapshot: objects, mode, corner }); event.currentTarget.setPointerCapture(event.pointerId); return;
     }
     if (tool === "select") { setSelectedId(undefined); return; }
     const created = makeObject(p);
@@ -343,17 +392,11 @@ export default function Home() {
       dragChangedRef.current = true;
       const dx = p.x - drag.start.x; const dy = p.y - drag.start.y; const o = drag.original;
       const center = objectCenter(o);
-      const startOffset = localOffset(drag.start, center, o.rotation ?? 0); const currentOffset = localOffset(p, center, o.rotation ?? 0);
-      const proportionalScale = Math.hypot(currentOffset.x, currentOffset.y) / Math.max(1, Math.hypot(startOffset.x, startOffset.y));
       const next = drag.mode === "resize"
-        ? event.shiftKey
-          ? { ...o, scale: undefined, scaleX: clamp(scaleXFor(o) * proportionalScale, 0.25, 3), scaleY: clamp(scaleYFor(o) * proportionalScale, 0.25, 3) }
-          : { ...o, scale: undefined, scaleX: clamp(scaleXFor(o) * Math.abs(currentOffset.x / (startOffset.x || 1)), 0.25, 3), scaleY: clamp(scaleYFor(o) * Math.abs(currentOffset.y / (startOffset.y || 1)), 0.25, 3) }
+        ? drag.corner ? resizeFromCorner(o, drag.corner, p, event.shiftKey) : o
         : drag.mode === "rotate"
           ? { ...o, rotation: Math.round(((o.rotation ?? 0) + (Math.atan2(p.y - center.y, p.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 }
-          : connectorKinds.includes(o.kind)
-            ? { ...o, x: o.x + dx, y: o.y + dy, x2: (o.x2 ?? o.x) + dx, y2: (o.y2 ?? o.y) + dy, control: o.control ? { x: o.control.x + dx, y: o.control.y + dy } : undefined }
-            : { ...o, x: o.x + dx, y: o.y + dy, points: o.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })) };
+          : translateObject(o, dx, dy);
       dispatchHistory({ type: "transient", objects: objects.map((item) => item.id !== o.id ? item : next) });
       return;
     }
@@ -425,7 +468,7 @@ export default function Home() {
       {toolboxGroups.map((group) => <div key={group.title}><strong>{group.title}</strong>{group.kinds.map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{kind === "select" ? "Sélectionner / déplacer" : labels[kind]}</button>)}</div>)}
     </section>
     <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd + Z">↶ Retour</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd + Y ou Ctrl/Cmd + Maj + Z">↷ Avancer</button><button onClick={deleteSelected} disabled={!selectedId} title="Touche Suppr">Supprimer la sélection</button><button onClick={() => { if (!objects.length) return; commitObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button>
-      {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Objet sélectionné · Maj = proportions</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
+      {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Coins : côté opposé fixe · Maj = proportions</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
     </section>
     <section className="workspace">
       <div className="canvas-wrap"><svg ref={svgRef} tabIndex={0} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
