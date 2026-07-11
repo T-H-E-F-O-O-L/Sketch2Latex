@@ -206,12 +206,12 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "dashed-line") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} strokeDasharray="7 5" />;
   if (object.kind === "double-arrow") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" />;
   if (object.kind === "dimension") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><text x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fontSize="14" fill={color} stroke="white" strokeWidth="4" paintOrder="stroke">{a("main", "d")}</text></g>;
-  if (object.kind === "resistor") return <g transform={`translate(${midX} ${midY}) rotate(${rotation})`}><line {...common} x1={-length / 2} y1="0" x2={length / 2} y2="0" /><rect x="-18" y="-8" width="36" height="16" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /></g>;
+  if (object.kind === "resistor") return <g transform={`translate(${midX} ${midY}) rotate(${rotation})`}><line {...common} x1={-length / 2} y1="0" x2={length / 2} y2="0" /><rect x="-18" y="-8" width="36" height="16" rx="1.5" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text className="diagram-label" x="0" y="-13" textAnchor="middle" fill={color}>{a("main", "R")}</text></g>;
   if (object.kind === "battery" || object.kind === "capacitor") {
     const wide = object.kind === "battery" ? 15 : 12; const narrow = object.kind === "battery" ? 9 : 12;
-    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><line {...common} x1={midX - 5 * ux - wide * px} y1={midY - 5 * uy - wide * py} x2={midX - 5 * ux + wide * px} y2={midY - 5 * uy + wide * py} /><line {...common} x1={midX + 6 * ux - narrow * px} y1={midY + 6 * uy - narrow * py} x2={midX + 6 * ux + narrow * px} y2={midY + 6 * uy + narrow * py} /></g>;
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><line {...common} x1={midX - 5 * ux - wide * px} y1={midY - 5 * uy - wide * py} x2={midX - 5 * ux + wide * px} y2={midY - 5 * uy + wide * py} /><line {...common} x1={midX + 6 * ux - narrow * px} y1={midY + 6 * uy - narrow * py} x2={midX + 6 * ux + narrow * px} y2={midY + 6 * uy + narrow * py} />{object.kind === "capacitor" && <text className="diagram-label" x={midX + 21 * px} y={midY + 21 * py} textAnchor="middle" fill={color}>{a("main", "C")}</text>}</g>;
   }
-  if (object.kind === "inductor") return <g transform={`translate(${midX} ${midY}) rotate(${rotation})`}><line {...common} x1={-length / 2} y1="0" x2="-22" y2="0" /><path {...common} d="M -22 0 q 5 -15 10 0 q 5 -15 10 0 q 5 -15 10 0 q 5 -15 10 0" /><line {...common} x1="18" y1="0" x2={length / 2} y2="0" /></g>;
+  if (object.kind === "inductor") return <g transform={`translate(${midX} ${midY}) rotate(${rotation})`}><line {...common} x1={-length / 2} y1="0" x2="-22" y2="0" /><path {...common} d="M -22 0 q 5 -15 10 0 q 5 -15 10 0 q 5 -15 10 0 q 5 -15 10 0" /><line {...common} x1="18" y1="0" x2={length / 2} y2="0" /><text className="diagram-label" x="0" y="-19" textAnchor="middle" fill={color}>{a("main", "L")}</text></g>;
   if (object.kind === "switch") return <g><line {...common} x1={object.x} y1={object.y} x2={midX - 12 * ux} y2={midY - 12 * uy} /><line {...common} x1={midX + 14 * ux} y1={midY + 14 * uy} x2={x2} y2={y2} /><line {...common} x1={midX - 12 * ux} y1={midY - 12 * uy} x2={midX + 12 * ux - 12 * px} y2={midY + 12 * uy - 12 * py} /><circle cx={midX - 12 * ux} cy={midY - 12 * uy} r="3" fill={color} /></g>;
   if (object.kind === "voltmeter" || object.kind === "ammeter") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r="15" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text x={midX} y={midY + 5} textAnchor="middle" fontSize="14" fill={color}>{a("main", object.kind === "voltmeter" ? "V" : "A")}</text></g>;
   if (object.kind === "spring") return <polyline {...common} points={Array.from({ length: 11 }, (_, i) => `${object.x + dx * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * px)},${object.y + dy * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * py)}`).join(" ")} />;
@@ -232,6 +232,28 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   const x = object.x; const y = object.y; const w = object.width ?? 80; const h = object.height ?? 80; const cx = x + w / 2; const cy = y + h / 2;
   const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill={color} stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
   const a = (key: string, fallback: string) => annotation(object, key, fallback);
+  const opAmp = () => {
+    const kind = object.kind; const topInput = y + h * .37; const bottomInput = y + h * .66; const inputEnd = x + w * .34; const apex = x + w * .8; const outputX = x + w * .96;
+    const inputLine = (fromY: number, toY: number, key: string) => <line key={key} x1={x + w * .04} y1={fromY} x2={inputEnd} y2={toY} />;
+    const feedback = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"].includes(kind);
+    const symbol = a("main", kind === "op-amp-comparator" ? ">" : kind === "op-amp-summing" ? "Σ" : kind === "op-amp-integrator" ? "∫" : kind === "op-amp-differentiator" ? "d/dt" : kind === "op-amp-schmitt" ? "S" : "A");
+    return <g {...common} strokeLinecap="round" strokeLinejoin="round">
+      <path d={`M ${inputEnd} ${y + h * .12} L ${inputEnd} ${y + h * .88} L ${apex} ${cy} Z`} fill="white" />
+      {inputLine(topInput, topInput, "minus-input")}{inputLine(bottomInput, bottomInput, "plus-input")}
+      <line x1={apex} y1={cy} x2={outputX} y2={cy} />
+      <text className="diagram-sign" x={inputEnd - 11} y={topInput + 5} textAnchor="middle" fill={color}>−</text>
+      <text className="diagram-sign" x={inputEnd - 11} y={bottomInput + 5} textAnchor="middle" fill={color}>+</text>
+      <text className="diagram-label" x={x + w * .56} y={cy + 5} textAnchor="middle" fontSize={kind === "op-amp-differentiator" ? "11" : "16"} fill={color}>{symbol}</text>
+      {kind === "op-amp-summing" && <>{inputLine(y + h * .2, topInput, "sum-1")}{inputLine(y + h * .5, topInput, "sum-2")}</>}
+      {(kind === "op-amp-inverting" || kind === "op-amp-differentiator") && <polyline points={`${x + w * .04},${topInput} ${x + w * .1},${topInput - 7} ${x + w * .16},${topInput + 7} ${x + w * .22},${topInput - 7} ${inputEnd},${topInput}`} fill="white" />}
+      {kind === "op-amp-differentiator" && <><line x1={x + w * .11} y1={topInput - 13} x2={x + w * .11} y2={topInput + 13} /><line x1={x + w * .16} y1={topInput - 13} x2={x + w * .16} y2={topInput + 13} /></>}
+      {feedback && <path d={`M ${outputX} ${cy} L ${outputX} ${y + h * .06} L ${x + w * .2} ${y + h * .06} L ${x + w * .2} ${topInput}`} />}
+      {kind === "op-amp-integrator" && <><line x1={x + w * .44} y1={y + h * .02} x2={x + w * .44} y2={y + h * .1} /><line x1={x + w * .49} y1={y + h * .02} x2={x + w * .49} y2={y + h * .1} /></>}
+      {kind === "op-amp-schmitt" && <path d={`M ${x + w * .18} ${bottomInput} L ${x + w * .18} ${y + h * .94} L ${outputX} ${y + h * .94} L ${outputX} ${cy}`} />}
+      {kind === "op-amp-comparator" && <text className="diagram-output-label" x={outputX - 2} y={cy - 8} textAnchor="end" fill={color}>Vₛ</text>}
+    </g>;
+  };
+  if (object.kind.startsWith("op-amp")) return opAmp();
   if (object.kind === "point") return <circle cx={cx} cy={cy} r={Math.min(w, h) * .28} fill={color} stroke="none" pointerEvents="all" />;
   if (object.kind === "ground") return <g {...common}><line x1={cx} y1={y} x2={cx} y2={y + h * .35} /><path d={`M ${x + 6} ${y + h*.35} L ${x + w - 6} ${y + h*.35} M ${x + 11} ${y + h*.53} L ${x + w - 11} ${y + h*.53} M ${x + 17} ${y + h*.71} L ${x + w - 17} ${y + h*.71}`} /></g>;
   if (object.kind === "gbf") return <g {...common}><circle cx={cx} cy={cy} r={w*.36} /><path d={`M ${x+w*.22} ${cy} q ${w*.07} ${-h*.16} ${w*.14} 0 q ${w*.07} ${h*.16} ${w*.14} 0 q ${w*.07} ${-h*.16} ${w*.14} 0`} />{text(a("main", "GBF"), cx, y+h*.78)}</g>;

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root { color: #151515; background: #f6f6f5; font-family: Arial, Helvetica, sans-serif; }
+:root { color: #151515; background: #f6f6f5; font-family: "Times New Roman", Times, serif; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 button, input, textarea { font: inherit; }
@@ -93,6 +93,10 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .control-handle { fill: #e8f2ff; }
 .free-point-handle { fill: #fff7d6; stroke: #a56a00; }
 .control-line { fill: none; stroke: #1769aa; stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.app-shell .canvas-wrap svg text { font-family: "Times New Roman", Times, serif; font-weight: 400; }
+.app-shell .canvas-wrap svg .diagram-label { font-size: 15px; font-weight: 600; letter-spacing: .01em; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.app-shell .canvas-wrap svg .diagram-sign { font-size: 17px; font-weight: 600; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.app-shell .canvas-wrap svg .diagram-output-label { font-size: 13px; font-style: italic; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
 .canvas-help { padding: 6px 3px; color: #5f6973; font-size: 11px; }
 .graph-composer { display: grid; grid-template-columns: minmax(180px,2fr) 110px 110px auto; align-items: end; gap: 6px; margin-top: 5px; padding: 8px; border: 1px solid #c7cdd3; border-radius: 5px; background: #fff; }
 .graph-composer h2 { grid-column: 1 / -1; margin: 0; }

@@ -50,6 +50,12 @@ function stamp(object: CanvasObject) {
   const frame = (body: string, baseWidth = 80) => `\\begin{scope}[shift={(${x},${y})}, scale=${(Math.round((width / baseWidth) * 100) / 100).toFixed(2)}]\n${body}\n\\end{scope}`;
   switch (object.kind) {
     case "ground": return frame("\\draw (0,0) node[ground] {};", 44);
+    case "op-amp": case "op-amp-comparator": case "op-amp-inverting": case "op-amp-non-inverting": case "op-amp-summing": case "op-amp-integrator": case "op-amp-differentiator": case "op-amp-schmitt": {
+      const symbol = a("main", object.kind === "op-amp-comparator" ? ">" : object.kind === "op-amp-summing" ? "S" : object.kind === "op-amp-integrator" ? "I" : object.kind === "op-amp-differentiator" ? "d/dt" : object.kind === "op-amp-schmitt" ? "S" : "A");
+      const feedback = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"].includes(object.kind) ? " \\draw (0.9,0) -- (0.9,0.65) -- (-0.42,0.65) -- (-0.42,0.18);" : "";
+      const summing = object.kind === "op-amp-summing" ? " \\draw (-0.9,0.48) -- (-0.42,0.18); \\draw (-0.9,-0.12) -- (-0.42,0.18);" : "";
+      return frame(`\\draw (-0.42,-0.55) -- (-0.42,0.55) -- (0.55,0) -- cycle; \\draw (-1,0.18) -- (-0.42,0.18); \\draw (-1,-0.25) -- (-0.42,-0.25); \\draw (0.55,0) -- (0.95,0); \\node at (-0.54,0.18) {$-$}; \\node at (-0.54,-0.25) {$+$}; \\node at (0,0) {\\scriptsize ${symbol}};${feedback}${summing}`, 150);
+    }
     case "gbf": return frame(`\\draw (0,0) circle (0.45); \\node at (0,0) {\\scriptsize ${a("main", "GBF")}}; \\draw (-0.28,0) sin (-0.14,0.16) cos (0,0) sin (0.14,-0.16) cos (0.28,0);`, 70);
     case "oscilloscope": return frame(`\\draw (-0.7,-0.45) rectangle (0.7,0.45); \\draw (-0.5,0) sin (-0.25,0.2) cos (0,0) sin (0.25,-0.2) cos (0.5,0); \\node[below] at (0,-0.45) {\\scriptsize ${a("main", "oscillo")}};`, 100);
     case "mass": return frame(`\\draw (-0.45,-0.3) rectangle (0.45,0.3); \\node at (0,0) {${a("main", "m")}};`, 70);
