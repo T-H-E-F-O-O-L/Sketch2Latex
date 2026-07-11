@@ -1,4 +1,4 @@
-import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type Point } from "./canvas-types";
+import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 
 const SCALE = 50;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -136,8 +136,11 @@ function objectToLatexBase(object: CanvasObject): string {
     case "text": return `\\node at ${origin} {${safeText(object.text)}};`;
     case "freehand": { const points = simplify(object.points ?? []); return points.length > 1 ? `\\draw[smooth, tension=0.7] plot coordinates {${points.map((p) => point(p.x, p.y)).join(" ")}};` : ""; }
     case "axes": {
-      const width = n(object.width ?? 250); const height = n(object.height ?? 180); const expression = object.graph?.expression?.trim(); const domain = `${object.graph?.xMin ?? -5}:${object.graph?.xMax ?? 5}`;
-      return `\\begin{axis}[at={${origin}}, anchor=north west, width=${width}cm, height=${height}cm, xmin=-5, xmax=5, ymin=-5, ymax=5, axis lines=middle, grid=both, xlabel={$x$}, ylabel={$y$}]\n${expression ? `  \\addplot[domain=${domain}, samples=100, smooth] {${expression}};` : ""}\n\\end{axis}`;
+      const width = n(object.width ?? 250); const height = n(object.height ?? 180); const graph = object.graph;
+      const expressions = graph?.expressions?.length ? graph.expressions : graph?.expression?.trim() ? [graph.expression.trim()] : [];
+      const domain = `${graph?.xMin ?? -5}:${graph?.xMax ?? 5}`;
+      const plots = expressions.map((expression, index) => `  \\addplot[domain=${domain}, samples=100, smooth${expressions.length > 1 ? `, color=${["blue", "red", "green!60!black", "orange", "violet"][index % 5]}` : ""}] {${expression}};`).join("\n");
+      return `\\begin{axis}[at={${origin}}, anchor=north west, width=${width}cm, height=${height}cm, xmin=${graph?.xMin ?? -5}, xmax=${graph?.xMax ?? 5}, ymin=${graph?.yMin ?? -5}, ymax=${graph?.yMax ?? 5}, axis lines=middle, grid=${graph?.showGrid === false ? "none" : "both"}, xlabel={${safeText(graph?.xLabel ?? "$x$")}}, ylabel={${safeText(graph?.yLabel ?? "$y$")}}]\n${plots}\n\\end{axis}`;
     }
     default: return stamp(object);
   }
@@ -170,14 +173,16 @@ export function objectToLatex(object: CanvasObject): string {
   return `\\begin{scope}[cm={${matrixNumber(a)},${matrixNumber(b)},${matrixNumber(c)},${matrixNumber(d)},(${matrixNumber(tx)},${matrixNumber(ty)})}]\n${body}\n\\end{scope}`;
 }
 
-export function documentFor(objects: CanvasObject[], snippetOnly = false): string {
+export function documentFor(objects: CanvasObject[], snippetOnly = false, settings?: DocumentSettings): string {
   const body = objects.flatMap((object) => {
     const rendered = objectToLatex(object);
     return rendered ? [`% sketch2latex id=${object.id}\n% @sketch2latex ${JSON.stringify(object)}\n  ${rendered}`] : [];
   }).join("\n\n  ");
-  const picture = `\\begin{tikzpicture}[x=1cm,y=1cm]\n  ${body}\n\\end{tikzpicture}`;
+  const unit = settings?.unit ?? "cm";
+  const picture = `\\begin{tikzpicture}[x=1${unit},y=1${unit}]\n  ${body}\n\\end{tikzpicture}`;
   if (snippetOnly) return picture;
   return `\\documentclass[tikz,border=5pt]{standalone}
+% Sketch2LaTeX document: ${settings?.width ?? 900} x ${settings?.height ?? 560}px, ${settings?.orientation ?? "landscape"}, unit ${settings?.unit ?? "cm"}
 \\usepackage{tikz}
 \\usepackage{circuitikz}
 \\usepackage{pgfplots}
@@ -286,6 +291,18 @@ function mergeTikzEdits(metadata: CanvasObject, visual: CanvasObject, original: 
 
 export function objectsFromLatex(source: string, currentObjects: CanvasObject[]): LatexSyncResult {
   const markers = [...source.matchAll(/^\s*%+\s*sketch2latex\s+id=([^\s]+)\s*$/gim)];
+  if (!markers.length) {
+    const imported: CanvasObject[] = [];
+    const lines = [...source.matchAll(/\\draw(?:\[([^\]]*)\])?\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*(--|rectangle)\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*;/g)];
+    lines.forEach((match, index) => {
+      const options = match[1] ?? ""; const x = Number(match[2]) * SCALE; const rawY = -Number(match[3]) * SCALE; const y = Object.is(rawY, -0) ? 0 : rawY; const x2 = Number(match[5]) * SCALE; const rawY2 = -Number(match[6]) * SCALE; const y2 = Object.is(rawY2, -0) ? 0 : rawY2;
+      if (match[4] === "rectangle") imported.push({ id: `tikz-rect-${index}`, kind: "rect", x, y, width: x2 - x, height: y2 - y });
+      else imported.push({ id: `tikz-line-${index}`, kind: options.includes("<->") ? "double-arrow" : options.includes("->") || options.includes("Latex") ? "arrow" : options.includes("dashed") ? "dashed-line" : "line", x, y, x2, y2 });
+    });
+    const nodes = [...source.matchAll(/\\node(?:\[[^\]]*\])?\s+at\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([^{}]*)\}\s*;/g)];
+    nodes.forEach((match, index) => { const rawY = -Number(match[2]) * SCALE; imported.push({ id: `tikz-text-${index}`, kind: "text", x: Number(match[1]) * SCALE, y: Object.is(rawY, -0) ? 0 : rawY, text: textFromLatex(match[3]) }); });
+    if (imported.length) return { objects: imported, applied: imported.length, preserved: 0 };
+  }
   if (!markers.length) throw new Error("Conservez les commentaires % sketch2latex id=… pour appliquer le LaTeX au canevas.");
   const originals = new Map(currentObjects.map((object) => [object.id, object])); const seen = new Set<string>(); const resultIds = new Set<string>(); const objects: CanvasObject[] = [];
   let applied = 0; let preserved = 0;

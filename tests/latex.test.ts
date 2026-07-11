@@ -3,6 +3,8 @@ import test from "node:test";
 import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
 import { graphPathFor } from "../app/lib/graph";
 import { documentFor, objectsFromLatex, objectToLatex } from "../app/lib/latex";
+import { parseProject } from "../app/lib/project";
+import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 
 test("converts circuit connectors using circuitikz", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
@@ -128,4 +130,26 @@ test("emits LaTeX for every MPSI component exposed in the toolbar", () => {
     return { id: kind, kind, x, y: 30, width: 40, height: 40 };
   });
   for (const object of objects) assert.notEqual(objectToLatex(object).trim(), "", object.kind);
+});
+
+test("imports ordinary TikZ lines, rectangles and labels when metadata is absent", () => {
+  const source = "\\begin{tikzpicture}\\draw (0,0) -- (2,-1);\\draw[dashed] (1,-1) rectangle (3,-2);\\node at (1,-3) {hello};\\end{tikzpicture}";
+  const result = objectsFromLatex(source, []);
+  assert.equal(result.applied, 3);
+  assert.deepEqual(result.objects[0], { id: "tikz-line-0", kind: "line", x: 0, y: 0, x2: 100, y2: 50 });
+  assert.deepEqual(result.objects[1], { id: "tikz-rect-1", kind: "rect", x: 50, y: 50, width: 100, height: 50 });
+  assert.deepEqual(result.objects[2], { id: "tikz-text-0", kind: "text", x: 50, y: 150, text: "hello" });
+});
+
+test("keeps document settings and structured template projects portable", () => {
+  const template = diagramTemplates.find((item) => item.id === "rlc-series");
+  assert.ok(template);
+  const cloned = cloneTemplateObjects(template);
+  assert.equal(cloned.length, template.objects.length);
+  assert.notEqual(cloned[0].id, template.objects[0].id);
+  const project = parseProject({ name: "Essai", objects: cloned, settings: { width: 1000, height: 700, unit: "mm", orientation: "portrait", gridSize: 10, showGrid: false, snapToGrid: true } });
+  assert.equal(project.settings.width, 1000);
+  assert.equal(project.settings.orientation, "portrait");
+  assert.equal(project.objects.length, cloned.length);
+  assert.match(documentFor([], true, project.settings), /x=1mm,y=1mm/);
 });

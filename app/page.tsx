@@ -1,9 +1,14 @@
 "use client";
 
+/* Autosave hydration intentionally restores client-only state after mount. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { PointerEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { annotation, connectorKinds, defaultAnnotations, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind, type Point } from "./lib/canvas-types";
-import { graphPathFor } from "./lib/graph";
+import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type DocumentSettings, type ObjectKind, type Point } from "./lib/canvas-types";
+import { graphPathFor, graphPathsFor } from "./lib/graph";
 import { documentFor, objectsFromLatex } from "./lib/latex";
+import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
+import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
 
 const canvasWidth = 900;
 const canvasHeight = 560;
@@ -18,10 +23,10 @@ type HistoryAction =
   | { type: "undo" }
   | { type: "redo" };
 
-type DragMode = "move" | "resize" | "rotate";
+type DragMode = "move" | "resize" | "rotate" | "endpoint-start" | "endpoint-end" | "control" | "free-point";
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 type CanvasBounds = { x: number; y: number; width: number; height: number };
-type DragState = { id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode; corner?: ResizeCorner };
+type DragState = { id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode; corner?: ResizeCorner; pointIndex?: number };
 
 const keepHistory = (items: CanvasObject[][]) => items.slice(-100);
 
@@ -37,9 +42,14 @@ function historyReducer(state: HistoryState, action: HistoryAction): HistoryStat
   return next ? { objects: next, past: [...state.past, state.objects], future: state.future.slice(0, -1) } : state;
 }
 
-const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement): Point => {
+const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement, width = canvasWidth, height = canvasHeight): Point => {
+  const matrix = svg.getScreenCTM();
+  if (matrix) {
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    return { x: point.x, y: point.y };
+  }
   const rect = svg.getBoundingClientRect();
-  return { x: ((event.clientX - rect.left) / rect.width) * canvasWidth, y: ((event.clientY - rect.top) / rect.height) * canvasHeight };
+  return { x: ((event.clientX - rect.left) / rect.width) * width, y: ((event.clientY - rect.top) / rect.height) * height };
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -281,7 +291,11 @@ function preview(object: CanvasObject, selected: boolean) {
   if (object.kind === "text") return <text x={object.x} y={object.y} fill={color} fontSize="17" pointerEvents="all">{object.text}</text>;
   if (object.kind === "axes") {
     const width = object.width ?? 0; const height = object.height ?? 0; const xMin = object.graph?.xMin ?? -5; const xMax = object.graph?.xMax ?? 5;
-    const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const graphPath = graphPathFor(object); const clipId = `graph-clip-${object.id}`;
+    const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const graphPath = graphPathFor(object); const graphPaths = graphPathsFor(object); const clipId = `graph-clip-${object.id}`;
+    if (graphPaths.length > 1) {
+      const yMin = object.graph?.yMin ?? -5; const yMax = object.graph?.yMax ?? 5; const horizontalAxis = object.y + clamp((yMax - 0) / Math.max(.0001, yMax - yMin), 0, 1) * height; const colors = [color, "#c62828", "#2e7d32", "#ef6c00", "#6a1b9a"];
+      return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{object.graph?.showGrid !== false && Array.from({ length: 9 }, (_, index) => <g key={index} opacity=".12"><line x1={object.x + width * index / 8} y1={object.y} x2={object.x + width * index / 8} y2={object.y + height} stroke={color} /><line x1={object.x} y1={object.y + height * index / 8} x2={object.x + width} y2={object.y + height * index / 8} stroke={color} /></g>)}{graphPaths.map((path, index) => <path key={path} d={path} fill="none" stroke={colors[index % colors.length]} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />)}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /></g>;
+    }
     return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{graphPath && <path d={graphPath} fill="none" stroke={color} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={object.y + height / 2} x2={object.x + width} y2={object.y + height / 2} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14" fill={color}>{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
   }
   return stampPreview(object, selected);
@@ -297,7 +311,45 @@ function selectionOverlay(object: CanvasObject) {
   </g>;
 }
 
-export default function Home() {
+const deepCloneObjects = (objects: CanvasObject[]) => objects.map((object) => ({ ...object, style: object.style ? { ...object.style } : undefined, annotations: object.annotations ? { ...object.annotations } : undefined, graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined, points: object.points?.map((point) => ({ ...point })), control: object.control ? { ...object.control } : undefined, bindings: object.bindings ? { ...object.bindings } : undefined }));
+
+function connectionPoint(object: CanvasObject, toward: Point): Point {
+  const bounds = boundsFor(object); const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  const dx = toward.x - center.x; const dy = toward.y - center.y;
+  if (!dx && !dy) return center;
+  const factor = Math.min(Math.abs((bounds.width / 2) / (dx || .0001)), Math.abs((bounds.height / 2) / (dy || .0001)));
+  return { x: center.x + dx * factor, y: center.y + dy * factor };
+}
+
+function bindableAt(objects: CanvasObject[], point: Point, excludeId?: string) {
+  return [...objects].reverse().find((object) => object.id !== excludeId && !connectorKinds.includes(object.kind) && !object.hidden && !object.locked && (() => {
+    const bounds = boundsFor(object); const dx = Math.max(bounds.x - point.x, 0, point.x - bounds.x - bounds.width); const dy = Math.max(bounds.y - point.y, 0, point.y - bounds.y - bounds.height);
+    return Math.hypot(dx, dy) <= 28;
+  })());
+}
+
+function resolveConnections(objects: CanvasObject[]): CanvasObject[] {
+  const lookup = new Map(objects.map((object) => [object.id, object]));
+  return objects.map((object) => {
+    if (!connectorKinds.includes(object.kind) || !object.bindings) return object;
+    let next = object; const start = object.bindings.startId ? lookup.get(object.bindings.startId) : undefined; const end = object.bindings.endId ? lookup.get(object.bindings.endId) : undefined;
+    if (start) { const point = connectionPoint(start, { x: object.x2 ?? object.x, y: object.y2 ?? object.y }); next = { ...next, x: point.x, y: point.y }; }
+    if (end) { const point = connectionPoint(end, { x: next.x, y: next.y }); next = { ...next, x2: point.x, y2: point.y }; }
+    return next;
+  });
+}
+
+const snapPoint = (point: Point, settings: DocumentSettings, bypass = false): Point => !settings.snapToGrid || bypass ? point : ({ x: Math.round(point.x / settings.gridSize) * settings.gridSize, y: Math.round(point.y / settings.gridSize) * settings.gridSize });
+
+function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
+  const copy = svg.cloneNode(true) as SVGSVGElement;
+  copy.querySelectorAll("[data-export-ignore]").forEach((element) => element.remove());
+  copy.setAttribute("xmlns", "http://www.w3.org/2000/svg"); copy.setAttribute("width", String(width)); copy.setAttribute("height", String(height)); copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  return copy;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LegacyHome() {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragChangedRef = useRef(false);
   const [tool, setTool] = useState<ObjectKind | "select">("select");
@@ -494,5 +546,295 @@ export default function Home() {
       <aside><div className="code-actions"><label><input type="checkbox" checked={snippetOnly} onChange={(e) => setSnippetOnly(e.target.checked)} /> Extrait TikZ seul</label><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={resetLatexDraft} disabled={!latexDirty}>Annuler l’édition</button><button onClick={copy}>Copier le LaTeX</button><button onClick={exportPdf}>Exporter le PDF</button></div><p className="latex-help">Chaque objet comporte un bloc <code>% @sketch2latex &#123;…&#125;</code> éditable. Exemple pour un ion : remplacez <code>&quot;main&quot;:&quot;ion&quot;</code> par <code>&quot;main&quot;:&quot;Na+&quot;</code>, puis choisissez « Appliquer au canevas ». La couleur et l’épaisseur sont enregistrées dans <code>&quot;style&quot;</code> ; les libellés visibles et les coordonnées TikZ des formes simples restent aussi synchronisés.</p><textarea value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} aria-label="LaTeX éditable synchronisé avec le canevas" spellCheck="false" /></aside>
     </section>
     <footer>Chaque objet est vectoriel, typé et converti de façon déterministe. Les coordonnées du canevas utilisent 50 px = 1 unité TikZ et l’axe vertical est retourné à l’export.</footer>
+  </main>;
+}
+
+type ActiveTool = ObjectKind | "select" | "eraser" | "pan";
+type PanelName = "library" | "templates" | "project" | "document";
+
+export default function Home() {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragChangedRef = useRef(false);
+  const clipboardRef = useRef<CanvasObject[]>([]);
+  const hydratedRef = useRef(false);
+  const panDragRef = useRef<{ client: Point; origin: Point } | undefined>(undefined);
+  const [{ objects, past, future }, dispatchHistory] = useReducer(historyReducer, { objects: [], past: [], future: [] });
+  const [tool, setTool] = useState<ActiveTool>("select");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [draft, setDraft] = useState<CanvasObject>();
+  const [curveAnchor, setCurveAnchor] = useState<{ start: Point; end?: Point }>();
+  const [drag, setDrag] = useState<DragState>();
+  const [marquee, setMarquee] = useState<{ start: Point; end: Point }>();
+  const [settings, setSettings] = useState<DocumentSettings>(defaultDocumentSettings);
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
+  const [mode, setMode] = useState<"beginner" | "advanced">("beginner");
+  const [panel, setPanel] = useState<PanelName>("library");
+  const [search, setSearch] = useState("");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [templateCategory, setTemplateCategory] = useState("Toutes");
+  const [projectName, setProjectName] = useState("Mon schéma");
+  const [savedProjects, setSavedProjects] = useState<ProjectFile[]>([]);
+  const [notice, setNotice] = useState("Prêt. Le projet est enregistré automatiquement sur cet appareil.");
+  const [lastSaved, setLastSaved] = useState<string>();
+  const [snippetOnly, setSnippetOnly] = useState(false);
+  const [latexDraft, setLatexDraft] = useState<string>();
+  const [drawingStyle, setDrawingStyle] = useState({ stroke: "#111111", strokeWidth: 2 });
+  const [expression, setExpression] = useState("sin(x); cos(x)");
+  const [xRange, setXRange] = useState("-5:5");
+  const [yRange, setYRange] = useState("-5:5");
+  const [marqueeEnabled, setMarqueeEnabled] = useState(true);
+  const [clipboardCount, setClipboardCount] = useState(0);
+
+  const selected = selectedIds.length === 1 ? objects.find((object) => object.id === selectedIds[0]) : undefined;
+  const selectedObjects = useMemo(() => objects.filter((object) => selectedIds.includes(object.id)), [objects, selectedIds]);
+  const latex = useMemo(() => documentFor(objects.filter((object) => !object.hidden), snippetOnly, settings), [objects, settings, snippetOnly]);
+  const latexSource = latexDraft ?? latex;
+  const latexDirty = latexDraft !== undefined;
+  const filteredGroups = useMemo(() => toolboxGroups.map((group) => ({ ...group, kinds: group.kinds.filter((kind) => kind === "select" || labels[kind].toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr"))) })).filter((group) => group.kinds.length), [search]);
+  const categories = useMemo(() => ["Toutes", ...new Set(diagramTemplates.map((template) => template.category))], []);
+  const filteredTemplates = diagramTemplates.filter((template) => (templateCategory === "Toutes" || template.category === templateCategory) && `${template.title} ${template.description}`.toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr")));
+
+  const commitObjects = useCallback((next: CanvasObject[], message?: string) => {
+    dispatchHistory({ type: "commit", objects: resolveConnections(next) });
+    if (message) setNotice(message);
+  }, []);
+  const undo = useCallback(() => dispatchHistory({ type: "undo" }), []);
+  const redo = useCallback(() => dispatchHistory({ type: "redo" }), []);
+
+  useEffect(() => {
+    try {
+      const autosave = localStorage.getItem(AUTOSAVE_KEY);
+      if (autosave) {
+        const project = parseProject(autosave); dispatchHistory({ type: "transient", objects: project.objects }); setSettings(project.settings); setProjectName(project.name); setNotice("Dernière sauvegarde automatique restaurée.");
+      }
+      setFavorites(JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? "[]"));
+      setMode(localStorage.getItem(MODE_KEY) === "advanced" ? "advanced" : "beginner");
+      setSavedProjects(storedProjects());
+    } catch { setNotice("Le brouillon local était illisible ; un projet vide a été ouvert."); }
+    hydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(makeProject(projectName, objects, settings)));
+      const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); setLastSaved(time);
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [objects, projectName, settings]);
+
+  useEffect(() => { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); }, [favorites]);
+  useEffect(() => { localStorage.setItem(MODE_KEY, mode); }, [mode]);
+  useEffect(() => { if (!latexDirty) setLatexDraft(undefined); }, [latex, latexDirty]);
+  useEffect(() => { setSelectedIds((ids) => ids.filter((id) => objects.some((object) => object.id === id))); }, [objects]);
+
+  const updateSelected = useCallback((patch: Partial<CanvasObject>, message?: string) => {
+    if (!selectedIds.length) return;
+    commitObjects(objects.map((object) => selectedIds.includes(object.id) ? { ...object, ...patch } : object), message);
+  }, [commitObjects, objects, selectedIds]);
+
+  const updateOne = useCallback((id: string, patch: Partial<CanvasObject>) => commitObjects(objects.map((object) => object.id === id ? { ...object, ...patch } : object)), [commitObjects, objects]);
+
+  const deleteSelected = useCallback(() => {
+    if (!selectedIds.length) return;
+    const ids = new Set(selectedIds); commitObjects(objects.filter((object) => !ids.has(object.id)).map((object) => object.bindings ? { ...object, bindings: { startId: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startId, endId: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endId } } : object), "Sélection supprimée. Utilisez Annuler pour la restaurer."); setSelectedIds([]);
+  }, [commitObjects, objects, selectedIds]);
+
+  const copySelection = useCallback(() => {
+    setClipboardCount(selectedObjects.length);
+    clipboardRef.current = deepCloneObjects(selectedObjects); setNotice(`${selectedObjects.length} objet${selectedObjects.length > 1 ? "s" : ""} copié${selectedObjects.length > 1 ? "s" : ""}.`);
+  }, [selectedObjects]);
+  const pasteSelection = useCallback(() => {
+    if (!clipboardRef.current.length) return;
+    const idMap = new Map(clipboardRef.current.map((object) => [object.id, objectId()]));
+    const pasted = clipboardRef.current.map((object) => ({ ...translateObject(object, 24, 24), id: idMap.get(object.id)!, groupId: object.groupId ? `group-${objectId()}` : undefined, bindings: object.bindings ? { startId: idMap.get(object.bindings.startId ?? ""), endId: idMap.get(object.bindings.endId ?? "") } : undefined }));
+    commitObjects([...objects, ...pasted], "Copie collée avec un décalage de 24 px."); setSelectedIds(pasted.map((object) => object.id));
+  }, [commitObjects, objects]);
+  const duplicateSelection = useCallback(() => { copySelection(); window.setTimeout(pasteSelection, 0); }, [copySelection, pasteSelection]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const input = event.target as HTMLElement; if (["INPUT", "TEXTAREA", "SELECT"].includes(input.tagName)) return;
+      const command = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase();
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedIds.length) { event.preventDefault(); deleteSelected(); }
+      else if (command && key === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
+      else if (command && key === "y") { event.preventDefault(); redo(); }
+      else if (command && key === "c") { event.preventDefault(); copySelection(); }
+      else if (command && key === "v") { event.preventDefault(); pasteSelection(); }
+      else if (command && key === "d") { event.preventDefault(); duplicateSelection(); }
+      else if (command && key === "a") { event.preventDefault(); setSelectedIds(objects.filter((object) => !object.hidden && !object.locked).map((object) => object.id)); }
+      else if (event.key === "Escape") { setDraft(undefined); setCurveAnchor(undefined); setMarquee(undefined); setTool("select"); }
+      else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) && selectedIds.length) {
+        event.preventDefault(); const step = event.shiftKey ? 10 : 1; const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0; const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+        commitObjects(objects.map((object) => selectedIds.includes(object.id) && !object.locked ? translateObject(object, dx, dy) : object));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true); return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [copySelection, deleteSelected, duplicateSelection, objects, pasteSelection, redo, selectedIds, undo, commitObjects]);
+
+  const makeObject = (point: Point): CanvasObject => {
+    const kind = tool as ObjectKind;
+    if (stampKinds.includes(kind)) { const size = stampSize(kind); return { id: objectId(), kind, x: point.x - size.width / 2, y: point.y - size.height / 2, annotations: defaultAnnotations(kind), style: drawingStyle, ...size }; }
+    if (kind === "text") return { id: objectId(), kind, x: point.x, y: point.y, text: "Étiquette", style: drawingStyle };
+    if (kind === "axes") return { id: objectId(), kind, x: point.x, y: point.y, width: 300, height: 210, graph: { expression: "", expressions: [], xMin: -5, xMax: 5, yMin: -5, yMax: 5, xLabel: "x", yLabel: "y", showGrid: true }, style: drawingStyle };
+    if (kind === "freehand") return { id: objectId(), kind, x: point.x, y: point.y, points: [point], style: drawingStyle };
+    if (connectorKinds.includes(kind)) { const startTarget = bindableAt(objects, point); const start = startTarget ? connectionPoint(startTarget, point) : point; return { id: objectId(), kind, x: start.x, y: start.y, x2: start.x, y2: start.y, annotations: defaultAnnotations(kind), bindings: startTarget ? { startId: startTarget.id } : undefined, style: drawingStyle }; }
+    return { id: objectId(), kind, x: point.x, y: point.y, width: 0, height: 0, style: drawingStyle };
+  };
+
+  const chooseObject = (id: string, additive: boolean) => {
+    const object = objects.find((item) => item.id === id); if (!object || object.hidden || object.locked) return;
+    const groupIds = object.groupId ? objects.filter((item) => item.groupId === object.groupId).map((item) => item.id) : [id];
+    setSelectedIds((current) => additive ? (current.includes(id) ? current.filter((value) => !groupIds.includes(value)) : [...new Set([...current, ...groupIds])]) : groupIds);
+  };
+
+  const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current; if (!svg) return; svg.focus({ preventScroll: true });
+    const raw = canvasPoint(event, svg, settings.width, settings.height); const point = snapPoint(raw, settings, event.altKey); const element = event.target as Element; const targetId = element.closest("[data-id]")?.getAttribute("data-id"); const handle = element.closest("[data-handle]")?.getAttribute("data-handle"); const corner = element.closest("[data-corner]")?.getAttribute("data-corner") as ResizeCorner | undefined; const pointIndex = Number(element.closest("[data-point-index]")?.getAttribute("data-point-index"));
+    if (tool === "pan" || event.button === 1 || event.buttons === 4) { panDragRef.current = { client: { x: event.clientX, y: event.clientY }, origin: { x: view.x, y: view.y } }; event.currentTarget.setPointerCapture(event.pointerId); return; }
+    if (tool === "eraser" && targetId) { commitObjects(objects.filter((object) => object.id !== targetId), "Objet effacé. Utilisez Annuler pour le récupérer."); return; }
+    if (tool === "curve") {
+      if (!curveAnchor) { setCurveAnchor({ start: point }); setNotice("Cliquez l’arrivée de la courbe."); return; }
+      if (!curveAnchor.end) { const end = event.shiftKey ? straightEndpoint(curveAnchor.start, point) : point; setCurveAnchor({ ...curveAnchor, end }); setDraft({ id: objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control: straightCurveControl(curveAnchor.start, end), style: drawingStyle }); setNotice("Placez le point de contrôle."); return; }
+      const complete = { ...(draft ?? makeObject(curveAnchor.start)), kind: "curve" as const, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : point };
+      commitObjects([...objects, complete], "Courbe ajoutée."); setSelectedIds([complete.id]); setDraft(undefined); setCurveAnchor(undefined); setTool("select"); return;
+    }
+    if (tool === "select" && targetId) {
+      const original = objects.find((object) => object.id === targetId); if (!original) return;
+      chooseObject(targetId, event.shiftKey);
+      const mode: DragMode = handle === "rotate" ? "rotate" : handle === "resize" ? "resize" : handle === "endpoint-start" ? "endpoint-start" : handle === "endpoint-end" ? "endpoint-end" : handle === "control" ? "control" : handle === "free-point" ? "free-point" : "move";
+      dragChangedRef.current = false; setDrag({ id: targetId, start: point, original, snapshot: deepCloneObjects(objects), mode, corner, pointIndex: Number.isFinite(pointIndex) ? pointIndex : undefined }); event.currentTarget.setPointerCapture(event.pointerId); return;
+    }
+    if (tool === "select") { setSelectedIds([]); if (marqueeEnabled) { setMarquee({ start: raw, end: raw }); event.currentTarget.setPointerCapture(event.pointerId); } return; }
+    const created = makeObject(point);
+    if (stampKinds.includes(created.kind) || created.kind === "text" || created.kind === "axes" || created.kind === "point") { commitObjects([...objects, created], `${labels[created.kind]} ajouté.`); setSelectedIds([created.id]); if (!standardDrawingTools.includes(created.kind)) setTool("select"); return; }
+    setDraft(created); event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current; if (!svg) return;
+    if (panDragRef.current) { const rect = svg.getBoundingClientRect(); const factorX = (settings.width / view.zoom) / rect.width; const factorY = (settings.height / view.zoom) / rect.height; setView((current) => ({ ...current, x: panDragRef.current!.origin.x - (event.clientX - panDragRef.current!.client.x) * factorX, y: panDragRef.current!.origin.y - (event.clientY - panDragRef.current!.client.y) * factorY })); return; }
+    const raw = canvasPoint(event, svg, settings.width, settings.height); const point = snapPoint(raw, settings, event.altKey);
+    if (marquee) { setMarquee({ ...marquee, end: raw }); return; }
+    if (drag) {
+      dragChangedRef.current = true; const original = drag.original; const dx = point.x - drag.start.x; const dy = point.y - drag.start.y; const center = objectCenter(original);
+      let nextObjects = drag.snapshot.map((object) => {
+        if (drag.mode === "move" && selectedIds.includes(object.id) && !object.locked) return translateObject(object, dx, dy);
+        if (object.id !== drag.id) return object;
+        if (drag.mode === "resize" && drag.corner) return resizeFromCorner(original, drag.corner, point, event.shiftKey);
+        if (drag.mode === "rotate") return { ...original, rotation: Math.round(((original.rotation ?? 0) + (Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 };
+        if (drag.mode === "endpoint-start") return { ...original, x: point.x, y: point.y, bindings: { ...original.bindings, startId: undefined } };
+        if (drag.mode === "endpoint-end") return { ...original, x2: point.x, y2: point.y, bindings: { ...original.bindings, endId: undefined } };
+        if (drag.mode === "control") return { ...original, control: point };
+        if (drag.mode === "free-point" && original.points && drag.pointIndex !== undefined) return { ...original, points: original.points.map((value, index) => index === drag.pointIndex ? point : value) };
+        return object;
+      });
+      nextObjects = resolveConnections(nextObjects); dispatchHistory({ type: "transient", objects: nextObjects }); return;
+    }
+    if (tool === "curve" && curveAnchor) { if (!curveAnchor.end) { const end = event.shiftKey ? straightEndpoint(curveAnchor.start, point) : point; setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control: straightCurveControl(curveAnchor.start, end), style: drawingStyle }); } else setDraft({ ...(draft!), control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : point }); return; }
+    if (!draft) return;
+    if (draft.kind === "freehand") setDraft({ ...draft, points: [...(draft.points ?? []), raw] });
+    else if (connectorKinds.includes(draft.kind)) { const end = event.shiftKey ? straightEndpoint({ x: draft.x, y: draft.y }, point) : point; setDraft({ ...draft, x2: end.x, y2: end.y }); }
+    else setDraft({ ...draft, width: point.x - draft.x, height: point.y - draft.y });
+  };
+
+  const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current; const point = svg ? canvasPoint(event, svg, settings.width, settings.height) : { x: 0, y: 0 };
+    if (panDragRef.current) panDragRef.current = undefined;
+    if (marquee) { const x = Math.min(marquee.start.x, marquee.end.x); const y = Math.min(marquee.start.y, marquee.end.y); const width = Math.abs(marquee.end.x - marquee.start.x); const height = Math.abs(marquee.end.y - marquee.start.y); if (width > 4 || height > 4) setSelectedIds(objects.filter((object) => { const bounds = boundsFor(object); return !object.hidden && !object.locked && bounds.x >= x && bounds.y >= y && bounds.x + bounds.width <= x + width && bounds.y + bounds.height <= y + height; }).map((object) => object.id)); setMarquee(undefined); }
+    if (draft && tool !== "curve") { let complete = draft; if (connectorKinds.includes(draft.kind)) { const target = bindableAt(objects, point); if (target) { const end = connectionPoint(target, { x: draft.x, y: draft.y }); complete = { ...draft, x2: end.x, y2: end.y, bindings: { ...draft.bindings, endId: target.id } }; } } commitObjects([...objects, complete], `${labels[complete.kind]} ajouté.`); setSelectedIds([complete.id]); setDraft(undefined); if (!standardDrawingTools.includes(complete.kind)) setTool("select"); }
+    else if (drag && dragChangedRef.current) {
+      let finalObjects = objects;
+      if (drag.mode === "endpoint-start" || drag.mode === "endpoint-end") { const target = bindableAt(objects, point, drag.id); if (target) finalObjects = objects.map((object) => object.id !== drag.id ? object : drag.mode === "endpoint-start" ? { ...object, bindings: { ...object.bindings, startId: target.id } } : { ...object, bindings: { ...object.bindings, endId: target.id } }); }
+      dispatchHistory({ type: "transient", objects: resolveConnections(finalObjects) }); dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
+    }
+    setDrag(undefined); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const onDoubleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    const id = (event.target as Element).closest("[data-id]")?.getAttribute("data-id"); const object = objects.find((item) => item.id === id); if (!object) return;
+    if (object.kind === "text") { const value = window.prompt("Modifier le texte", object.text ?? ""); if (value !== null) updateOne(object.id, { text: value }); }
+    else if (object.annotations) { const key = Object.keys(object.annotations)[0]; const value = window.prompt(`Modifier ${key}`, object.annotations[key]); if (value !== null) updateOne(object.id, { annotations: { ...object.annotations, [key]: value } }); }
+  };
+
+  const onWheel = (event: React.WheelEvent<SVGSVGElement>) => { event.preventDefault(); const factor = event.deltaY > 0 ? .9 : 1.1; setView((current) => ({ ...current, zoom: clamp(current.zoom * factor, .25, 4) })); };
+  const fitView = () => setView({ x: 0, y: 0, zoom: 1 });
+
+  const groupSelection = () => { if (selectedIds.length < 2) return; const groupId = `group-${objectId()}`; commitObjects(objects.map((object) => selectedIds.includes(object.id) ? { ...object, groupId } : object), "Sélection groupée."); };
+  const ungroupSelection = () => { updateSelected({ groupId: undefined }, "Groupe dissocié."); };
+  const alignSelection = (mode: "left" | "center" | "top" | "middle") => {
+    if (selectedObjects.length < 2) return; const bounds = selectedObjects.map(boundsFor); const target = mode === "left" ? Math.min(...bounds.map((value) => value.x)) : mode === "top" ? Math.min(...bounds.map((value) => value.y)) : mode === "center" ? bounds.reduce((sum, value) => sum + value.x + value.width / 2, 0) / bounds.length : bounds.reduce((sum, value) => sum + value.y + value.height / 2, 0) / bounds.length;
+    commitObjects(objects.map((object) => { const index = selectedObjects.findIndex((value) => value.id === object.id); if (index < 0) return object; const boundsValue = bounds[index]; const dx = mode === "left" ? target - boundsValue.x : mode === "center" ? target - boundsValue.x - boundsValue.width / 2 : 0; const dy = mode === "top" ? target - boundsValue.y : mode === "middle" ? target - boundsValue.y - boundsValue.height / 2 : 0; return translateObject(object, dx, dy); }), "Sélection alignée.");
+  };
+  const reorder = (front: boolean) => { const selectedSet = new Set(selectedIds); const moving = objects.filter((object) => selectedSet.has(object.id)); const rest = objects.filter((object) => !selectedSet.has(object.id)); commitObjects(front ? [...rest, ...moving] : [...moving, ...rest], front ? "Placée au premier plan." : "Placée à l’arrière-plan."); };
+
+  const addFunction = () => {
+    const [xMin, xMax] = xRange.split(":").map(Number); const [yMin, yMax] = yRange.split(":").map(Number); const expressions = expression.split(";").map((value) => value.trim()).filter(Boolean);
+    const next: CanvasObject = { id: objectId(), kind: "axes", x: 90, y: 80, width: 520, height: 360, graph: { expression: expressions[0] ?? "", expressions, xMin, xMax, yMin, yMax, xLabel: "x", yLabel: "y", showGrid: true }, style: drawingStyle };
+    if (!expressions.length || !Number.isFinite(xMin) || !Number.isFinite(xMax) || !Number.isFinite(yMin) || !Number.isFinite(yMax) || graphPathsFor(next).length !== expressions.length) { setNotice("Expression ou domaine invalide. Séparez plusieurs fonctions par un point-virgule."); return; }
+    commitObjects([...objects, next], "Graphe ajouté."); setSelectedIds([next.id]);
+  };
+
+  const applyTemplate = (templateId: string) => { const template = diagramTemplates.find((item) => item.id === templateId); if (!template) return; if (objects.length && !window.confirm("Remplacer le canevas actuel par ce modèle ? Le canevas reste récupérable avec Annuler.")) return; const next = cloneTemplateObjects(template); commitObjects(next, `Modèle « ${template.title} » chargé. Tous ses éléments sont modifiables.`); setSelectedIds([]); setPanel("library"); fitView(); };
+  const toggleFavorite = (kind: string) => setFavorites((current) => current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind]);
+
+  const saveProject = () => { const project = makeProject(projectName, objects, settings); saveNamedProject(project); localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project)); setSavedProjects(storedProjects()); setNotice(`Projet « ${project.name} » enregistré sur cet appareil.`); };
+  const loadProject = (name: string) => { const project = savedProjects.find((item) => item.name === name); if (!project) return; if (objects.length && !window.confirm(`Ouvrir « ${name} » et remplacer le canevas ?`)) return; commitObjects(project.objects, `Projet « ${name} » ouvert.`); setSettings(project.settings); setProjectName(project.name); setSelectedIds([]); fitView(); };
+  const exportProject = () => downloadText(`${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "schema"}.sketch2latex.json`, JSON.stringify(makeProject(projectName, objects, settings), null, 2), "application/json");
+  const importProject = async (file: File) => { try { const project = parseProject(await file.text()); if (objects.length && !window.confirm("Remplacer le canevas par le projet importé ?")) return; commitObjects(project.objects, `Projet « ${project.name} » importé.`); setProjectName(project.name); setSettings(project.settings); setSelectedIds([]); } catch (error) { setNotice(error instanceof Error ? error.message : "Import impossible."); } };
+
+  const applyLatexToCanvas = () => { try { const result = objectsFromLatex(latexSource, objects); commitObjects(result.objects, `${result.applied} objet${result.applied > 1 ? "s" : ""} appliqué${result.applied > 1 ? "s" : ""} depuis le TikZ.`); setSelectedIds([]); setLatexDraft(undefined); } catch (error) { setNotice(error instanceof Error ? error.message : "TikZ invalide."); } };
+  const copyLatex = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copié."); };
+  const exportSvg = () => { if (!svgRef.current) return; const copy = cleanSvg(svgRef.current, settings.width, settings.height); downloadText("schema-mpsi.svg", new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("SVG vectoriel exporté."); };
+  const exportPdf = async () => {
+    if (!svgRef.current) return; setNotice("Création du PDF vectoriel…");
+    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); const svg = cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: settings.width, height: settings.height }); pdf.save("schema-mpsi.pdf"); setNotice("PDF vectoriel exporté sans poignées de sélection."); }
+    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(cleanSvg(svgRef.current!, settings.width, settings.height)); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); pdf.addImage(image, "PNG", 0, 0, settings.width, settings.height); pdf.save("schema-mpsi.pdf"); setNotice("PDF exporté en mode de compatibilité."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export PDF impossible."); } }
+  };
+
+  const clearCanvas = () => { if (!objects.length || !window.confirm("Effacer tout le canevas ? Vous pourrez encore utiliser Annuler.")) return; commitObjects([], "Canevas effacé. Cliquez sur Annuler pour le restaurer."); setSelectedIds([]); };
+  const changeMode = (next: "beginner" | "advanced") => { setMode(next); if (next === "beginner") setPanel("library"); setNotice(next === "beginner" ? "Mode essentiel : outils courants et propriétés principales." : "Mode avancé : calques, document, métadonnées et synchronisation complète."); };
+
+  const renderSelectionHandles = (object: CanvasObject) => {
+    if (connectorKinds.includes(object.kind)) return <g key={`handles-${object.id}`} data-id={object.id} data-export-ignore="true" transform={transformFor(object)}><circle className="endpoint-handle" data-handle="endpoint-start" cx={object.x} cy={object.y} r="7" /><circle className="endpoint-handle" data-handle="endpoint-end" cx={object.x2 ?? object.x} cy={object.y2 ?? object.y} r="7" />{object.kind === "curve" && object.control && <><line className="control-line" x1={object.x} y1={object.y} x2={object.control.x} y2={object.control.y} /><line className="control-line" x1={object.control.x} y1={object.control.y} x2={object.x2} y2={object.y2} /><circle className="control-handle" data-handle="control" cx={object.control.x} cy={object.control.y} r="7" /></>}</g>;
+    if (object.kind === "freehand" && object.points) { const step = Math.max(1, Math.ceil(object.points.length / 16)); return <g key={`handles-${object.id}`} data-id={object.id} data-export-ignore="true" transform={transformFor(object)}>{object.points.map((point, index) => index % step === 0 ? <circle key={index} className="free-point-handle" data-handle="free-point" data-point-index={index} cx={point.x} cy={point.y} r="5" /> : null)}</g>; }
+    return <g key={`selection-${object.id}`} data-export-ignore="true">{selectionOverlay(object)}</g>;
+  };
+
+  return <main className={`app-shell mode-${mode}`}>
+    <header className="app-header"><div><p className="eyebrow">Éditeur scientifique CPGE</p><h1>Sketch2LaTeX</h1></div><div className="header-actions"><label className="project-name">Projet <input value={projectName} onChange={(event) => setProjectName(event.target.value)} /></label><span className="save-state">{lastSaved ? `Sauvegardé à ${lastSaved}` : "Autosauvegarde active"}</span><div className="mode-switch" role="group" aria-label="Niveau d’outils"><button className={mode === "beginner" ? "active" : ""} onClick={() => changeMode("beginner")}>Essentiel</button><button className={mode === "advanced" ? "active" : ""} onClick={() => changeMode("advanced")}>Avancé</button></div></div></header>
+    <p className="status" aria-live="polite">{notice}</p>
+    <span hidden data-clipboard-count={clipboardCount} />
+    {/* eslint-disable-next-line react-hooks/refs */}
+    <nav className="command-bar" aria-label="Commandes du document"><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd+Z">↶ Annuler</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd+Y">↷ Rétablir</button><button onClick={copySelection} disabled={!selectedIds.length}>Copier</button><button onClick={pasteSelection} disabled={!clipboardRef.current.length}>Coller</button><button onClick={duplicateSelection} disabled={!selectedIds.length}>Dupliquer</button><button onClick={deleteSelected} disabled={!selectedIds.length}>Supprimer</button><button onClick={clearCanvas} disabled={!objects.length}>Tout effacer</button><span className="bar-separator" /><button onClick={() => setTool("select")} className={tool === "select" ? "active" : ""}>Sélection</button><button onClick={() => setTool("pan")} className={tool === "pan" ? "active" : ""}>Main</button><button onClick={() => setTool("eraser")} className={tool === "eraser" ? "active" : ""}>Gomme</button><label className="snap-toggle"><input type="checkbox" checked={settings.snapToGrid} onChange={(event) => setSettings({ ...settings, snapToGrid: event.target.checked })} /> Aimantation</label><button onClick={() => setView((current) => ({ ...current, zoom: clamp(current.zoom - .2, .25, 4) }))}>−</button><output>{Math.round(view.zoom * 100)}%</output><button onClick={() => setView((current) => ({ ...current, zoom: clamp(current.zoom + .2, .25, 4) }))}>+</button><button onClick={fitView}>Ajuster</button></nav>
+    <section className="editor-layout">
+      <aside className="left-panel">
+        <div className="panel-tabs"><button className={panel === "library" ? "active" : ""} onClick={() => setPanel("library")}>Bibliothèque</button><button className={panel === "templates" ? "active" : ""} onClick={() => setPanel("templates")}>Modèles</button><button className={panel === "project" ? "active" : ""} onClick={() => setPanel("project")}>Projet</button>{mode === "advanced" && <button className={panel === "document" ? "active" : ""} onClick={() => setPanel("document")}>Document</button>}</div>
+        {(panel === "library" || panel === "templates") && <input className="panel-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un outil ou modèle…" />}
+        {panel === "library" && <div className="library-scroll">{favorites.length > 0 && <section className="tool-group"><h2>Favoris</h2><div className="tool-grid">{favorites.filter((kind): kind is ObjectKind => Object.hasOwn(labels, kind)).map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button>)}</div></section>}{filteredGroups.map((group) => <details key={group.title} open={group.title === "Outils" || mode === "advanced"}><summary>{group.title}</summary><div className="tool-grid">{group.kinds.map((kind) => kind === "select" ? null : <div className="tool-item" key={kind}><button className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button><button className={`favorite-button ${favorites.includes(kind) ? "active" : ""}`} onClick={() => toggleFavorite(kind)} aria-label={`${favorites.includes(kind) ? "Retirer" : "Ajouter"} ${labels[kind]} des favoris`}>★</button></div>)}</div></details>)}<section className="style-section"><h2>Style de dessin</h2><label>Couleur <input type="color" value={selected?.style?.stroke ?? drawingStyle.stroke} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, stroke: event.target.value } }) : setDrawingStyle({ ...drawingStyle, stroke: event.target.value })} /></label><label>Épaisseur <input type="range" min="1" max="8" value={selected?.style?.strokeWidth ?? drawingStyle.strokeWidth} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, strokeWidth: Number(event.target.value) } }) : setDrawingStyle({ ...drawingStyle, strokeWidth: Number(event.target.value) })} /></label></section></div>}
+        {panel === "templates" && <div className="library-scroll"><div className="category-chips">{categories.map((category) => <button key={category} className={templateCategory === category ? "active" : ""} onClick={() => setTemplateCategory(category)}>{category}</button>)}</div>{filteredTemplates.map((template) => <article className="template-card" key={template.id}><h2>{template.title}</h2><p>{template.description}</p><p className="template-meta">{template.sourceName} · {template.license}</p><div><button onClick={() => applyTemplate(template.id)}>Utiliser ce modèle</button> <a href={template.sourceUrl} target="_blank" rel="noreferrer">Source</a></div></article>)}</div>}
+        {panel === "project" && <div className="project-panel"><button onClick={saveProject}>Enregistrer maintenant</button><button onClick={exportProject}>Exporter le projet JSON</button><button onClick={() => fileInputRef.current?.click()}>Importer un projet JSON</button><input ref={fileInputRef} hidden type="file" accept=".json,.sketch2latex.json,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importProject(file); event.currentTarget.value = ""; }} /><h2>Projets enregistrés</h2>{savedProjects.length ? savedProjects.map((project) => <button className="saved-project" key={`${project.name}-${project.updatedAt}`} onClick={() => loadProject(project.name)}><strong>{project.name}</strong><small>{new Date(project.updatedAt).toLocaleString()}</small></button>) : <p>Aucun projet nommé. Le brouillon courant reste autosauvegardé.</p>}</div>}
+        {panel === "document" && <div className="document-panel"><h2>Document</h2><label>Largeur (px)<input type="number" min="320" max="2400" value={settings.width} onChange={(event) => setSettings({ ...settings, width: clamp(Number(event.target.value), 320, 2400) })} /></label><label>Hauteur (px)<input type="number" min="240" max="1800" value={settings.height} onChange={(event) => setSettings({ ...settings, height: clamp(Number(event.target.value), 240, 1800) })} /></label><label>Orientation<select value={settings.orientation} onChange={(event) => setSettings({ ...settings, orientation: event.target.value as DocumentSettings["orientation"] })}><option value="landscape">Paysage</option><option value="portrait">Portrait</option></select></label><label>Unité LaTeX<select value={settings.unit} onChange={(event) => setSettings({ ...settings, unit: event.target.value as DocumentSettings["unit"] })}><option value="cm">cm</option><option value="mm">mm</option><option value="pt">pt</option></select></label><label>Pas de grille<input type="number" min="5" max="100" value={settings.gridSize} onChange={(event) => setSettings({ ...settings, gridSize: clamp(Number(event.target.value), 5, 100) })} /></label><label><input type="checkbox" checked={settings.showGrid} onChange={(event) => setSettings({ ...settings, showGrid: event.target.checked })} /> Afficher la grille</label></div>}
+      </aside>
+      <section className="canvas-column">
+        {selectedIds.length > 1 && <div className="selection-toolbar"><strong>{selectedIds.length} objets</strong><button onClick={groupSelection}>Grouper</button><button onClick={ungroupSelection}>Dissocier</button><button onClick={() => alignSelection("left")}>Aligner à gauche</button><button onClick={() => alignSelection("center")}>Centrer horizontalement</button><button onClick={() => alignSelection("top")}>Aligner en haut</button><button onClick={() => alignSelection("middle")}>Centrer verticalement</button><button onClick={() => reorder(true)}>Premier plan</button><button onClick={() => reorder(false)}>Arrière-plan</button></div>}
+        <div className={`canvas-wrap tool-${tool}`}><svg ref={svgRef} tabIndex={0} viewBox={`${view.x} ${view.y} ${settings.width / view.zoom} ${settings.height / view.zoom}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDoubleClick={onDoubleClick} onWheel={onWheel} aria-label="Canevas scientifique interactif">
+          <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker><pattern id="small-grid" width={settings.gridSize} height={settings.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${settings.gridSize} 0 L 0 0 0 ${settings.gridSize}`} fill="none" stroke="#d8dde3" strokeWidth="1" /></pattern></defs>
+          <rect width={settings.width} height={settings.height} fill="white" />{settings.showGrid && <rect data-export-ignore="true" width={settings.width} height={settings.height} fill="url(#small-grid)" />}
+          {objects.map((object) => object.hidden ? null : <g key={object.id} data-id={object.id} transform={transformFor(object)} opacity={object.locked ? .55 : 1}>{preview(object, selectedIds.includes(object.id))}</g>)}
+          {selectedObjects.map(renderSelectionHandles)}
+          {draft && <g opacity=".6" transform={transformFor(draft)}>{preview(draft, true)}</g>}
+          {marquee && <rect data-export-ignore="true" className="marquee" x={Math.min(marquee.start.x, marquee.end.x)} y={Math.min(marquee.start.y, marquee.end.y)} width={Math.abs(marquee.end.x - marquee.start.x)} height={Math.abs(marquee.end.y - marquee.start.y)} />}
+        </svg></div>
+        <div className="canvas-help">Molette : zoom · Outil Main : déplacer la vue · Maj-clic : sélection multiple · Alt : ignorer la grille · Double-clic : éditer un libellé · Flèches : déplacer</div>
+        <div className="graph-composer"><h2>Ajouter un graphe</h2><label>Fonctions (séparées par ;)<input value={expression} onChange={(event) => setExpression(event.target.value)} /></label><label>x min:max<input value={xRange} onChange={(event) => setXRange(event.target.value)} /></label><label>y min:max<input value={yRange} onChange={(event) => setYRange(event.target.value)} /></label><button onClick={addFunction}>Ajouter</button></div>
+      </section>
+      <aside className="right-panel">
+        <section className="properties-panel"><h2>Propriétés</h2>{selected ? <><p className="object-kind">{labels[selected.kind]}</p><div className="property-grid"><label>X<input type="number" value={Math.round(selected.x)} onChange={(event) => updateSelected({ x: Number(event.target.value) })} /></label><label>Y<input type="number" value={Math.round(selected.y)} onChange={(event) => updateSelected({ y: Number(event.target.value) })} /></label>{selected.width !== undefined && <label>Largeur<input type="number" min="1" value={Math.round(selected.width)} onChange={(event) => updateSelected({ width: Number(event.target.value) })} /></label>}{selected.height !== undefined && <label>Hauteur<input type="number" min="1" value={Math.round(selected.height)} onChange={(event) => updateSelected({ height: Number(event.target.value) })} /></label>}<label>Rotation<input type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(event) => updateSelected({ rotation: Number(event.target.value) })} /></label></div>{selected.kind === "text" && <label>Texte<textarea className="small-textarea" value={selected.text ?? ""} onChange={(event) => updateSelected({ text: event.target.value })} /></label>}{selected.annotations && <div className="annotation-fields">{Object.entries(selected.annotations).map(([key, value]) => <label key={key}>{key}<input value={value} onChange={(event) => updateSelected({ annotations: { ...selected.annotations, [key]: event.target.value } })} /></label>)}</div>}{selected.kind === "axes" && selected.graph && <div className="annotation-fields"><label>Courbes<input value={(selected.graph.expressions ?? [selected.graph.expression]).join("; ")} onChange={(event) => updateSelected({ graph: { ...selected.graph!, expression: event.target.value.split(";")[0].trim(), expressions: event.target.value.split(";").map((value) => value.trim()).filter(Boolean) } })} /></label><label>x min<input type="number" value={selected.graph.xMin} onChange={(event) => updateSelected({ graph: { ...selected.graph!, xMin: Number(event.target.value) } })} /></label><label>x max<input type="number" value={selected.graph.xMax} onChange={(event) => updateSelected({ graph: { ...selected.graph!, xMax: Number(event.target.value) } })} /></label><label>y min<input type="number" value={selected.graph.yMin ?? -5} onChange={(event) => updateSelected({ graph: { ...selected.graph!, yMin: Number(event.target.value) } })} /></label><label>y max<input type="number" value={selected.graph.yMax ?? 5} onChange={(event) => updateSelected({ graph: { ...selected.graph!, yMax: Number(event.target.value) } })} /></label><label>Axe x<input value={selected.graph.xLabel ?? "x"} onChange={(event) => updateSelected({ graph: { ...selected.graph!, xLabel: event.target.value } })} /></label><label>Axe y<input value={selected.graph.yLabel ?? "y"} onChange={(event) => updateSelected({ graph: { ...selected.graph!, yLabel: event.target.value } })} /></label><label><input type="checkbox" checked={selected.graph.showGrid !== false} onChange={(event) => updateSelected({ graph: { ...selected.graph!, showGrid: event.target.checked } })} /> Grille</label></div>}<div className="property-actions"><button onClick={() => reorder(true)}>Premier plan</button><button onClick={() => reorder(false)}>Arrière-plan</button><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div></> : selectedIds.length > 1 ? <p>{selectedIds.length} objets sélectionnés. Utilisez la barre d’alignement au-dessus du canevas.</p> : <p>Sélectionnez un objet pour modifier ses coordonnées, dimensions, texte et annotations.</p>}</section>
+        {mode === "advanced" && <section className="layers-panel"><h2>Calques</h2><label><input type="checkbox" checked={marqueeEnabled} onChange={(event) => setMarqueeEnabled(event.target.checked)} /> Sélection par zone</label><div className="layer-list">{[...objects].reverse().map((object) => <div key={object.id} className={selectedIds.includes(object.id) ? "selected" : ""}><button onClick={() => chooseObject(object.id, false)}>{labels[object.kind]}</button><button title={object.hidden ? "Afficher" : "Masquer"} onClick={() => updateOne(object.id, { hidden: !object.hidden })}>{object.hidden ? "○" : "●"}</button><button title={object.locked ? "Déverrouiller" : "Verrouiller"} onClick={() => updateOne(object.id, { locked: !object.locked })}>{object.locked ? "🔒" : "🔓"}</button></div>)}</div></section>}
+        <section className="export-panel"><h2>Exporter</h2><div className="export-buttons"><button onClick={exportSvg}>SVG vectoriel</button><button onClick={exportPdf}>PDF vectoriel</button><button onClick={copyLatex}>Copier LaTeX</button></div><label><input type="checkbox" checked={snippetOnly} onChange={(event) => setSnippetOnly(event.target.checked)} /> Extrait TikZ seul</label>{mode === "advanced" && <><div className="latex-actions"><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={() => setLatexDraft(undefined)} disabled={!latexDirty}>Annuler l’édition</button></div><textarea className="latex-editor" value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} spellCheck="false" aria-label="Code LaTeX/TikZ éditable" /><p className="latex-hint">Les blocs Sketch2LaTeX permettent une synchronisation complète. Un TikZ ordinaire composé de lignes, rectangles, flèches et nœuds peut aussi être importé.</p></>}</section>
+      </aside>
+    </section>
   </main>;
 }

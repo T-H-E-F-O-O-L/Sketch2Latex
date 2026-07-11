@@ -29,7 +29,31 @@ export type CanvasObject = {
   text?: string;
   annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; fill?: string };
-  graph?: { expression: string; xMin: number; xMax: number };
+  graph?: { expression: string; expressions?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
+  bindings?: { startId?: string; endId?: string };
+  groupId?: string;
+  locked?: boolean;
+  hidden?: boolean;
+};
+
+export type DocumentSettings = {
+  width: number;
+  height: number;
+  unit: "cm" | "mm" | "pt";
+  orientation: "landscape" | "portrait";
+  gridSize: number;
+  showGrid: boolean;
+  snapToGrid: boolean;
+};
+
+export const defaultDocumentSettings: DocumentSettings = {
+  width: 900,
+  height: 560,
+  unit: "cm",
+  orientation: "landscape",
+  gridSize: 20,
+  showGrid: true,
+  snapToGrid: true,
 };
 
 const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = {
