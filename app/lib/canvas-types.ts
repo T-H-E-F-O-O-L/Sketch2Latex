@@ -1,5 +1,5 @@
 export type ObjectKind =
-  | "freehand" | "line" | "curve" | "arrow" | "rect" | "circle" | "ellipse" | "text" | "axes"
+  | "freehand" | "line" | "dashed-line" | "curve" | "arrow" | "double-arrow" | "dimension" | "point" | "rect" | "circle" | "ellipse" | "text" | "axes"
   | "wire" | "resistor" | "capacitor" | "inductor" | "battery" | "switch" | "ground"
   | "voltmeter" | "ammeter" | "gbf" | "oscilloscope"
   | "spring" | "force" | "mass" | "pulley" | "pendulum" | "reference-frame" | "circular-trajectory" | "gravity-field"
@@ -36,7 +36,7 @@ const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = 
   voltmeter: { main: "V" }, ammeter: { main: "A" }, gbf: { main: "GBF" }, oscilloscope: { main: "oscillo" }, mass: { main: "m" },
   "reference-frame": { x: "x", y: "y", origin: "O" }, "circular-trajectory": { origin: "O" }, "gravity-field": { main: "g" },
   "electric-field": { main: "E" }, "bar-magnet": { north: "N", south: "S" }, "laplace-rails": { velocity: "v" }, "charged-particle": { main: "q" },
-  "heat-arrow": { main: "Q" }, "work-arrow": { main: "W" }, dipole: { main: "μ" }, "piston-cylinder": { main: "P, V, T" }, "thermal-reservoir": { main: "T" },
+  dimension: { main: "d" }, "heat-arrow": { main: "Q" }, "work-arrow": { main: "W" }, dipole: { main: "μ" }, "piston-cylinder": { main: "P, V, T" }, "thermal-reservoir": { main: "T" },
   "heat-engine": { main: "machine", hot: "Qh", cold: "Qc", work: "W" }, ion: { main: "ion" },
   "electrochemical-cell": { anode: "anode (−)", cathode: "cathode (+)", bridge: "pont salin" },
 };
@@ -49,20 +49,20 @@ export function defaultAnnotations(kind: ObjectKind) {
 export const annotation = (object: CanvasObject, key: string, fallback: string) => object.annotations?.[key] ?? fallback;
 
 export const connectorKinds: ObjectKind[] = [
-  "line", "curve", "arrow", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
+  "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
   "spring", "force", "light-ray", "wave", "heat-arrow", "work-arrow", "bond-single", "bond-double", "bond-triple",
   "reaction-arrow", "equilibrium-arrow", "hydrogen-bond", "dipole",
 ];
 
 export const stampKinds: ObjectKind[] = [
-  "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field",
+  "point", "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field",
   "lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
   "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
 ];
 
 export const labels: Record<ObjectKind, string> = {
-  freehand: "Main levée", line: "Segment", curve: "Courbe de Bézier", arrow: "Flèche", rect: "Rectangle", circle: "Cercle", ellipse: "Ellipse", text: "Texte", axes: "Repère / graphe",
+  freehand: "Main levée", line: "Segment", "dashed-line": "Trait pointillé", curve: "Courbe de Bézier", arrow: "Flèche", "double-arrow": "Double flèche", dimension: "Cote / mesure", point: "Point", rect: "Rectangle", circle: "Cercle", ellipse: "Ellipse", text: "Texte", axes: "Repère / graphe",
   wire: "Fil", resistor: "Résistance R", capacitor: "Condensateur C", inductor: "Bobine L", battery: "Générateur", switch: "Interrupteur", ground: "Masse / terre", voltmeter: "Voltmètre", ammeter: "Ampèremètre", gbf: "GBF", oscilloscope: "Oscilloscope",
   spring: "Ressort", force: "Vecteur force", mass: "Masse m", pulley: "Poulie", pendulum: "Pendule", "reference-frame": "Repère (O,x,y)", "circular-trajectory": "Trajectoire circulaire", "gravity-field": "Champ de pesanteur",
   lens: "Lentille convergente", "diverging-lens": "Lentille divergente", "plane-mirror": "Miroir plan", screen: "Écran", prism: "Prisme", fiber: "Fibre optique", "light-ray": "Rayon lumineux", wave: "Onde progressive",
@@ -75,7 +75,7 @@ export const labels: Record<ObjectKind, string> = {
 export type ToolboxGroup = { title: string; kinds: Array<ObjectKind | "select"> };
 
 export const toolboxGroups: ToolboxGroup[] = [
-  { title: "Outils", kinds: ["select", "line", "curve", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"] },
+  { title: "Outils", kinds: ["select", "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "point", "rect", "circle", "ellipse", "freehand", "text", "axes"] },
   { title: "Électricité & signaux", kinds: ["wire", "resistor", "capacitor", "inductor", "battery", "switch", "ground", "voltmeter", "ammeter", "gbf", "oscilloscope"] },
   { title: "Optique & ondes", kinds: ["lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "light-ray", "wave"] },
   { title: "Mécanique", kinds: ["force", "spring", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field"] },
@@ -86,6 +86,7 @@ export const toolboxGroups: ToolboxGroup[] = [
 ];
 
 const sizes: Partial<Record<ObjectKind, { width: number; height: number }>> = {
+  point: { width: 18, height: 18 },
   ground: { width: 44, height: 42 }, gbf: { width: 70, height: 70 }, oscilloscope: { width: 100, height: 70 }, mass: { width: 70, height: 55 }, pulley: { width: 85, height: 85 }, pendulum: { width: 80, height: 110 }, "reference-frame": { width: 100, height: 80 }, "circular-trajectory": { width: 90, height: 90 }, "gravity-field": { width: 95, height: 85 },
   lens: { width: 60, height: 120 }, "diverging-lens": { width: 60, height: 120 }, "plane-mirror": { width: 34, height: 120 }, screen: { width: 34, height: 120 }, prism: { width: 90, height: 80 }, fiber: { width: 140, height: 65 }, "electric-field": { width: 100, height: 75 }, "magnetic-field-in": { width: 90, height: 75 }, "magnetic-field-out": { width: 90, height: 75 }, "bar-magnet": { width: 110, height: 48 }, coil: { width: 100, height: 70 }, solenoid: { width: 130, height: 80 }, "laplace-rails": { width: 140, height: 90 }, "charged-particle": { width: 50, height: 50 },
   "piston-cylinder": { width: 100, height: 105 }, "thermal-reservoir": { width: 78, height: 78 }, "heat-engine": { width: 120, height: 100 },

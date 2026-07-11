@@ -31,6 +31,18 @@ function bondLines(object: CanvasObject, count: number) {
   return offsets.map((offset) => `\\draw ${point(x1 + px * offset, y1 + py * offset)} -- ${point(x2 + px * offset, y2 + py * offset)};`).join("\n");
 }
 
+function tikzStyle(object: CanvasObject) {
+  const options: string[] = []; const color = object.style?.stroke?.trim();
+  const match = color?.match(/^#([0-9a-f]{6})$/i);
+  if (match && match[1].toLowerCase() !== "111111") {
+    const value = Number.parseInt(match[1], 16); const red = (value >> 16) & 255; const green = (value >> 8) & 255; const blue = value & 255;
+    options.push(`color={rgb,255:red,${red};green,${green};blue,${blue}}`);
+  }
+  const strokeWidth = object.style?.strokeWidth;
+  if (strokeWidth !== undefined && strokeWidth !== 2) options.push(`line width=${(strokeWidth * .4).toFixed(2)}pt`);
+  return options.join(",");
+}
+
 function stamp(object: CanvasObject) {
   const width = object.width ?? 80; const height = object.height ?? 80;
   const x = n(object.x + width / 2); const y = n(-(object.y + height / 2));
@@ -90,11 +102,15 @@ function stamp(object: CanvasObject) {
 }
 
 function objectToLatexBase(object: CanvasObject): string {
-  const origin = point(object.x, object.y); const stroke = object.style?.strokeWidth && object.style.strokeWidth > 2 ? ", thick" : "";
+  const origin = point(object.x, object.y);
   switch (object.kind) {
-    case "line": return `\\draw${stroke} ${origin} -- ${end(object)};`;
-    case "curve": { const control = object.control ?? { x: (object.x + (object.x2 ?? object.x)) / 2, y: (object.y + (object.y2 ?? object.y)) / 2 }; return `\\draw${stroke} ${origin} .. controls ${point(control.x, control.y)} and ${point(control.x, control.y)} .. ${end(object)};`; }
-    case "arrow": case "force": case "light-ray": return `\\draw[-{Latex}${stroke}] ${origin} -- ${end(object)};`;
+    case "line": return `\\draw ${origin} -- ${end(object)};`;
+    case "dashed-line": return `\\draw[dashed] ${origin} -- ${end(object)};`;
+    case "curve": { const control = object.control ?? { x: (object.x + (object.x2 ?? object.x)) / 2, y: (object.y + (object.y2 ?? object.y)) / 2 }; return `\\draw ${origin} .. controls ${point(control.x, control.y)} and ${point(control.x, control.y)} .. ${end(object)};`; }
+    case "arrow": case "force": case "light-ray": return `\\draw[-{Latex}] ${origin} -- ${end(object)};`;
+    case "double-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
+    case "dimension": return `\\draw[<->] ${origin} -- ${end(object)} node[midway,above,fill=white,inner sep=1pt] {${safeText(annotation(object, "main", "d"))}};`;
+    case "point": return `\\fill ${point(object.x + (object.width ?? 18) / 2, object.y + (object.height ?? 18) / 2)} circle (0.06);`;
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": return `\\draw ${origin} to[R] ${end(object)};`;
     case "capacitor": return `\\draw ${origin} to[C] ${end(object)};`;
@@ -144,7 +160,7 @@ function objectCenter(object: CanvasObject) {
 const matrixNumber = (value: number) => (Math.round(value * 100000) / 100000).toString();
 
 export function objectToLatex(object: CanvasObject): string {
-  const body = objectToLatexBase(object);
+  const rawBody = objectToLatexBase(object); const style = tikzStyle(object); const body = rawBody && style ? `\\begin{scope}[${style}]\n${rawBody}\n\\end{scope}` : rawBody;
   const scaleX = object.scaleX ?? object.scale ?? 1; const scaleY = object.scaleY ?? object.scale ?? 1; const rotation = object.rotation ?? 0;
   if (!body || (scaleX === 1 && scaleY === 1 && rotation === 0)) return body;
   const center = objectCenter(object); const cx = center.x / SCALE; const cy = -center.y / SCALE;
@@ -186,6 +202,13 @@ function isCanvasObject(value: unknown): value is CanvasObject {
   for (const key of ["x2", "y2", "width", "height", "scale", "scaleX", "scaleY", "rotation"] as const) if (object[key] !== undefined && !isFiniteNumber(object[key])) return false;
   if (object.text !== undefined && typeof object.text !== "string") return false;
   if (object.annotations !== undefined && (!object.annotations || typeof object.annotations !== "object" || Object.values(object.annotations as Record<string, unknown>).some((annotation) => typeof annotation !== "string"))) return false;
+  if (object.style !== undefined) {
+    if (!object.style || typeof object.style !== "object") return false;
+    const style = object.style as { stroke?: unknown; strokeWidth?: unknown; fill?: unknown };
+    if (style.stroke !== undefined && typeof style.stroke !== "string") return false;
+    if (style.fill !== undefined && typeof style.fill !== "string") return false;
+    if (style.strokeWidth !== undefined && !isFiniteNumber(style.strokeWidth)) return false;
+  }
   if (object.points !== undefined && (!Array.isArray(object.points) || object.points.some((point) => !point || typeof point !== "object" || !isFiniteNumber((point as Point).x) || !isFiniteNumber((point as Point).y)))) return false;
   if (object.control !== undefined && (!object.control || typeof object.control !== "object" || !isFiniteNumber((object.control as Point).x) || !isFiniteNumber((object.control as Point).y))) return false;
   if (object.graph !== undefined) {
@@ -255,7 +278,7 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
 
 function mergeTikzEdits(metadata: CanvasObject, visual: CanvasObject, original: CanvasObject): CanvasObject {
   const next = { ...metadata } as Record<string, unknown>;
-  for (const key of ["x", "y", "x2", "y2", "width", "height", "control", "text", "annotations", "graph"] as const) {
+  for (const key of ["x", "y", "x2", "y2", "width", "height", "control", "text", "annotations", "style", "graph"] as const) {
     if (JSON.stringify(visual[key]) !== JSON.stringify(original[key])) next[key] = visual[key];
   }
   return next as CanvasObject;

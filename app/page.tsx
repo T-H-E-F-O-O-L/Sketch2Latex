@@ -8,7 +8,7 @@ import { documentFor, objectsFromLatex } from "./lib/latex";
 const canvasWidth = 900;
 const canvasHeight = 560;
 const objectId = () => Math.random().toString(36).slice(2, 10);
-const standardDrawingTools: ObjectKind[] = ["line", "curve", "arrow", "rect", "circle", "ellipse", "freehand", "text", "axes"];
+const standardDrawingTools: ObjectKind[] = ["line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "point", "rect", "circle", "ellipse", "freehand", "text", "axes"];
 
 type HistoryState = { objects: CanvasObject[]; past: CanvasObject[][]; future: CanvasObject[][] };
 type HistoryAction =
@@ -45,6 +45,8 @@ const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement): Po
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const scaleXFor = (object: CanvasObject) => object.scaleX ?? object.scale ?? 1;
 const scaleYFor = (object: CanvasObject) => object.scaleY ?? object.scale ?? 1;
+const strokeFor = (object: CanvasObject) => object.style?.stroke ?? "#111111";
+const strokeWidthFor = (object: CanvasObject, selected = false) => Math.max(1, object.style?.strokeWidth ?? 2) + (selected ? .75 : 0);
 
 function boundsFor(object: CanvasObject): CanvasBounds {
   if (connectorKinds.includes(object.kind)) {
@@ -180,7 +182,7 @@ async function canvasPdfImage(svg: SVGSVGElement) {
 }
 
 function connectorPreview(object: CanvasObject, selected: boolean) {
-  const common = { stroke: "#111", strokeWidth: selected ? 3 : 2, fill: "none", pointerEvents: "stroke" as const };
+  const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
   const a = (key: string, fallback: string) => annotation(object, key, fallback);
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y;
   const midX = (object.x + x2) / 2; const midY = (object.y + y2) / 2;
@@ -191,14 +193,17 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
     const control = object.control ?? { x: midX, y: midY };
     return <path {...common} d={`M ${object.x} ${object.y} Q ${control.x} ${control.y} ${x2} ${y2}`} />;
   }
-  if (object.kind === "resistor") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><rect x={midX - 18 * ux - 8 * px} y={midY - 18 * uy - 8 * py} width="36" height="16" transform={`rotate(${rotation} ${midX} ${midY})`} fill="white" stroke="#111" /></g>;
+  if (object.kind === "dashed-line") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} strokeDasharray="7 5" />;
+  if (object.kind === "double-arrow") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" />;
+  if (object.kind === "dimension") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><text x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fontSize="14" fill={color} stroke="white" strokeWidth="4" paintOrder="stroke">{a("main", "d")}</text></g>;
+  if (object.kind === "resistor") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><rect x={midX - 18 * ux - 8 * px} y={midY - 18 * uy - 8 * py} width="36" height="16" transform={`rotate(${rotation} ${midX} ${midY})`} fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /></g>;
   if (object.kind === "battery" || object.kind === "capacitor") {
     const wide = object.kind === "battery" ? 15 : 12; const narrow = object.kind === "battery" ? 9 : 12;
-    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><line stroke="#111" strokeWidth="2" x1={midX - 5 * ux - wide * px} y1={midY - 5 * uy - wide * py} x2={midX - 5 * ux + wide * px} y2={midY - 5 * uy + wide * py} /><line stroke="#111" strokeWidth="2" x1={midX + 6 * ux - narrow * px} y1={midY + 6 * uy - narrow * py} x2={midX + 6 * ux + narrow * px} y2={midY + 6 * uy + narrow * py} /></g>;
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><line {...common} x1={midX - 5 * ux - wide * px} y1={midY - 5 * uy - wide * py} x2={midX - 5 * ux + wide * px} y2={midY - 5 * uy + wide * py} /><line {...common} x1={midX + 6 * ux - narrow * px} y1={midY + 6 * uy - narrow * py} x2={midX + 6 * ux + narrow * px} y2={midY + 6 * uy + narrow * py} /></g>;
   }
   if (object.kind === "inductor") return <g transform={`rotate(${rotation} ${midX} ${midY})`}><line {...common} x1={object.x} y1={object.y} x2={midX - 22} y2={midY} /><path {...common} d={`M ${midX - 22} ${midY} q 5 -15 10 0 q 5 -15 10 0 q 5 -15 10 0 q 5 -15 10 0`} /><line {...common} x1={midX + 18} y1={midY} x2={x2} y2={y2} /></g>;
-  if (object.kind === "switch") return <g><line {...common} x1={object.x} y1={object.y} x2={midX - 12 * ux} y2={midY - 12 * uy} /><line {...common} x1={midX + 14 * ux} y1={midY + 14 * uy} x2={x2} y2={y2} /><line stroke="#111" strokeWidth="2" x1={midX - 12 * ux} y1={midY - 12 * uy} x2={midX + 12 * ux - 12 * px} y2={midY + 12 * uy - 12 * py} /><circle cx={midX - 12 * ux} cy={midY - 12 * uy} r="3" fill="#111" /></g>;
-  if (object.kind === "voltmeter" || object.kind === "ammeter") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r="15" fill="white" stroke="#111" strokeWidth="2" /><text x={midX} y={midY + 5} textAnchor="middle" fontSize="14">{a("main", object.kind === "voltmeter" ? "V" : "A")}</text></g>;
+  if (object.kind === "switch") return <g><line {...common} x1={object.x} y1={object.y} x2={midX - 12 * ux} y2={midY - 12 * uy} /><line {...common} x1={midX + 14 * ux} y1={midY + 14 * uy} x2={x2} y2={y2} /><line {...common} x1={midX - 12 * ux} y1={midY - 12 * uy} x2={midX + 12 * ux - 12 * px} y2={midY + 12 * uy - 12 * py} /><circle cx={midX - 12 * ux} cy={midY - 12 * uy} r="3" fill={color} /></g>;
+  if (object.kind === "voltmeter" || object.kind === "ammeter") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r="15" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text x={midX} y={midY + 5} textAnchor="middle" fontSize="14" fill={color}>{a("main", object.kind === "voltmeter" ? "V" : "A")}</text></g>;
   if (object.kind === "spring") return <polyline {...common} points={Array.from({ length: 11 }, (_, i) => `${object.x + dx * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * px)},${object.y + dy * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * py)}`).join(" ")} />;
   if (object.kind === "wave") return <polyline {...common} points={Array.from({ length: 17 }, (_, i) => `${object.x + dx * i / 16 + Math.sin(i * Math.PI / 2) * 7 * px},${object.y + dy * i / 16 + Math.sin(i * Math.PI / 2) * 7 * py}`).join(" ")} />;
   if (object.kind.startsWith("bond-")) {
@@ -213,18 +218,19 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
 }
 
 function stampPreview(object: CanvasObject, selected: boolean) {
-  const common = { stroke: "#111", strokeWidth: selected ? 3 : 2, fill: "none", pointerEvents: "stroke" as const };
+  const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
   const x = object.x; const y = object.y; const w = object.width ?? 80; const h = object.height ?? 80; const cx = x + w / 2; const cy = y + h / 2;
-  const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill="#111" stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
+  const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill={color} stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
   const a = (key: string, fallback: string) => annotation(object, key, fallback);
+  if (object.kind === "point") return <circle cx={cx} cy={cy} r={Math.min(w, h) * .28} fill={color} stroke="none" pointerEvents="all" />;
   if (object.kind === "ground") return <g {...common}><line x1={cx} y1={y} x2={cx} y2={y + h * .35} /><path d={`M ${x + 6} ${y + h*.35} L ${x + w - 6} ${y + h*.35} M ${x + 11} ${y + h*.53} L ${x + w - 11} ${y + h*.53} M ${x + 17} ${y + h*.71} L ${x + w - 17} ${y + h*.71}`} /></g>;
   if (object.kind === "gbf") return <g {...common}><circle cx={cx} cy={cy} r={w*.36} /><path d={`M ${x+w*.22} ${cy} q ${w*.07} ${-h*.16} ${w*.14} 0 q ${w*.07} ${h*.16} ${w*.14} 0 q ${w*.07} ${-h*.16} ${w*.14} 0`} />{text(a("main", "GBF"), cx, y+h*.78)}</g>;
   if (object.kind === "oscilloscope") return <g {...common}><rect x={x} y={y} width={w} height={h} rx="4" /><path d={`M ${x+w*.15} ${cy} q ${w*.12} ${-h*.2} ${w*.24} 0 q ${w*.12} ${h*.2} ${w*.24} 0 q ${w*.12} ${-h*.2} ${w*.24} 0`} />{text(a("main", "oscillo"), cx, y+h*.88)}</g>;
   if (object.kind === "mass") return <g {...common}><rect x={x+5} y={y+8} width={w-10} height={h-16} fill="white" />{text(a("main", "m"))}</g>;
-  if (object.kind === "pulley") return <g {...common}><circle cx={cx} cy={cy} r={w*.32} /><circle cx={cx} cy={cy} r="4" fill="#111" /></g>;
+  if (object.kind === "pulley") return <g {...common}><circle cx={cx} cy={cy} r={w*.32} /><circle cx={cx} cy={cy} r="4" fill={color} /></g>;
   if (object.kind === "pendulum") return <g {...common}><line x1={cx} y1={y+6} x2={cx} y2={y+h*.72} /><circle cx={cx} cy={y+h*.82} r={w*.17} fill="white" /><line x1={cx-w*.25} y1={y+6} x2={cx+w*.25} y2={y+6} /></g>;
   if (object.kind === "reference-frame") return <g {...common}><line x1={x+w*.2} y1={y+h*.78} x2={x+w*.84} y2={y+h*.78} markerEnd="url(#arrowhead)" /><line x1={x+w*.2} y1={y+h*.78} x2={x+w*.2} y2={y+h*.18} markerEnd="url(#arrowhead)" />{text(a("origin", "O"), x+w*.15, y+h*.92)}{text(a("x", "x"), x+w*.91, y+h*.86)}{text(a("y", "y"), x+w*.13, y+h*.15)}</g>;
-  if (object.kind === "circular-trajectory") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.35} markerEnd="url(#arrowhead)" /><circle cx={cx} cy={cy} r="3" fill="#111" />{text(a("origin", "O"), cx, cy+18)}</g>;
+  if (object.kind === "circular-trajectory") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.35} markerEnd="url(#arrowhead)" /><circle cx={cx} cy={cy} r="3" fill={color} />{text(a("origin", "O"), cx, cy+18)}</g>;
   if (object.kind === "gravity-field") return <g {...common}>{[.2,.5,.8].map((p) => <line key={p} x1={x+w*p} y1={y+h*.15} x2={x+w*p} y2={y+h*.78} markerEnd="url(#arrowhead)" />)}{text(a("main", "g"), x+w*.9, cy)}</g>;
   if (object.kind === "lens") return <g {...common}><line x1={cx} y1={y+h*.1} x2={cx} y2={y+h*.9} /><path d={`M ${cx-w*.08} ${y+h*.16} L ${cx} ${y+h*.1} L ${cx+w*.08} ${y+h*.16} M ${cx-w*.08} ${y+h*.84} L ${cx} ${y+h*.9} L ${cx+w*.08} ${y+h*.84}`} /></g>;
   if (object.kind === "diverging-lens") return <g {...common}><line x1={cx} y1={y+h*.1} x2={cx} y2={y+h*.9} /><path d={`M ${cx-w*.08} ${y+h*.1} L ${cx} ${y+h*.16} L ${cx+w*.08} ${y+h*.1} M ${cx-w*.08} ${y+h*.9} L ${cx} ${y+h*.84} L ${cx+w*.08} ${y+h*.9}`} /></g>;
@@ -241,7 +247,7 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "thermal-reservoir") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.4} />{text(a("main", "T"))}</g>;
   if (object.kind === "heat-engine") return <g {...common}><rect x={x+w*.2} y={y+h*.28} width={w*.6} height={h*.42} fill="white" />{text(a("main", "machine"), cx, cy+5, 11)}<line x1={cx} y1={y+3} x2={cx} y2={y+h*.25} markerEnd="url(#arrowhead)" /><line x1={cx} y1={y+h*.72} x2={cx} y2={y+h-3} markerEnd="url(#arrowhead)" /><line x1={x+w*.82} y1={cy} x2={x+w-3} y2={cy} markerEnd="url(#arrowhead)" />{text(a("hot", "Qh"), cx+10, y+h*.18, 11)}{text(a("cold", "Qc"), cx+10, y+h*.94, 11)}{text(a("work", "W"), x+w*.92, cy-5, 11)}</g>;
   if (object.kind === "ion") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w,h)*.34} />{text(a("main", "ion"))}</g>;
-  if (object.kind === "lone-pair") return <g><circle cx={cx-7} cy={cy} r="3" fill="#111" /><circle cx={cx+7} cy={cy} r="3" fill="#111" /></g>;
+  if (object.kind === "lone-pair") return <g><circle cx={cx-7} cy={cy} r="3" fill={color} /><circle cx={cx+7} cy={cy} r="3" fill={color} /></g>;
   if (object.kind === "crystal-fcc") return <g {...common}><rect x={x+w*.14} y={y+h*.28} width={w*.58} height={h*.55} /><path d={`M ${x+w*.14} ${y+h*.28} L ${x+w*.36} ${y+h*.1} L ${x+w*.94} ${y+h*.1} L ${x+w*.72} ${y+h*.28} M ${x+w*.72} ${y+h*.28} L ${x+w*.94} ${y+h*.1} L ${x+w*.94} ${y+h*.65} L ${x+w*.72} ${y+h*.83}`} />{[[.14,.28],[.72,.28],[.14,.83],[.72,.83],[.36,.1],[.94,.1],[.94,.65],[.43,.55]].map(([a,b],i)=><circle key={i} cx={x+w*a} cy={y+h*b} r="4" fill="#111" />)}</g>;
   if (object.kind === "precipitate") return <g {...common}><path d={`M ${x+w*.12} ${y+h*.1} L ${x+w*.22} ${y+h*.88} L ${x+w*.78} ${y+h*.88} L ${x+w*.88} ${y+h*.1}`} /><path d={`M ${x+w*.22} ${y+h*.88} L ${x+w*.78} ${y+h*.88} L ${x+w*.73} ${y+h*.67} L ${x+w*.27} ${y+h*.67} Z`} fill="#c7c7c7" stroke="#111" /></g>;
   if (object.kind === "electrochemical-cell") return <g {...common}><path d={`M ${x+w*.06} ${y+h*.2} L ${x+w*.12} ${y+h*.84} L ${x+w*.39} ${y+h*.84} L ${x+w*.45} ${y+h*.2} M ${x+w*.55} ${y+h*.2} L ${x+w*.61} ${y+h*.84} L ${x+w*.88} ${y+h*.84} L ${x+w*.94} ${y+h*.2}`} /><path d={`M ${x+w*.1} ${y+h*.59} L ${x+w*.13} ${y+h*.81} L ${x+w*.38} ${y+h*.81} L ${x+w*.41} ${y+h*.59} Z M ${x+w*.59} ${y+h*.59} L ${x+w*.62} ${y+h*.81} L ${x+w*.87} ${y+h*.81} L ${x+w*.9} ${y+h*.59} Z`} fill="#dcecff" stroke="none" /><line x1={x+w*.25} y1={y+h*.12} x2={x+w*.25} y2={y+h*.72} strokeWidth="4" /><line x1={x+w*.75} y1={y+h*.12} x2={x+w*.75} y2={y+h*.72} strokeWidth="4" /><path d={`M ${x+w*.31} ${y+h*.66} L ${x+w*.31} ${y+h*.35} Q ${cx} ${y+h*.08} ${x+w*.69} ${y+h*.35} L ${x+w*.69} ${y+h*.66}`} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><path d={`M ${x+w*.25} ${y+h*.12} L ${x+w*.75} ${y+h*.12}`} strokeDasharray="4 3" />{text(a("anode", "anode (−)"), x+w*.25, y+h*.96, 11)}{text(a("cathode", "cathode (+)"), x+w*.75, y+h*.96, 11)}{text(a("bridge", "pont salin"), cx, y+h*.25, 11)}</g>;
@@ -266,17 +272,17 @@ function stampPreview(object: CanvasObject, selected: boolean) {
 }
 
 function preview(object: CanvasObject, selected: boolean) {
-  const common = { stroke: "#111", strokeWidth: selected ? 3 : 2, fill: "none", pointerEvents: "stroke" as const };
+  const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
   if (connectorKinds.includes(object.kind)) return connectorPreview(object, selected);
   if (object.kind === "rect") return <rect {...common} x={object.x} y={object.y} width={object.width} height={object.height} />;
   if (object.kind === "circle") return <circle {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} r={Math.abs(object.width ?? 0) / 2} />;
   if (object.kind === "ellipse") return <ellipse {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} rx={Math.abs(object.width ?? 0) / 2} ry={Math.abs(object.height ?? 0) / 2} />;
   if (object.kind === "freehand") return <polyline {...common} points={(object.points ?? []).map((p) => `${p.x},${p.y}`).join(" ")} />;
-  if (object.kind === "text") return <text x={object.x} y={object.y} fill="#111" fontSize="17" pointerEvents="all">{object.text}</text>;
+  if (object.kind === "text") return <text x={object.x} y={object.y} fill={color} fontSize="17" pointerEvents="all">{object.text}</text>;
   if (object.kind === "axes") {
     const width = object.width ?? 0; const height = object.height ?? 0; const xMin = object.graph?.xMin ?? -5; const xMax = object.graph?.xMax ?? 5;
     const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const graphPath = graphPathFor(object); const clipId = `graph-clip-${object.id}`;
-    return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{graphPath && <path d={graphPath} fill="none" stroke="#1476ad" strokeWidth="2.5" clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={object.y + height / 2} x2={object.x + width} y2={object.y + height / 2} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14">{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
+    return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{graphPath && <path d={graphPath} fill="none" stroke={color} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={object.y + height / 2} x2={object.x + width} y2={object.y + height / 2} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14" fill={color}>{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
   }
   return stampPreview(object, selected);
 }
@@ -302,6 +308,8 @@ export default function Home() {
   const [drag, setDrag] = useState<DragState>();
   const [snippetOnly, setSnippetOnly] = useState(false);
   const [notice, setNotice] = useState("Choisissez un outil puis dessinez sur le canevas.");
+  const [drawingColor, setDrawingColor] = useState("#111111");
+  const [drawingWidth, setDrawingWidth] = useState(2);
   const [expression, setExpression] = useState("sin(deg(x))");
   const [range, setRange] = useState("-5:5");
   const latex = useMemo(() => documentFor(objects, snippetOnly), [objects, snippetOnly]);
@@ -314,6 +322,8 @@ export default function Home() {
   const selectedScaleY = selected ? scaleYFor(selected) : 1;
   const selectedWidth = selectedBounds ? Math.round(selectedBounds.width * selectedScaleX) : 0;
   const selectedHeight = selectedBounds ? Math.round(selectedBounds.height * selectedScaleY) : 0;
+  const activeColor = selected?.style?.stroke ?? drawingColor; const activeStrokeWidth = selected?.style?.strokeWidth ?? drawingWidth;
+  const drawingStyle = { stroke: drawingColor, strokeWidth: drawingWidth };
   const commitObjects = useCallback((next: CanvasObject[]) => dispatchHistory({ type: "commit", objects: next }), []);
   const undo = useCallback(() => { dispatchHistory({ type: "undo" }); setSelectedId(undefined); }, []);
   const redo = useCallback(() => { dispatchHistory({ type: "redo" }); setSelectedId(undefined); }, []);
@@ -321,6 +331,8 @@ export default function Home() {
     if (!selectedId) return;
     commitObjects(objects.map((object) => object.id === selectedId ? { ...object, ...change } : object));
   }, [commitObjects, objects, selectedId]);
+  const applyDrawingColor = (color: string) => { setDrawingColor(color); if (selected) updateSelected({ style: { ...selected.style, stroke: color, strokeWidth: selected.style?.strokeWidth ?? drawingWidth } }); };
+  const applyDrawingWidth = (strokeWidth: number) => { setDrawingWidth(strokeWidth); if (selected) updateSelected({ style: { ...selected.style, stroke: selected.style?.stroke ?? drawingColor, strokeWidth } }); };
   const deleteSelected = useCallback(() => {
     if (!selectedId) return;
     commitObjects(objects.filter((object) => object.id !== selectedId)); setSelectedId(undefined); setNotice("Objet supprimé.");
@@ -343,12 +355,12 @@ export default function Home() {
 
   const makeObject = (p: Point): CanvasObject => {
     const kind = tool as ObjectKind;
-    if (stampKinds.includes(kind)) { const size = stampSize(kind); return { id: objectId(), kind, x: p.x - size.width / 2, y: p.y - size.height / 2, annotations: defaultAnnotations(kind), ...size }; }
-    if (kind === "text") return { id: objectId(), kind, x: p.x, y: p.y, text: "Étiquette" };
-    if (kind === "axes") return { id: objectId(), kind, x: p.x, y: p.y, width: 250, height: 180 };
-    if (kind === "freehand") return { id: objectId(), kind, x: p.x, y: p.y, points: [p] };
-    if (connectorKinds.includes(kind)) return { id: objectId(), kind, x: p.x, y: p.y, x2: p.x, y2: p.y, annotations: defaultAnnotations(kind) };
-    return { id: objectId(), kind, x: p.x, y: p.y, width: 0, height: 0 };
+    if (stampKinds.includes(kind)) { const size = stampSize(kind); return { id: objectId(), kind, x: p.x - size.width / 2, y: p.y - size.height / 2, annotations: defaultAnnotations(kind), style: drawingStyle, ...size }; }
+    if (kind === "text") return { id: objectId(), kind, x: p.x, y: p.y, text: "Étiquette", style: drawingStyle };
+    if (kind === "axes") return { id: objectId(), kind, x: p.x, y: p.y, width: 250, height: 180, style: drawingStyle };
+    if (kind === "freehand") return { id: objectId(), kind, x: p.x, y: p.y, points: [p], style: drawingStyle };
+    if (connectorKinds.includes(kind)) return { id: objectId(), kind, x: p.x, y: p.y, x2: p.x, y2: p.y, annotations: defaultAnnotations(kind), style: drawingStyle };
+    return { id: objectId(), kind, x: p.x, y: p.y, width: 0, height: 0, style: drawingStyle };
   };
 
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
@@ -363,11 +375,11 @@ export default function Home() {
         const end = event.shiftKey ? straightEndpoint(curveAnchor.start, p) : p;
         const control = straightCurveControl(curveAnchor.start, end);
         setCurveAnchor({ ...curveAnchor, end });
-        setDraft({ id: objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control });
+        setDraft({ id: objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control, style: drawingStyle });
         setNotice("Placez le point de courbure, puis cliquez pour terminer.");
         return;
       }
-      const completed: CanvasObject = { id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : p };
+      const completed: CanvasObject = { id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : p, style: draft?.style ?? drawingStyle };
       commitObjects([...objects, completed]); setSelectedId(completed.id); setDraft(undefined); setCurveAnchor(undefined); setTool("select"); setNotice("Courbe ajoutée au canevas.");
       return;
     }
@@ -403,8 +415,8 @@ export default function Home() {
     if (tool === "curve" && curveAnchor) {
       if (!curveAnchor.end) {
         const end = event.shiftKey ? straightEndpoint(curveAnchor.start, p) : p;
-        setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control: straightCurveControl(curveAnchor.start, end) });
-      } else setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : p });
+        setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: end.x, y2: end.y, control: straightCurveControl(curveAnchor.start, end), style: draft?.style ?? drawingStyle });
+      } else setDraft({ id: draft?.id ?? objectId(), kind: "curve", x: curveAnchor.start.x, y: curveAnchor.start.y, x2: curveAnchor.end.x, y2: curveAnchor.end.y, control: event.shiftKey ? straightCurveControl(curveAnchor.start, curveAnchor.end) : p, style: draft?.style ?? drawingStyle });
       return;
     }
     if (!draft) return;
@@ -435,7 +447,7 @@ export default function Home() {
   const addFunction = () => {
     const [xMin, xMax] = range.split(":").map(Number);
     if (!expression.trim() || !Number.isFinite(xMin) || !Number.isFinite(xMax)) { setNotice("Utilisez une expression et un intervalle, par exemple -5:5."); return; }
-    const next = { id: objectId(), kind: "axes" as const, x: 40, y: 350, width: 250, height: 180, graph: { expression, xMin, xMax } };
+    const next = { id: objectId(), kind: "axes" as const, x: 40, y: 350, width: 250, height: 180, graph: { expression, xMin, xMax }, style: drawingStyle };
     if (!graphPathFor(next)) { setNotice("Expression non reconnue. Utilisez par exemple sin(deg(x)), x^2, exp(x), sqrt(x) ou abs(x)."); return; }
     commitObjects([...objects, next]); setSelectedId(next.id); setNotice("Graphe ajouté au canevas.");
   };
@@ -465,21 +477,21 @@ export default function Home() {
     <header><div><p className="eyebrow">Représentations scientifiques CPGE</p><h1>Sketch2LaTeX — MPSI</h1></div><p className="status" aria-live="polite">{notice}</p></header>
     <section className="programme-note">Bibliothèque structurée à partir du programme de physique-chimie MPSI : optique géométrique, RLC et signaux, mécanique, champs et induction, thermodynamique, chimie des solutions et verrerie de TP.</section>
     <section className="toolbox" aria-label="Outils de représentation MPSI">
-      {toolboxGroups.map((group) => <div key={group.title}><strong>{group.title}</strong>{group.kinds.map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{kind === "select" ? "Sélectionner / déplacer" : labels[kind]}</button>)}</div>)}
+      {toolboxGroups.map((group) => <div key={group.title}><strong>{group.title}</strong>{group.kinds.map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{kind === "select" ? "Sélectionner / déplacer" : labels[kind]}</button>)}{group.title === "Outils" && <div className="tool-style-controls"><label>Couleur <input type="color" value={activeColor} onChange={(event) => applyDrawingColor(event.target.value)} aria-label="Couleur du tracé ou de l’objet sélectionné" /></label><div className="color-swatches" aria-label="Couleurs rapides">{["#111111", "#1769aa", "#c62828", "#2e7d32", "#ef6c00", "#6a1b9a"].map((color) => <button key={color} className="color-swatch" style={{ backgroundColor: color }} onClick={() => applyDrawingColor(color)} aria-label={`Choisir la couleur ${color}`} title={color} />)}</div><label>Épaisseur <input type="range" min="1" max="8" step="1" value={activeStrokeWidth} onChange={(event) => applyDrawingWidth(Number(event.target.value))} aria-label="Épaisseur du tracé" /><output>{activeStrokeWidth}px</output></label></div>}</div>)}
     </section>
     <section className="graph-controls"><label>Fonction <input value={expression} onChange={(e) => setExpression(e.target.value)} aria-label="Expression de la fonction" /></label><label>Intervalle en x <input value={range} onChange={(e) => setRange(e.target.value)} aria-label="Intervalle des x" /></label><button onClick={addFunction}>Ajouter le graphe</button><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd + Z">↶ Retour</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd + Y ou Ctrl/Cmd + Maj + Z">↷ Avancer</button><button onClick={deleteSelected} disabled={!selectedId} title="Touche Suppr">Supprimer la sélection</button><button onClick={() => { if (!objects.length) return; commitObjects([]); setSelectedId(undefined); setNotice("Canevas effacé."); }}>Effacer le canevas</button>
       {selected && <div className="selection-controls" aria-label="Transformation de l’objet sélectionné"><strong>Coins : côté opposé fixe · Maj = proportions</strong><label>Taille <input type="range" min="25" max="300" step="5" value={Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)} onChange={(e) => { const scale = Number(e.target.value) / 100; updateSelected({ scale: undefined, scaleX: scale, scaleY: scale }); }} aria-label="Taille proportionnelle de l’objet" /><output>{Math.round(((selectedScaleX + selectedScaleY) / 2) * 100)}%</output></label><label>Largeur <input className="dimension-input" type="number" min="8" step="1" value={selectedWidth} onChange={(e) => updateSelected({ scale: undefined, scaleX: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.width ?? 1), .25, 3) })} aria-label="Largeur de l’objet" /><span>px</span></label><label>Hauteur <input className="dimension-input" type="number" min="8" step="1" value={selectedHeight} onChange={(e) => updateSelected({ scale: undefined, scaleY: clamp(Number(e.target.value) / Math.max(1, selectedBounds?.height ?? 1), .25, 3) })} aria-label="Hauteur de l’objet" /><span>px</span></label><label>Rotation <input type="range" min="-180" max="180" step="1" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} aria-label="Rotation de l’objet" /><input className="angle-input" type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })} aria-label="Angle de rotation en degrés" /><span>°</span></label><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div>}
     </section>
     <section className="workspace">
       <div className="canvas-wrap"><svg ref={svgRef} tabIndex={0} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Canevas de schémas scientifiques">
-        <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#111" /></marker></defs>
+        <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker></defs>
         <rect width={canvasWidth} height={canvasHeight} fill="white" />
         {objects.map((object) => <g key={object.id} data-id={object.id} transform={transformFor(object)}>{preview(object, object.id === selectedId)}</g>)}
         {selected && selectionOverlay(selected)}
         {draft && <g opacity=".65" transform={transformFor(draft)}>{preview(draft, true)}</g>}
         {draft?.kind === "curve" && draft.control && <g pointerEvents="none" opacity=".75"><line x1={draft.x} y1={draft.y} x2={draft.control.x} y2={draft.control.y} stroke="#2176ae" strokeDasharray="4 4" /><line x1={draft.control.x} y1={draft.control.y} x2={draft.x2} y2={draft.y2} stroke="#2176ae" strokeDasharray="4 4" /><circle cx={draft.control.x} cy={draft.control.y} r="5" fill="#2176ae" /></g>}
       </svg></div>
-      <aside><div className="code-actions"><label><input type="checkbox" checked={snippetOnly} onChange={(e) => setSnippetOnly(e.target.checked)} /> Extrait TikZ seul</label><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={resetLatexDraft} disabled={!latexDirty}>Annuler l’édition</button><button onClick={copy}>Copier le LaTeX</button><button onClick={exportPdf}>Exporter le PDF</button></div><p className="latex-help">Chaque objet comporte un bloc <code>% @sketch2latex &#123;…&#125;</code> éditable. Exemple pour un ion : remplacez <code>&quot;main&quot;:&quot;ion&quot;</code> par <code>&quot;main&quot;:&quot;Na+&quot;</code>, puis choisissez « Appliquer au canevas ». Les libellés visibles et les coordonnées TikZ des formes simples restent aussi synchronisés.</p><textarea value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} aria-label="LaTeX éditable synchronisé avec le canevas" spellCheck="false" /></aside>
+      <aside><div className="code-actions"><label><input type="checkbox" checked={snippetOnly} onChange={(e) => setSnippetOnly(e.target.checked)} /> Extrait TikZ seul</label><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={resetLatexDraft} disabled={!latexDirty}>Annuler l’édition</button><button onClick={copy}>Copier le LaTeX</button><button onClick={exportPdf}>Exporter le PDF</button></div><p className="latex-help">Chaque objet comporte un bloc <code>% @sketch2latex &#123;…&#125;</code> éditable. Exemple pour un ion : remplacez <code>&quot;main&quot;:&quot;ion&quot;</code> par <code>&quot;main&quot;:&quot;Na+&quot;</code>, puis choisissez « Appliquer au canevas ». La couleur et l’épaisseur sont enregistrées dans <code>&quot;style&quot;</code> ; les libellés visibles et les coordonnées TikZ des formes simples restent aussi synchronisés.</p><textarea value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} aria-label="LaTeX éditable synchronisé avec le canevas" spellCheck="false" /></aside>
     </section>
     <footer>Chaque objet est vectoriel, typé et converti de façon déterministe. Les coordonnées du canevas utilisent 50 px = 1 unité TikZ et l’axe vertical est retourné à l’export.</footer>
   </main>;

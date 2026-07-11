@@ -33,6 +33,15 @@ test("keeps independent selected-object width and height in the exported LaTeX",
   assert.match(output, /cm=\{2,0,0,0\.5,/);
 });
 
+test("exports editable drawing color and line width", () => {
+  const objects: CanvasObject[] = [{ id: "colored-line", kind: "line", x: 0, y: 0, x2: 100, y2: 0, style: { stroke: "#c62828", strokeWidth: 4 } }];
+  const output = documentFor(objects);
+  assert.match(output, /color=\{rgb,255:red,198;green,40;blue,40\}/);
+  assert.match(output, /line width=1\.60pt/);
+  const edited = output.replace('"stroke":"#c62828"', '"stroke":"#1769aa"');
+  assert.deepEqual(objectsFromLatex(edited, objects).objects[0].style, { stroke: "#1769aa", strokeWidth: 4 });
+});
+
 test("applies editable generated LaTeX coordinates back to the canvas", () => {
   const objects: CanvasObject[] = [{ id: "line-1", kind: "line", x: 0, y: 0, x2: 100, y2: 0 }];
   const edited = documentFor(objects).replace("(2.00,0.00);", "(4.00,-1.00);");
