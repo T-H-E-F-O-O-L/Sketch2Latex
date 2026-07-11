@@ -21,6 +21,7 @@ test("server-renders the Sketch2LaTeX editor", async () => {
   assert.match(html, /Canevas scientifique interactif/);
   assert.match(html, /Ajouter un graphe/);
   assert.match(html, /SVG vectoriel/);
+  assert.match(html, /Compiler le LaTeX/);
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
@@ -37,6 +38,9 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /svg2pdf\.js/);
   assert.match(page, /objectsFromLatex/);
   assert.match(page, /groupSelection/);
+  assert.match(page, /makeAopCircuit/);
+  assert.match(page, /roundTripReport/);
+  assert.match(page, /templateMode/);
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
   assert.match(templates, /Circuit RLC série/);
@@ -44,5 +48,6 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(templates, /Pile électrochimique/);
   assert.match(project, /PROJECT_VERSION/);
   assert.match(latex, /tikz-rect-/);
+  assert.match(latex, /raw-tikz/);
   assert.match(packageJson, /"svg2pdf\.js"/);
 });

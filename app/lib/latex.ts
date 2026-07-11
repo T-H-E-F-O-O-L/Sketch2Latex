@@ -139,6 +139,8 @@ function objectToLatexBase(object: CanvasObject): string {
     case "circle": return `\\draw ${point(object.x + (object.width ?? 0) / 2, object.y + (object.height ?? 0) / 2)} circle (${n(Math.abs(object.width ?? 0) / 2)});`;
     case "ellipse": return `\\draw ${point(object.x + (object.width ?? 0) / 2, object.y + (object.height ?? 0) / 2)} ellipse (${n(Math.abs(object.width ?? 0) / 2)} and ${n(Math.abs(object.height ?? 0) / 2)});`;
     case "text": return `\\node at ${origin} {${safeText(object.text)}};`;
+    case "equation": { const formula = (object.text ?? "").trim().replace(/^\$|\$$/g, ""); return `\\node at ${point(object.x + (object.width ?? 220) / 2, object.y + (object.height ?? 70) / 2)} {$${formula}$};`; }
+    case "raw-tikz": return object.rawTikz?.trim() ?? "";
     case "freehand": { const points = simplify(object.points ?? []); return points.length > 1 ? `\\draw[smooth, tension=0.7] plot coordinates {${points.map((p) => point(p.x, p.y)).join(" ")}};` : ""; }
     case "axes": {
       const width = n(object.width ?? 250); const height = n(object.height ?? 180); const graph = object.graph;
@@ -184,13 +186,17 @@ export function documentFor(objects: CanvasObject[], snippetOnly = false, settin
     return rendered ? [`% sketch2latex id=${object.id}\n% @sketch2latex ${JSON.stringify(object)}\n  ${rendered}`] : [];
   }).join("\n\n  ");
   const unit = settings?.unit ?? "cm";
-  const picture = `\\begin{tikzpicture}[x=1${unit},y=1${unit}]\n  ${body}\n\\end{tikzpicture}`;
+  const axisUnit = unit === "tikz" ? "cm" : unit;
+  const unitScale = unit === "mm" ? 10 : unit === "pt" ? 28.3464567 : 1;
+  const scaledBody = unitScale === 1 ? body : `\\begin{scope}[scale=${matrixNumber(unitScale)}]\n${body}\n\\end{scope}`;
+  const picture = `\\begin{tikzpicture}[x=1${axisUnit},y=1${axisUnit}]\n  ${scaledBody}\n\\end{tikzpicture}`;
   if (snippetOnly) return picture;
   return `\\documentclass[tikz,border=5pt]{standalone}
 % Sketch2LaTeX document: ${settings?.width ?? 900} x ${settings?.height ?? 560}px, ${settings?.orientation ?? "landscape"}, unit ${settings?.unit ?? "cm"}
 \\usepackage{tikz}
 \\usepackage{circuitikz}
 \\usepackage{pgfplots}
+\\usepackage{amsmath,amssymb}
 \\pgfplotsset{compat=1.18}
 \\usetikzlibrary{arrows.meta,decorations.pathmorphing,calc}
 \\begin{document}
@@ -211,6 +217,7 @@ function isCanvasObject(value: unknown): value is CanvasObject {
   if (typeof object.id !== "string" || typeof object.kind !== "string" || !Object.hasOwn(labels, object.kind) || !isFiniteNumber(object.x) || !isFiniteNumber(object.y)) return false;
   for (const key of ["x2", "y2", "width", "height", "scale", "scaleX", "scaleY", "rotation"] as const) if (object[key] !== undefined && !isFiniteNumber(object[key])) return false;
   if (object.text !== undefined && typeof object.text !== "string") return false;
+  if (object.rawTikz !== undefined && typeof object.rawTikz !== "string") return false;
   if (object.annotations !== undefined && (!object.annotations || typeof object.annotations !== "object" || Object.values(object.annotations as Record<string, unknown>).some((annotation) => typeof annotation !== "string"))) return false;
   if (object.style !== undefined) {
     if (!object.style || typeof object.style !== "object") return false;
@@ -279,6 +286,10 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
     const node = block.match(/\\node\s+at\s+\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([\s\S]*?)\};/);
     if (node) return { ...original, x: Number(node[1]) * SCALE, y: -Number(node[2]) * SCALE, text: textFromLatex(node[3]) };
   }
+  if (original.kind === "equation") {
+    const node = block.match(/\\node\s+at\s+\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{\$([\s\S]*?)\$\};/);
+    if (node) { const width = original.width ?? 220; const height = original.height ?? 70; return { ...original, x: Number(node[1]) * SCALE - width / 2, y: -Number(node[2]) * SCALE - height / 2, text: node[3] }; }
+  }
   if (original.kind === "axes" && points.length) {
     const width = block.match(/width\s*=\s*(-?\d+(?:\.\d+)?)cm/); const height = block.match(/height\s*=\s*(-?\d+(?:\.\d+)?)cm/); const expression = block.match(/\\addplot\[[^\]]*\]\s*\{([\s\S]*?)\};/);
     return { ...original, x: points[0].x, y: points[0].y, width: width ? Number(width[1]) * SCALE : original.width, height: height ? Number(height[1]) * SCALE : original.height, graph: original.graph ? { ...original.graph, expression: expression?.[1].trim() || original.graph.expression } : original.graph };
@@ -288,24 +299,46 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
 
 function mergeTikzEdits(metadata: CanvasObject, visual: CanvasObject, original: CanvasObject): CanvasObject {
   const next = { ...metadata } as Record<string, unknown>;
-  for (const key of ["x", "y", "x2", "y2", "width", "height", "control", "text", "annotations", "style", "graph"] as const) {
+  for (const key of ["x", "y", "x2", "y2", "width", "height", "control", "text", "rawTikz", "annotations", "style", "graph"] as const) {
     if (JSON.stringify(visual[key]) !== JSON.stringify(original[key])) next[key] = visual[key];
   }
   return next as CanvasObject;
 }
 
+type ImportedCandidate = { index: number; object: CanvasObject };
+
+function ordinaryTikzObjects(source: string): CanvasObject[] {
+  const picture = source.match(/\\begin\{tikzpicture\}(?:\[[^\]]*\])?([\s\S]*?)\\end\{tikzpicture\}/)?.[1] ?? source;
+  const candidates: ImportedCandidate[] = []; const protectedRanges: Array<[number, number]> = [];
+  const pointAt = (x: string, y: string) => { const rawY = -Number(y) * SCALE; return { x: Number(x) * SCALE, y: Object.is(rawY, -0) ? 0 : rawY }; };
+  const rawObject = (raw: string, index: number): ImportedCandidate => { const coordinate = raw.match(/\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/); const position = coordinate ? pointAt(coordinate[1], coordinate[2]) : { x: 40 + (candidates.length % 5) * 28, y: 50 + (candidates.length % 5) * 24 }; return { index, object: { id: `tikz-raw-${index}`, kind: "raw-tikz", ...position, width: 180, height: 70, rawTikz: raw.trim() } }; };
+  for (const block of picture.matchAll(/\\begin\{(?:scope|axis)\}(?:\[[^\]]*\])?[\s\S]*?\\end\{(?:scope|axis)\}/g)) { const index = block.index ?? 0; protectedRanges.push([index, index + block[0].length]); candidates.push(rawObject(block[0], index)); }
+  const isProtected = (start: number, end: number) => protectedRanges.some(([from, to]) => start >= from && end <= to);
+
+  for (const match of picture.matchAll(/\\(?:draw|path|fill|filldraw|node|coordinate|clip|shade)\b[\s\S]*?;/g)) {
+    const raw = match[0]; const index = match.index ?? 0; if (isProtected(index, index + raw.length)) continue;
+    const node = raw.match(/^\\node(?:\[[^\]]*\])?\s+at\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([\s\S]*?)\}\s*;/);
+    if (node) { const position = pointAt(node[1], node[2]); const content = textFromLatex(node[3]); const equation = /^\$[\s\S]*\$$/.test(content); candidates.push({ index, object: { id: `tikz-${equation ? "equation" : "text"}-${index}`, kind: equation ? "equation" : "text", x: equation ? position.x - 110 : position.x, y: equation ? position.y - 35 : position.y, text: equation ? content.slice(1, -1) : content, ...(equation ? { width: 220, height: 70 } : {}) } }); continue; }
+    const curve = raw.match(/^\\draw(?:\[([^\]]*)\])?\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\.\.\s*controls\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)(?:\s*and\s*\([^)]*\))?\s*\.\.\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*;/);
+    if (curve) { const start = pointAt(curve[2], curve[3]); const control = pointAt(curve[4], curve[5]); const end = pointAt(curve[6], curve[7]); candidates.push({ index, object: { id: `tikz-curve-${index}`, kind: "curve", ...start, x2: end.x, y2: end.y, control } }); continue; }
+    const shape = raw.match(/^\\draw(?:\[([^\]]*)\])?\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*(--|rectangle)\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*;/);
+    if (shape) { const options = shape[1] ?? ""; const start = pointAt(shape[2], shape[3]); const end = pointAt(shape[5], shape[6]); const kind: CanvasObject["kind"] = shape[4] === "rectangle" ? "rect" : options.includes("<->") ? "double-arrow" : options.includes("->") || options.includes("Latex") ? "arrow" : options.includes("dashed") ? "dashed-line" : "line"; candidates.push({ index, object: kind === "rect" ? { id: `tikz-rect-${index}`, kind, ...start, width: end.x - start.x, height: end.y - start.y } : { id: `tikz-line-${index}`, kind, ...start, x2: end.x, y2: end.y } }); continue; }
+    const circle = raw.match(/^\\draw(?:\[[^\]]*\])?\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*circle\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*;/);
+    if (circle) { const center = pointAt(circle[1], circle[2]); const radius = Number(circle[3]) * SCALE; candidates.push({ index, object: { id: `tikz-circle-${index}`, kind: "circle", x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2 } }); continue; }
+    const ellipse = raw.match(/^\\draw(?:\[[^\]]*\])?\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*ellipse\s*\(\s*(-?\d+(?:\.\d+)?)\s+and\s+(-?\d+(?:\.\d+)?)\s*\)\s*;/);
+    if (ellipse) { const center = pointAt(ellipse[1], ellipse[2]); const rx = Number(ellipse[3]) * SCALE; const ry = Number(ellipse[4]) * SCALE; candidates.push({ index, object: { id: `tikz-ellipse-${index}`, kind: "ellipse", x: center.x - rx, y: center.y - ry, width: rx * 2, height: ry * 2 } }); continue; }
+    const coordinates = [...raw.matchAll(/\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/g)].map((entry) => pointAt(entry[1], entry[2]));
+    if (/^\\draw/.test(raw) && coordinates.length > 2 && raw.includes("--")) { candidates.push({ index, object: { id: `tikz-path-${index}`, kind: "freehand", x: coordinates[0].x, y: coordinates[0].y, points: coordinates } }); continue; }
+    candidates.push(rawObject(raw, index));
+  }
+  if (!candidates.length && picture.trim()) candidates.push(rawObject(picture, 0));
+  return candidates.sort((a, b) => a.index - b.index).map((candidate, sequence) => ({ ...candidate.object, id: candidate.object.id.replace(/-\d+$/, `-${sequence}`) }));
+}
+
 export function objectsFromLatex(source: string, currentObjects: CanvasObject[]): LatexSyncResult {
   const markers = [...source.matchAll(/^\s*%+\s*sketch2latex\s+id=([^\s]+)\s*$/gim)];
   if (!markers.length) {
-    const imported: CanvasObject[] = [];
-    const lines = [...source.matchAll(/\\draw(?:\[([^\]]*)\])?\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*(--|rectangle)\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*;/g)];
-    lines.forEach((match, index) => {
-      const options = match[1] ?? ""; const x = Number(match[2]) * SCALE; const rawY = -Number(match[3]) * SCALE; const y = Object.is(rawY, -0) ? 0 : rawY; const x2 = Number(match[5]) * SCALE; const rawY2 = -Number(match[6]) * SCALE; const y2 = Object.is(rawY2, -0) ? 0 : rawY2;
-      if (match[4] === "rectangle") imported.push({ id: `tikz-rect-${index}`, kind: "rect", x, y, width: x2 - x, height: y2 - y });
-      else imported.push({ id: `tikz-line-${index}`, kind: options.includes("<->") ? "double-arrow" : options.includes("->") || options.includes("Latex") ? "arrow" : options.includes("dashed") ? "dashed-line" : "line", x, y, x2, y2 });
-    });
-    const nodes = [...source.matchAll(/\\node(?:\[[^\]]*\])?\s+at\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([^{}]*)\}\s*;/g)];
-    nodes.forEach((match, index) => { const rawY = -Number(match[2]) * SCALE; imported.push({ id: `tikz-text-${index}`, kind: "text", x: Number(match[1]) * SCALE, y: Object.is(rawY, -0) ? 0 : rawY, text: textFromLatex(match[3]) }); });
+    const imported = ordinaryTikzObjects(source);
     if (imported.length) return { objects: imported, applied: imported.length, preserved: 0 };
   }
   if (!markers.length) throw new Error("Conservez les commentaires % sketch2latex id=… pour appliquer le LaTeX au canevas.");
@@ -327,4 +360,36 @@ export function objectsFromLatex(source: string, currentObjects: CanvasObject[])
     objects.push(next);
   });
   return { objects, applied, preserved };
+}
+
+export type RoundTripReport = {
+  ok: boolean;
+  mismatchedIds: string[];
+  message: string;
+};
+
+function stableValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableValue).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableValue(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function roundTripReport(source: string, currentObjects: CanvasObject[]): RoundTripReport {
+  if (!currentObjects.length) return { ok: true, mismatchedIds: [], message: "Canevas vide : aucune donnée à perdre." };
+  try {
+    const restored = objectsFromLatex(source, currentObjects).objects;
+    const restoredById = new Map(restored.map((object) => [object.id, object]));
+    const mismatchedIds = currentObjects
+      .filter((object) => stableValue(restoredById.get(object.id)) !== stableValue(object))
+      .map((object) => object.id);
+    for (const object of restored) if (!currentObjects.some((current) => current.id === object.id)) mismatchedIds.push(object.id);
+    return mismatchedIds.length
+      ? { ok: false, mismatchedIds, message: `${mismatchedIds.length} objet(s) diffèrent après le retour TikZ → canevas.` }
+      : { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." };
+  } catch (error) {
+    return { ok: false, mismatchedIds: [], message: error instanceof Error ? error.message : "Aller-retour TikZ impossible à vérifier." };
+  }
 }

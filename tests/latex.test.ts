@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
+import { makeAopCircuit, type AopConfiguration } from "../app/lib/aop-circuits";
 import { graphPathFor } from "../app/lib/graph";
-import { documentFor, objectsFromLatex, objectToLatex } from "../app/lib/latex";
+import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from "../app/lib/latex";
 import { parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
+import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 
 test("converts circuit connectors using circuitikz", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
@@ -138,7 +140,7 @@ test("imports ordinary TikZ lines, rectangles and labels when metadata is absent
   assert.equal(result.applied, 3);
   assert.deepEqual(result.objects[0], { id: "tikz-line-0", kind: "line", x: 0, y: 0, x2: 100, y2: 50 });
   assert.deepEqual(result.objects[1], { id: "tikz-rect-1", kind: "rect", x: 50, y: 50, width: 100, height: 50 });
-  assert.deepEqual(result.objects[2], { id: "tikz-text-0", kind: "text", x: 50, y: 150, text: "hello" });
+  assert.deepEqual(result.objects[2], { id: "tikz-text-2", kind: "text", x: 50, y: 150, text: "hello" });
 });
 
 test("keeps document settings and structured template projects portable", () => {
@@ -152,4 +154,46 @@ test("keeps document settings and structured template projects portable", () => 
   assert.equal(project.settings.orientation, "portrait");
   assert.equal(project.objects.length, cloned.length);
   assert.match(documentFor([], true, project.settings), /x=1mm,y=1mm/);
+  assert.match(documentFor([], true, project.settings), /scale=10/);
+});
+
+test("imports richer ordinary TikZ and protects unsupported commands", () => {
+  const source = String.raw`\begin{tikzpicture}
+\draw (0,0) circle (1);
+\draw (0,0) .. controls (1,2) .. (3,0);
+\node at (2,-1) {$E=mc^2$};
+\shade[ball color=blue] (4,0) circle (.5);
+\end{tikzpicture}`;
+  const result = objectsFromLatex(source, []);
+  assert.deepEqual(result.objects.map((object) => object.kind), ["circle", "curve", "equation", "raw-tikz"]);
+  assert.match(result.objects[3].rawTikz ?? "", /\\shade/);
+});
+
+test("round-trips equations and protected TikZ without losing source", () => {
+  const objects: CanvasObject[] = [
+    { id: "eq", kind: "equation", x: 80, y: 40, width: 220, height: 70, text: "\\int_0^1 x^2\\,dx" },
+    { id: "raw", kind: "raw-tikz", x: 20, y: 30, width: 180, height: 70, rawTikz: "\\shade[ball color=red] (1,1) circle (.4);" },
+  ];
+  const source = documentFor(objects);
+  assert.match(source, /\$\\int_0\^1/);
+  assert.match(source, /\\shade\[ball color=red\]/);
+  assert.deepEqual(roundTripReport(source, objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("builds every AOP configuration from editable grouped components", () => {
+  const kinds: AopConfiguration[] = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"];
+  for (const kind of kinds) {
+    const circuit = makeAopCircuit(kind, { x: 300, y: 220 }, { stroke: "#111", strokeWidth: 2 });
+    assert.ok(circuit.length >= 8, kind);
+    assert.ok(circuit.some((object) => object.kind === "op-amp"), kind);
+    assert.ok(circuit.some((object) => object.kind === "resistor" || object.kind === "capacitor"), kind);
+    assert.equal(new Set(circuit.map((object) => object.groupId)).size, 1, kind);
+  }
+});
+
+test("converts editable dimensions between cm, mm, pt and TikZ units", () => {
+  assert.equal(toWorkingUnit(50, "cm"), 1);
+  assert.equal(toWorkingUnit(50, "mm"), 10);
+  assert.equal(toWorkingUnit(50, "tikz"), 1);
+  assert.ok(Math.abs(fromWorkingUnit(toWorkingUnit(50, "pt"), "pt") - 50) < .01);
 });

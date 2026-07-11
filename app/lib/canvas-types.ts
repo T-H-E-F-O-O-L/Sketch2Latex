@@ -1,5 +1,5 @@
 export type ObjectKind =
-  | "freehand" | "line" | "dashed-line" | "curve" | "arrow" | "double-arrow" | "dimension" | "point" | "rect" | "circle" | "ellipse" | "text" | "axes"
+  | "freehand" | "line" | "dashed-line" | "curve" | "arrow" | "double-arrow" | "dimension" | "point" | "rect" | "circle" | "ellipse" | "text" | "equation" | "raw-tikz" | "axes"
   | "wire" | "resistor" | "capacitor" | "inductor" | "battery" | "switch" | "ground"
   | "op-amp" | "op-amp-comparator" | "op-amp-inverting" | "op-amp-non-inverting" | "op-amp-summing" | "op-amp-integrator" | "op-amp-differentiator" | "op-amp-schmitt"
   | "voltmeter" | "ammeter" | "gbf" | "oscilloscope"
@@ -28,6 +28,7 @@ export type CanvasObject = {
   points?: Point[];
   control?: Point;
   text?: string;
+  rawTikz?: string;
   annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; fill?: string };
   graph?: { expression: string; expressions?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
@@ -40,7 +41,7 @@ export type CanvasObject = {
 export type DocumentSettings = {
   width: number;
   height: number;
-  unit: "cm" | "mm" | "pt";
+  unit: "cm" | "mm" | "pt" | "tikz";
   orientation: "landscape" | "portrait";
   gridSize: number;
   showGrid: boolean;
@@ -80,7 +81,7 @@ export const connectorKinds: ObjectKind[] = [
 ];
 
 export const stampKinds: ObjectKind[] = [
-  "point", "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field",
+  "point", "equation", "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field",
   "lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
   "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
@@ -96,13 +97,13 @@ export const labels: Record<ObjectKind, string> = {
   "heat-arrow": "Transfert thermique Q", "work-arrow": "Travail W", "piston-cylinder": "Piston-cylindre", "thermal-reservoir": "Réservoir thermique", "heat-engine": "Machine thermique",
   "bond-single": "Liaison simple", "bond-double": "Liaison double", "bond-triple": "Liaison triple", "reaction-arrow": "Flèche de réaction", "equilibrium-arrow": "Équilibre chimique", "hydrogen-bond": "Liaison hydrogène", dipole: "Moment dipolaire", ion: "Ion", "lone-pair": "Doublet non liant", "crystal-fcc": "Maille CFC", precipitate: "Précipité", "electrochemical-cell": "Pile électrochimique",
   beaker: "Bécher", flask: "Erlenmeyer", "round-bottom-flask": "Ballon à fond rond", "distillation-flask": "Ballon à distiller", "test-tube": "Tube à essai", "graduated-cylinder": "Éprouvette graduée", burette: "Burette", "volumetric-flask": "Fiole jaugée", "separatory-funnel": "Ampoule à décanter", pipette: "Pipette jaugée", "filter-funnel": "Entonnoir de filtration", "wash-bottle": "Pissette", "liebig-condenser": "Réfrigérant droit", "support-stand": "Potence", "magnetic-stirrer": "Agitateur magnétique", thermometer: "Thermomètre", "bunsen-burner": "Bec Bunsen",
-  "op-amp": "AOP standard", "op-amp-comparator": "AOP comparateur", "op-amp-inverting": "AOP inverseur", "op-amp-non-inverting": "AOP non-inverseur", "op-amp-summing": "AOP sommateur", "op-amp-integrator": "AOP intégrateur", "op-amp-differentiator": "AOP dérivateur", "op-amp-schmitt": "AOP trigger de Schmitt",
+  "op-amp": "AOP standard", "op-amp-comparator": "AOP comparateur", "op-amp-inverting": "AOP inverseur", "op-amp-non-inverting": "AOP non-inverseur", "op-amp-summing": "AOP sommateur", "op-amp-integrator": "AOP intégrateur", "op-amp-differentiator": "AOP dérivateur", "op-amp-schmitt": "AOP trigger de Schmitt", equation: "Équation LaTeX", "raw-tikz": "TikZ protégé",
 };
 
 export type ToolboxGroup = { title: string; kinds: Array<ObjectKind | "select"> };
 
 export const toolboxGroups: ToolboxGroup[] = [
-  { title: "Outils", kinds: ["select", "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "point", "rect", "circle", "ellipse", "freehand", "text", "axes"] },
+  { title: "Outils", kinds: ["select", "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "point", "rect", "circle", "ellipse", "freehand", "text", "equation", "axes"] },
   { title: "Électricité & signaux", kinds: ["wire", "resistor", "capacitor", "inductor", "battery", "switch", "ground", "voltmeter", "ammeter", "gbf", "oscilloscope"] },
   { title: "Optique & ondes", kinds: ["lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "light-ray", "wave"] },
   { title: "Mécanique", kinds: ["force", "spring", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field"] },
@@ -114,7 +115,7 @@ export const toolboxGroups: ToolboxGroup[] = [
 ];
 
 const sizes: Partial<Record<ObjectKind, { width: number; height: number }>> = {
-  point: { width: 18, height: 18 },
+  point: { width: 18, height: 18 }, equation: { width: 220, height: 70 }, "raw-tikz": { width: 180, height: 70 },
   ground: { width: 44, height: 42 }, gbf: { width: 70, height: 70 }, oscilloscope: { width: 100, height: 70 }, mass: { width: 70, height: 55 }, pulley: { width: 85, height: 85 }, pendulum: { width: 80, height: 110 }, "reference-frame": { width: 100, height: 80 }, "circular-trajectory": { width: 90, height: 90 }, "gravity-field": { width: 95, height: 85 },
   lens: { width: 60, height: 120 }, "diverging-lens": { width: 60, height: 120 }, "plane-mirror": { width: 34, height: 120 }, screen: { width: 34, height: 120 }, prism: { width: 90, height: 80 }, fiber: { width: 140, height: 65 }, "electric-field": { width: 100, height: 75 }, "magnetic-field-in": { width: 90, height: 75 }, "magnetic-field-out": { width: 90, height: 75 }, "bar-magnet": { width: 110, height: 48 }, coil: { width: 100, height: 70 }, solenoid: { width: 130, height: 80 }, "laplace-rails": { width: 140, height: 90 }, "charged-particle": { width: 50, height: 50 },
   "piston-cylinder": { width: 100, height: 105 }, "thermal-reservoir": { width: 78, height: 78 }, "heat-engine": { width: 120, height: 100 },

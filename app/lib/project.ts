@@ -27,7 +27,7 @@ function settingsFrom(value: unknown): DocumentSettings {
   return {
     width: finite(input.width) ? Math.max(320, Math.min(2400, input.width)) : defaultDocumentSettings.width,
     height: finite(input.height) ? Math.max(240, Math.min(1800, input.height)) : defaultDocumentSettings.height,
-    unit: input.unit === "mm" || input.unit === "pt" ? input.unit : "cm",
+    unit: input.unit === "mm" || input.unit === "pt" || input.unit === "tikz" ? input.unit : "cm",
     orientation: input.orientation === "portrait" ? "portrait" : "landscape",
     gridSize: finite(input.gridSize) ? Math.max(5, Math.min(100, input.gridSize)) : defaultDocumentSettings.gridSize,
     showGrid: input.showGrid !== false,

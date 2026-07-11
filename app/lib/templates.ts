@@ -160,4 +160,19 @@ export const diagramTemplates: DiagramTemplate[] = [
   },
 ];
 
-export const cloneTemplateObjects = (template: DiagramTemplate) => template.objects.map((object) => ({ ...object, id: `${object.id}-${Math.random().toString(36).slice(2, 7)}`, style: object.style ? { ...object.style } : undefined, graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined, annotations: object.annotations ? { ...object.annotations } : undefined, points: object.points?.map((point) => ({ ...point })), control: object.control ? { ...object.control } : undefined }));
+export const cloneTemplateObjects = (template: DiagramTemplate) => {
+  const suffix = Math.random().toString(36).slice(2, 7);
+  const ids = new Map(template.objects.map((object) => [object.id, `${object.id}-${suffix}`]));
+  const groups = new Map(template.objects.flatMap((object) => object.groupId ? [[object.groupId, `${object.groupId}-${suffix}`] as const] : []));
+  return template.objects.map((object) => ({
+    ...object,
+    id: ids.get(object.id)!,
+    groupId: object.groupId ? groups.get(object.groupId) : undefined,
+    bindings: object.bindings ? { startId: ids.get(object.bindings.startId ?? ""), endId: ids.get(object.bindings.endId ?? "") } : undefined,
+    style: object.style ? { ...object.style } : undefined,
+    graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined,
+    annotations: object.annotations ? { ...object.annotations } : undefined,
+    points: object.points?.map((point) => ({ ...point })),
+    control: object.control ? { ...object.control } : undefined,
+  }));
+};
