@@ -233,17 +233,19 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill={color} stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
   const a = (key: string, fallback: string) => annotation(object, key, fallback);
   const opAmp = () => {
-    const kind = object.kind; const topInput = y + h * .37; const bottomInput = y + h * .66; const inputEnd = x + w * .34; const apex = x + w * .8; const outputX = x + w * .96;
+    const kind = object.kind; const topInput = y + h * .37; const bottomInput = y + h * .66; const boxLeft = x + w * .28; const boxRight = x + w * .8; const inputEnd = boxLeft; const outputX = x + w * .96;
     const inputLine = (fromY: number, toY: number, key: string) => <line key={key} x1={x + w * .04} y1={fromY} x2={inputEnd} y2={toY} />;
     const feedback = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"].includes(kind);
-    const symbol = a("main", kind === "op-amp-comparator" ? ">" : kind === "op-amp-summing" ? "Σ" : kind === "op-amp-integrator" ? "∫" : kind === "op-amp-differentiator" ? "d/dt" : kind === "op-amp-schmitt" ? "S" : "A");
+    const variantLabel = kind === "op-amp-comparator" ? "Comparateur" : kind === "op-amp-inverting" ? "Inverseur" : kind === "op-amp-non-inverting" ? "Non-inverseur" : kind === "op-amp-summing" ? "Sommateur" : kind === "op-amp-integrator" ? "Intégrateur" : kind === "op-amp-differentiator" ? "Dérivateur" : kind === "op-amp-schmitt" ? "Schmitt" : "AOP";
     return <g {...common} strokeLinecap="round" strokeLinejoin="round">
-      <path d={`M ${inputEnd} ${y + h * .12} L ${inputEnd} ${y + h * .88} L ${apex} ${cy} Z`} fill="white" />
+      <rect x={boxLeft} y={y + h * .15} width={boxRight - boxLeft} height={h * .7} rx="1" fill="white" />
       {inputLine(topInput, topInput, "minus-input")}{inputLine(bottomInput, bottomInput, "plus-input")}
-      <line x1={apex} y1={cy} x2={outputX} y2={cy} />
-      <text className="diagram-sign" x={inputEnd - 11} y={topInput + 5} textAnchor="middle" fill={color}>−</text>
-      <text className="diagram-sign" x={inputEnd - 11} y={bottomInput + 5} textAnchor="middle" fill={color}>+</text>
-      <text className="diagram-label" x={x + w * .56} y={cy + 5} textAnchor="middle" fontSize={kind === "op-amp-differentiator" ? "11" : "16"} fill={color}>{symbol}</text>
+      <line x1={boxRight} y1={cy} x2={outputX} y2={cy} />
+      <text className="diagram-sign" x={boxLeft + 11} y={topInput + 5} textAnchor="middle" fill={color}>−</text>
+      <text className="diagram-sign" x={boxLeft + 11} y={bottomInput + 5} textAnchor="middle" fill={color}>+</text>
+      <path d={`M ${x + w * .49} ${cy - 10} L ${x + w * .49} ${cy + 10} L ${x + w * .57} ${cy} Z`} />
+      <text className="diagram-label" x={x + w * .67} y={cy + 6} textAnchor="middle" fontSize="19" fill={color}>∞</text>
+      <text className="diagram-output-label" x={x + w * .55} y={y + h * .96} textAnchor="middle" fill={color}>{variantLabel}</text>
       {kind === "op-amp-summing" && <>{inputLine(y + h * .2, topInput, "sum-1")}{inputLine(y + h * .5, topInput, "sum-2")}</>}
       {(kind === "op-amp-inverting" || kind === "op-amp-differentiator") && <polyline points={`${x + w * .04},${topInput} ${x + w * .1},${topInput - 7} ${x + w * .16},${topInput + 7} ${x + w * .22},${topInput - 7} ${inputEnd},${topInput}`} fill="white" />}
       {kind === "op-amp-differentiator" && <><line x1={x + w * .11} y1={topInput - 13} x2={x + w * .11} y2={topInput + 13} /><line x1={x + w * .16} y1={topInput - 13} x2={x + w * .16} y2={topInput + 13} /></>}

@@ -64,7 +64,6 @@ const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = 
   dimension: { main: "d" }, "heat-arrow": { main: "Q" }, "work-arrow": { main: "W" }, dipole: { main: "μ" }, "piston-cylinder": { main: "P, V, T" }, "thermal-reservoir": { main: "T" },
   "heat-engine": { main: "machine", hot: "Qh", cold: "Qc", work: "W" }, ion: { main: "ion" },
   "electrochemical-cell": { anode: "anode (−)", cathode: "cathode (+)", bridge: "pont salin" },
-  "op-amp": { main: "A" }, "op-amp-comparator": { main: ">" }, "op-amp-inverting": { main: "-A" }, "op-amp-non-inverting": { main: "+A" }, "op-amp-summing": { main: "S" }, "op-amp-integrator": { main: "I" }, "op-amp-differentiator": { main: "d/dt" }, "op-amp-schmitt": { main: "S" },
 };
 
 export function defaultAnnotations(kind: ObjectKind) {
