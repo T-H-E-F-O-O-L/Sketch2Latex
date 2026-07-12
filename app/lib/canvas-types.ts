@@ -1,5 +1,5 @@
 export type ObjectKind =
-  | "freehand" | "line" | "dashed-line" | "curve" | "arrow" | "double-arrow" | "dimension" | "point" | "rect" | "circle" | "ellipse" | "text" | "equation" | "raw-tikz" | "axes" | "symbol"
+  | "freehand" | "line" | "dashed-line" | "curve" | "arrow" | "double-arrow" | "dimension" | "point" | "rect" | "circle" | "ellipse" | "text" | "equation" | "raw-tikz" | "axes"
   | "wire" | "resistor" | "capacitor" | "inductor" | "battery" | "switch" | "ground"
   | "op-amp" | "op-amp-comparator" | "op-amp-inverting" | "op-amp-non-inverting" | "op-amp-summing" | "op-amp-integrator" | "op-amp-differentiator" | "op-amp-schmitt"
   | "voltmeter" | "ammeter" | "gbf" | "oscilloscope"
@@ -28,7 +28,6 @@ export type CanvasObject = {
   points?: Point[];
   control?: Point;
   text?: string;
-  symbol?: string;
   rawTikz?: string;
   annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; fill?: string };
@@ -83,7 +82,7 @@ export const connectorKinds: ObjectKind[] = [
 ];
 
 export const stampKinds: ObjectKind[] = [
-  "point", "equation", "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "symbol",
+  "point", "equation", "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field",
   "plane-mirror", "screen", "prism", "fiber", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
   "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
@@ -99,7 +98,7 @@ export const labels: Record<ObjectKind, string> = {
   "heat-arrow": "Transfert thermique Q", "work-arrow": "Travail W", "piston-cylinder": "Piston-cylindre", "thermal-reservoir": "Réservoir thermique", "heat-engine": "Machine thermique",
   "bond-single": "Liaison simple", "bond-double": "Liaison double", "bond-triple": "Liaison triple", "reaction-arrow": "Flèche de réaction", "equilibrium-arrow": "Équilibre chimique", "hydrogen-bond": "Liaison hydrogène", dipole: "Moment dipolaire", ion: "Ion", "lone-pair": "Doublet non liant", "crystal-fcc": "Maille CFC", precipitate: "Précipité", "electrochemical-cell": "Pile électrochimique",
   beaker: "Bécher", flask: "Erlenmeyer", "round-bottom-flask": "Ballon à fond rond", "distillation-flask": "Ballon à distiller", "test-tube": "Tube à essai", "graduated-cylinder": "Éprouvette graduée", burette: "Burette", "volumetric-flask": "Fiole jaugée", "separatory-funnel": "Ampoule à décanter", pipette: "Pipette jaugée", "filter-funnel": "Entonnoir de filtration", "wash-bottle": "Pissette", "liebig-condenser": "Réfrigérant droit", "support-stand": "Potence", "magnetic-stirrer": "Agitateur magnétique", thermometer: "Thermomètre", "bunsen-burner": "Bec Bunsen",
-  "op-amp": "AOP standard", "op-amp-comparator": "AOP comparateur", "op-amp-inverting": "AOP inverseur", "op-amp-non-inverting": "AOP non-inverseur", "op-amp-summing": "AOP sommateur", "op-amp-integrator": "AOP intégrateur", "op-amp-differentiator": "AOP dérivateur", "op-amp-schmitt": "AOP trigger de Schmitt", equation: "Équation LaTeX", "raw-tikz": "TikZ protégé", symbol: "Symbole CPGE",
+  "op-amp": "AOP standard", "op-amp-comparator": "AOP comparateur", "op-amp-inverting": "AOP inverseur", "op-amp-non-inverting": "AOP non-inverseur", "op-amp-summing": "AOP sommateur", "op-amp-integrator": "AOP intégrateur", "op-amp-differentiator": "AOP dérivateur", "op-amp-schmitt": "AOP trigger de Schmitt", equation: "Équation LaTeX", "raw-tikz": "TikZ protégé",
 };
 
 export type ToolboxGroup = { title: string; kinds: Array<ObjectKind | "select"> };

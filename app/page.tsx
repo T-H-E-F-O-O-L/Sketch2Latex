@@ -13,7 +13,6 @@ import { graphPathFor, graphPathsFor } from "./lib/graph";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
-import { symbolObject, symbolPresetMap, symbolPresets } from "./lib/symbol-presets";
 import { fromWorkingUnit, toWorkingUnit, unitLabel } from "./lib/units";
 
 const canvasWidth = 900;
@@ -168,6 +167,25 @@ function straightEndpoint(start: Point, end: Point): Point {
 
 const straightCurveControl = (start: Point, end: Point): Point => ({ x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 });
 
+const isPlainTextFormula = (value: string) => /\p{L}/u.test(value) && /^[\p{L}\p{N}\s.,;:!?'’"()-]+$/u.test(value);
+const formulaForTypesetting = (value: string) => {
+  const source = value.trim() || "x";
+  return isPlainTextFormula(source) ? `\\text{${source.replace(/[{}]/g, "\\$&")}}` : source;
+};
+const formulaFallbackText = (value: string) => (isPlainTextFormula(value) ? value : value
+  .replace(/\\text\{([^{}]*)\}/g, "$1")
+  .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "($1)/($2)")
+  .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
+  .replace(/\\,/g, " ")
+  .replace(/\\(?:cdot|times)/g, "·")
+  .replace(/\\(?:leq|le)/g, "≤")
+  .replace(/\\(?:geq|ge)/g, "≥")
+  .replace(/\\neq/g, "≠")
+  .replace(/\\([a-zA-Z]+)/g, "$1")
+  .replace(/[{}]/g, "")
+  .replace(/\s+/g, " ")
+  .trim());
+
 async function canvasPdfImage(svg: SVGSVGElement) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -242,50 +260,17 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd={markerEnd} markerStart={markerStart} strokeDasharray={dashed} />{label && <text x={midX + 8 * px} y={midY + 8 * py} fontSize="14">{label}</text>}</g>;
 }
 
-function symbolPreview(object: CanvasObject, selected: boolean) {
-  const preset = symbolPresetMap.get(object.symbol ?? "");
-  const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, pointerEvents: "stroke" as const };
-  const x = object.x; const y = object.y; const w = object.width ?? preset?.width ?? 100; const h = object.height ?? preset?.height ?? 80; const cx = x + w / 2; const cy = y + h / 2;
-  const label = (fallback: string, tx = cx, ty = cy + 5) => <text x={tx} y={ty} textAnchor="middle" fontSize="13" fill={color} stroke="white" strokeWidth="3" paintOrder="stroke" pointerEvents="all">{annotation(object, "main", fallback)}</text>;
-  const id = object.symbol;
-  if (id === "diode" || id === "led" || id === "zener-diode") return <g {...common}><line x1={x} y1={cy} x2={cx - 22} y2={cy} /><path d={`M ${cx - 22} ${cy - 17} L ${cx + 5} ${cy} L ${cx - 22} ${cy + 17} Z`} fill="white" /><line x1={cx + 5} y1={cy - 18} x2={cx + 5} y2={cy + 18} />{id === "zener-diode" && <path d={`M ${cx + 5} ${cy - 18} l 7 -5 M ${cx + 5} ${cy + 18} l 7 5`} />}{id === "led" && <><path d={`M ${cx + 17} ${cy - 12} l 14 -14 M ${cx + 17} ${cy - 12} l 0 -9 M ${cx + 17} ${cy - 12} l 9 0 M ${cx + 30} ${cy + 2} l 14 -14 M ${cx + 30} ${cy + 2} l 0 -9 M ${cx + 30} ${cy + 2} l 9 0`} /></>}<line x1={cx + 5} y1={cy} x2={x + w} y2={cy} />{label("D", cx, y + h - 7)}</g>;
-  if (id === "voltage-source" || id === "current-source") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w, h) * .3} fill="white" />{id === "voltage-source" ? <><path d={`M ${cx - 10} ${cy} q 10 -15 20 0 q -10 15 -20 0`} />{label("u(t)")}</> : <><line x1={cx} y1={cy + 15} x2={cx} y2={cy - 15} markerEnd="url(#arrowhead)" />{label("i(t)", cx, y + h - 7)}</>} </g>;
-  if (id === "junction") return <circle cx={cx} cy={cy} r={Math.min(w, h) * .22} fill={color} stroke="none" />;
-  if (id === "port") return <g {...common}><circle cx={cx} cy={cy} r="15" fill="white" />{label("A")}</g>;
-  if (id === "transformer") return <g {...common}><path d={`M ${cx - 38} ${y + 15} q -18 10 0 20 q 18 10 0 20 q -18 10 0 20`} /><path d={`M ${cx + 38} ${y + 15} q -18 10 0 20 q 18 10 0 20 q -18 10 0 20`} /><line x1={cx - 14} y1={y + 10} x2={cx - 14} y2={y + h - 10} /><line x1={cx + 14} y1={y + 10} x2={cx + 14} y2={y + h - 10} />{label("N₁/N₂", cx, y + h - 4)}</g>;
-  if (["npn-transistor", "pnp-transistor"].includes(id ?? "")) return <g {...common}><line x1={cx} y1={y + 10} x2={cx} y2={y + h - 10} /><path d={`M ${cx} ${cy - 25} L ${cx + 28} ${cy - 42} L ${cx + 28} ${cy + 42} L ${cx} ${cy + 25}`} fill="white" /><line x1={cx - 28} y1={cy} x2={cx} y2={cy} />{id === "npn-transistor" ? <path d={`M ${cx + 28} ${cy + 28} l -10 -2 l 4 -9`} /> : <path d={`M ${cx + 28} ${cy - 28} l -10 2 l 4 9`} />}{label(id === "npn-transistor" ? "NPN" : "PNP", cx, y + h - 4)}</g>;
-  if (["nmos", "pmos"].includes(id ?? "")) return <g {...common}><line x1={cx} y1={y + 12} x2={cx} y2={cy - 25} /><line x1={cx} y1={cy + 25} x2={cx} y2={y + h - 12} /><line x1={cx - 30} y1={cy} x2={cx - 10} y2={cy} /><line x1={cx - 10} y1={cy - 27} x2={cx - 10} y2={cy + 27} /><line x1={cx - 10} y1={cy - 20} x2={cx} y2={cy - 20} /><line x1={cx - 10} y1={cy + 20} x2={cx} y2={cy + 20} />{label(id === "nmos" ? "NMOS" : "PMOS", cx, y + h - 4)}</g>;
-  if (id === "bode-plot" || id === "kinetics-plot" || id === "arrhenius-plot" || id === "pv-diagram" || id === "phase-diagram" || id === "potential-well") return <g {...common}><line x1={x + 15} y1={y + h - 18} x2={x + w - 8} y2={y + h - 18} markerEnd="url(#arrowhead)" /><line x1={x + 15} y1={y + h - 18} x2={x + 15} y2={y + 10} markerEnd="url(#arrowhead)" /><path d={`M ${x + 20} ${y + h * .72} C ${x + w * .25} ${y + h * .2}, ${x + w * .45} ${y + h * .85}, ${x + w * .7} ${y + h * .3} S ${x + w - 18} ${y + h * .4}, ${x + w - 12} ${y + h * .2}`} />{label(preset?.annotations?.main ?? "f(x)", x + w * .65, y + 16)}</g>;
-  if (id === "signal" || id === "phase-wave" || id === "wavefront") return <g {...common}><line x1={x + 8} y1={cy} x2={x + w - 8} y2={cy} />{[0, 1, 2].map((i) => <path key={i} d={`M ${x + 12 + i * w / 3} ${cy} q ${w / 12} ${-h * .3} ${w / 6} 0 q ${w / 12} ${h * .3} ${w / 6} 0`} />)}{label(preset?.annotations?.main ?? "s(t)", cx, y + h - 5)}</g>;
-  if (id === "young-slits") return <g {...common}><line x1={x + 20} y1={y + 12} x2={x + 20} y2={y + h - 12} /><line x1={x + 48} y1={y + h * .38} x2={x + 48} y2={y + h * .45} /><line x1={x + 48} y1={y + h * .55} x2={x + 48} y2={y + h * .62} /><line x1={x + w - 20} y1={y + 10} x2={x + w - 20} y2={y + h - 10} />{[y + h * .38, y + h * .62].flatMap((yy, i) => [<path key={`${i}-a`} d={`M ${x + 20} ${cy} Q ${x + 75} ${yy} ${x + w - 20} ${y + 20}`} />, <path key={`${i}-b`} d={`M ${x + 20} ${cy} Q ${x + 75} ${yy} ${x + w - 20} ${y + h - 20}`} />])}{label("Δ", x + w - 34, y + h - 3)}</g>;
-  if (id === "optical-source") return <g {...common}><circle cx={cx} cy={cy} r="18" fill="white" /><path d={`M ${cx - 10} ${cy} q 10 -15 20 0 q -10 15 -20 0`} />{label("S", cx, y + h - 5)}</g>;
-  if (id === "optical-screen" || id === "spherical-mirror") return <g {...common}><path d={id === "optical-screen" ? `M ${cx} ${y + 10} L ${cx} ${y + h - 10}` : `M ${cx + 12} ${y + 10} Q ${cx - 18} ${cy} ${cx + 12} ${y + h - 10}`} strokeWidth="4" />{label(id === "optical-screen" ? "E" : "M", cx, y + h - 3)}</g>;
-  if (id === "optical-fiber") return <g {...common}><path d={`M ${x + 10} ${cy - 18} L ${x + w - 10} ${cy - 18} L ${x + w - 10} ${cy + 18} L ${x + 10} ${cy + 18} Z`} fill="#eef6ff" /><path d={`M ${x + 10} ${cy - 7} L ${x + w - 10} ${cy - 7} L ${x + w - 10} ${cy + 7} L ${x + 10} ${cy + 7} Z`} fill="white" />{label("n₁,n₂", cx, y + h - 3)}</g>;
-  if (id === "photon") return <g {...common}><path d={`M ${x + 12} ${cy} Q ${x + 35} ${cy - 20} ${x + 58} ${cy} T ${x + w - 12} ${cy}`} />{label("hν", cx, y + h - 4)}</g>;
-  if (id === "bohr-atom") return <g {...common}><circle cx={cx} cy={cy} r={15} fill="white" />{[.35,.58,.8].map((scale) => <ellipse key={scale} cx={cx} cy={cy} rx={w * scale / 2.5} ry={h * scale / 2.5} />)}{label("Eₙ", cx, y + h - 3)}</g>;
-  if (id === "force-vector" || id === "friction" || id === "torque" || id === "heat-source") return <g {...common}><circle cx={x + 28} cy={cy} r="7" fill="white" /><line x1={x + 28} y1={cy} x2={x + w - 12} y2={cy - 12} markerEnd="url(#arrowhead)" />{label(preset?.annotations?.main ?? "F⃗", cx, y + h - 4)}</g>;
-  if (id === "coordinate-system" || id === "frenet-frame") return <g {...common}><circle cx={cx} cy={cy} r="4" fill={color} /><line x1={cx} y1={cy} x2={x + w - 12} y2={cy} markerEnd="url(#arrowhead)" /><line x1={cx} y1={cy} x2={cx} y2={y + 12} markerEnd="url(#arrowhead)" />{id === "frenet-frame" && <path d={`M ${cx} ${cy} Q ${x + w * .75} ${y + h * .15} ${x + w - 12} ${cy + 18}`} strokeDasharray="4 3" />}{label(id === "coordinate-system" ? "O" : "t⃗,n⃗", cx, y + h - 4)}</g>;
-  if (id === "rigid-body" || id === "rolling-body" || id === "collision") return <g {...common}><circle cx={cx} cy={cy} r={Math.min(w, h) * .25} fill="white" />{id !== "collision" && <line x1={cx} y1={cy} x2={cx + 28} y2={cy - 22} markerEnd="url(#arrowhead)" />}{id === "collision" && <><line x1={x + 10} y1={cy} x2={cx - 20} y2={cy} markerEnd="url(#arrowhead)" /><line x1={x + w - 10} y1={cy} x2={cx + 20} y2={cy} markerEnd="url(#arrowhead)" /></>}{label(preset?.annotations?.main ?? "ω", cx, y + h - 4)}</g>;
-  if (id === "piston" || id === "thermostat" || id === "refrigerator") return <g {...common}><rect x={x + w * .25} y={y + h * .3} width={w * .5} height={h * .55} fill="white" />{id === "piston" && <line x1={cx} y1={y + 8} x2={cx} y2={y + h * .3} strokeWidth="4" />}{id === "thermostat" && <circle cx={cx} cy={cy} r="18" />}{id === "refrigerator" && <><line x1={x + w * .1} y1={cy} x2={x + w * .25} y2={cy} markerEnd="url(#arrowhead)" /><line x1={x + w * .75} y1={cy} x2={x + w * .9} y2={cy} markerEnd="url(#arrowhead)" /></>}{label(preset?.annotations?.main ?? "P,V,T", cx, y + h - 4)}</g>;
-  if (["lewis-molecule", "lewis-ion", "molecular-geometry", "molecular-dipole", "hydrogen-bond", "van-der-waals", "redox"].includes(id ?? "")) return <g {...common}><circle cx={cx - 24} cy={cy} r="15" fill="white" /><circle cx={cx + 24} cy={cy} r="15" fill="white" /><line x1={cx - 9} y1={cy} x2={cx + 9} y2={cy} strokeDasharray={id === "hydrogen-bond" ? "4 3" : undefined} />{id === "molecular-dipole" && <line x1={cx - 36} y1={cy - 28} x2={cx + 36} y2={cy - 28} markerEnd="url(#arrowhead)" />}{label(preset?.annotations?.main ?? "AB", cx, y + h - 4)}</g>;
-  if (id === "equilibrium-table") return <g {...common}><rect x={x + 12} y={y + 16} width={w - 24} height={h - 28} fill="white" /><line x1={x + 12} y1={y + h * .45} x2={x + w - 12} y2={y + h * .45} /><line x1={x + w * .33} y1={y + 16} x2={x + w * .33} y2={y + h - 12} /><line x1={x + w * .66} y1={y + 16} x2={x + w * .66} y2={y + h - 12} />{label("ξ", cx, y + h - 4)}</g>;
-  if (["carnot-cycle"].includes(id ?? "")) return <g {...common}><path d={`M ${x + 25} ${y + h - 22} L ${x + 25} ${y + 28} Q ${cx} ${y + 5} ${x + w - 25} ${y + 28} L ${x + w - 25} ${y + h - 22} Q ${cx} ${y + h - 5} ${x + 25} ${y + h - 22}`} markerEnd="url(#arrowhead)" />{label("η", cx, y + h - 4)}</g>;
-  if (["periodic-table"].includes(id ?? "")) return <g {...common}>{Array.from({ length: 18 }, (_, i) => <rect key={i} x={x + 10 + (i % 6) * (w - 20) / 6} y={y + 14 + Math.floor(i / 6) * 22} width={(w - 26) / 6} height="16" fill="white" />)}{label("Z", cx, y + h - 4)}</g>;
-  if (["crystal-cell", "tetrahedral-site", "octahedral-site"].includes(id ?? "")) return <g {...common}><path d={`M ${cx - 35} ${cy + 20} L ${cx + 20} ${cy + 20} L ${cx + 35} ${cy - 5} L ${cx - 20} ${cy - 5} Z M ${cx - 35} ${cy + 20} L ${cx - 35} ${cy - 25} L ${cx + 20} ${cy - 25} L ${cx + 20} ${cy + 20} M ${cx + 20} ${cy - 25} L ${cx + 35} ${cy - 5}`} fill="white" />{label(preset?.annotations?.main ?? "CFC", cx, y + h - 4)}</g>;
-  return <g {...common}><rect x={x + 5} y={y + 5} width={w - 10} height={h - 10} rx="6" fill="white" />{label(preset?.annotations?.main ?? preset?.title ?? "CPGE")}</g>;
-}
-
 function stampPreview(object: CanvasObject, selected: boolean) {
   const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
   const x = object.x; const y = object.y; const w = object.width ?? 80; const h = object.height ?? 80; const cx = x + w / 2; const cy = y + h / 2;
   const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill={color} stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
   const a = (key: string, fallback: string) => annotation(object, key, fallback);
-  if (object.kind === "symbol") return symbolPreview(object, selected);
   if (object.kind === "equation") {
     let html: string;
-    try { html = katex.renderToString(object.text || "x", { throwOnError: false, displayMode: true, output: "html" }); }
+    const formula = formulaForTypesetting(object.text || "x");
+    try { html = katex.renderToString(formula, { throwOnError: false, displayMode: true, output: "html" }); }
     catch { html = `<span>${object.text || "x"}</span>`; }
-    return <g><rect {...common} x={x} y={y} width={w} height={h} rx="5" strokeDasharray={selected ? "5 3" : undefined} fill="white" /><foreignObject x={x + 4} y={y + 4} width={Math.max(10, w - 8)} height={Math.max(10, h - 8)} pointerEvents="all"><div className="equation-render" dangerouslySetInnerHTML={{ __html: html }} /></foreignObject></g>;
+    return <g><foreignObject data-equation-html="true" x={x + 4} y={y + 4} width={Math.max(10, w - 8)} height={Math.max(10, h - 8)} pointerEvents="all"><div className="equation-render" dangerouslySetInnerHTML={{ __html: html }} /></foreignObject><text data-export-only="true" x={x + 4} y={y + Math.max(18, h / 2 + 5)} fontFamily="Times New Roman, Times, serif" fontSize="16" fill="#111" style={{ display: "none" }}>{formulaFallbackText(object.text || "x")}</text></g>;
   }
   if (object.kind === "raw-tikz") {
     const summary = (object.rawTikz ?? "TikZ").replace(/\s+/g, " ").slice(0, 58);
@@ -425,6 +410,8 @@ const snapPoint = (point: Point, settings: DocumentSettings, bypass = false): Po
 function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.querySelectorAll("[data-export-ignore]").forEach((element) => element.remove());
+  copy.querySelectorAll("[data-equation-html]").forEach((element) => element.remove());
+  copy.querySelectorAll<SVGElement>("[data-export-only]").forEach((element) => { element.removeAttribute("data-export-only"); element.style.removeProperty("display"); });
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg"); copy.setAttribute("width", String(width)); copy.setAttribute("height", String(height)); copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
   return copy;
 }
@@ -696,7 +683,7 @@ export default function Home() {
   const latexDirty = latexDraft !== undefined;
   const roundTrip = useMemo(() => roundTripReport(latexSource, objects.filter((object) => !object.hidden)), [latexSource, objects]);
   const mathPreview = useMemo(() => {
-    try { return katex.renderToString(mathFormula || "x", { throwOnError: false, displayMode: true, output: "html" }); }
+    try { return katex.renderToString(formulaForTypesetting(mathFormula), { throwOnError: false, displayMode: true, output: "html" }); }
     catch { return katex.renderToString("\\text{Formule invalide}", { throwOnError: false, displayMode: true, output: "html" }); }
   }, [mathFormula]);
   const filteredGroups = useMemo(() => toolboxGroups.map((group) => ({ ...group, kinds: group.kinds.filter((kind) => kind === "select" || labels[kind].toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr"))) })).filter((group) => group.kinds.length), [search]);
@@ -891,7 +878,7 @@ export default function Home() {
   const appendMathSymbol = (latexToken: string) => setMathFormula((current) => `${current}${current.trim() ? " " : ""}${latexToken}`);
   const addMathEquation = (demonstration = false) => {
     const formula = mathFormula.trim(); if (!formula) { setNotice("Écrivez une formule LaTeX avant de l’ajouter."); return; }
-    try { katex.renderToString(formula, { throwOnError: true, displayMode: true }); }
+    try { katex.renderToString(formulaForTypesetting(formula), { throwOnError: true, displayMode: true }); }
     catch (error) { setNotice(error instanceof Error ? `Formule LaTeX invalide : ${error.message}` : "Formule LaTeX invalide."); return; }
     const width = Math.min(demonstration ? 560 : 440, settings.width - 40); const height = demonstration ? 220 : 125; const point = lastCanvasPointRef.current;
     const next: CanvasObject = { id: objectId(), kind: "equation", x: clamp(point.x - width / 2, 20, Math.max(20, settings.width - width - 20)), y: clamp(point.y - height / 2, 20, Math.max(20, settings.height - height - 20)), width, height, text: formula, style: drawingStyle };
@@ -908,11 +895,6 @@ export default function Home() {
     }
     const next = templateMode === "replace" ? inserted : [...objects, ...inserted];
     commitObjects(next, `Modèle « ${template.title} » ${templateMode === "replace" ? "chargé" : "inséré"}. Tous ses éléments sont modifiables.`); setSelectedIds(templateMode === "replace" ? [] : inserted.map((object) => object.id)); setPanel("library"); if (templateMode === "replace") fitView();
-  };
-  const insertSymbol = (presetId: string) => {
-    const preset = symbolPresetMap.get(presetId); if (!preset) return;
-    const point = lastCanvasPointRef.current; const object = symbolObject(preset, point.x - preset.width / 2, point.y - preset.height / 2);
-    commitObjects([...objects, { ...object, style: drawingStyle }], `Symbole « ${preset.title} » ajouté.`); setSelectedIds([object.id]); setTool("select");
   };
   const toggleFavorite = (kind: string) => setFavorites((current) => current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind]);
 
@@ -949,7 +931,7 @@ export default function Home() {
       <aside className="left-panel">
         <div className="panel-tabs"><button className={panel === "library" ? "active" : ""} onClick={() => setPanel("library")}>Bibliothèque</button><button className={panel === "templates" ? "active" : ""} onClick={() => setPanel("templates")}>Modèles</button><button className={panel === "math" ? "active" : ""} onClick={() => setPanel("math")}>Maths & Physique</button><button className={panel === "project" ? "active" : ""} onClick={() => setPanel("project")}>Projet</button>{mode === "advanced" && <button className={panel === "document" ? "active" : ""} onClick={() => setPanel("document")}>Document</button>}</div>
         {(panel === "library" || panel === "templates") && <input className="panel-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un outil ou modèle…" />}
-        {panel === "library" && <div className="library-scroll">{favorites.length > 0 && <section className="tool-group"><h2>Favoris</h2><div className="tool-grid">{favorites.filter((kind): kind is ObjectKind => Object.hasOwn(labels, kind)).map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button>)}</div></section>}{filteredGroups.map((group) => <details key={group.title} open={group.title === "Outils" || mode === "advanced"}><summary>{group.title}</summary><div className="tool-grid">{group.kinds.map((kind) => kind === "select" ? null : <div className="tool-item" key={kind}><button className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button><button className={`favorite-button ${favorites.includes(kind) ? "active" : ""}`} onClick={() => toggleFavorite(kind)} aria-label={`${favorites.includes(kind) ? "Retirer" : "Ajouter"} ${labels[kind]} des favoris`}>★</button></div>)}</div></details>)}{Array.from(new Set(symbolPresets.map((preset) => preset.category))).map((category) => <details key={category} open={mode === "advanced"}><summary>Symboles · {category}</summary><div className="tool-grid">{symbolPresets.filter((preset) => preset.category === category && `${preset.title} ${preset.description}`.toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr"))).map((preset) => <button key={preset.id} title={preset.description} onClick={() => insertSymbol(preset.id)}>{preset.title}</button>)}</div></details>)}<section className="style-section"><h2>Style de dessin</h2><label>Couleur <input type="color" value={selected?.style?.stroke ?? drawingStyle.stroke} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, stroke: event.target.value } }) : setDrawingStyle({ ...drawingStyle, stroke: event.target.value })} /></label><label>Épaisseur <input type="range" min="1" max="8" value={selected?.style?.strokeWidth ?? drawingStyle.strokeWidth} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, strokeWidth: Number(event.target.value) } }) : setDrawingStyle({ ...drawingStyle, strokeWidth: Number(event.target.value) })} /></label></section></div>}
+        {panel === "library" && <div className="library-scroll">{favorites.length > 0 && <section className="tool-group"><h2>Favoris</h2><div className="tool-grid">{favorites.filter((kind): kind is ObjectKind => Object.hasOwn(labels, kind)).map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button>)}</div></section>}{filteredGroups.map((group) => <details key={group.title} open={group.title === "Outils" || mode === "advanced"}><summary>{group.title}</summary><div className="tool-grid">{group.kinds.map((kind) => kind === "select" ? null : <div className="tool-item" key={kind}><button className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button><button className={`favorite-button ${favorites.includes(kind) ? "active" : ""}`} onClick={() => toggleFavorite(kind)} aria-label={`${favorites.includes(kind) ? "Retirer" : "Ajouter"} ${labels[kind]} des favoris`}>★</button></div>)}</div></details>)}<section className="style-section"><h2>Style de dessin</h2><label>Couleur <input type="color" value={selected?.style?.stroke ?? drawingStyle.stroke} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, stroke: event.target.value } }) : setDrawingStyle({ ...drawingStyle, stroke: event.target.value })} /></label><label>Épaisseur <input type="range" min="1" max="8" value={selected?.style?.strokeWidth ?? drawingStyle.strokeWidth} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, strokeWidth: Number(event.target.value) } }) : setDrawingStyle({ ...drawingStyle, strokeWidth: Number(event.target.value) })} /></label></section></div>}
         {panel === "templates" && <div className="library-scroll"><label className="template-mode">Insertion du modèle<select value={templateMode} onChange={(event) => setTemplateMode(event.target.value as TemplateMode)}><option value="replace">Remplacer le canevas</option><option value="insert">Ajouter au document</option><option value="cursor">Placer au dernier point du canevas</option></select></label><div className="category-chips">{categories.map((category) => <button key={category} className={templateCategory === category ? "active" : ""} onClick={() => setTemplateCategory(category)}>{category}</button>)}</div>{filteredTemplates.map((template) => <article className="template-card" key={template.id}><h2>{template.title}</h2><p>{template.description}</p><p className="template-meta">{template.sourceName} · {template.license}</p><div><button onClick={() => applyTemplate(template.id)}>{templateMode === "replace" ? "Utiliser ce modèle" : templateMode === "insert" ? "Ajouter au document" : "Placer sur le canevas"}</button> <a href={template.sourceUrl} target="_blank" rel="noreferrer">Source</a></div></article>)}</div>}
         {panel === "math" && <div className="math-panel"><h2>Éditeur de formule</h2><p>Écrivez du LaTeX avancé ou choisissez un symbole. La formule reste entièrement modifiable après insertion.</p><label className="math-editor-field"><span>Code LaTeX</span><textarea className="math-input" value={mathFormula} onChange={(event) => setMathFormula(event.target.value)} spellCheck="false" aria-label="Formule mathématique LaTeX" /></label><span className="math-section-label">Aperçu</span><div className="math-live-preview" dangerouslySetInnerHTML={{ __html: mathPreview }} /><div className="math-actions"><button onClick={() => addMathEquation(false)}>Ajouter la formule</button><button onClick={() => addMathEquation(true)}>Ajouter comme démonstration</button><button onClick={() => setMathFormula("")}>Effacer</button></div>{mathSymbolGroups.map((group) => <details key={group.title} open={group.title === "Analyse"}><summary>{group.title}</summary><div className="math-token-grid">{group.symbols.map(([label, token]) => <button key={`${group.title}-${label}`} title={token} onClick={() => appendMathSymbol(token)}>{label}</button>)}</div></details>)}<h2>Formules de physique</h2><p>Choisissez une formule, puis adaptez les indices, hypothèses et notations avant de l’ajouter.</p>{physicsFormulaGroups.map((group) => <details key={group.title} open={group.title === "Mécanique"}><summary>{group.title}</summary><div className="physics-formula-list">{group.formulas.map(([label, formula]) => <button key={`${group.title}-${label}`} onClick={() => setMathFormula(formula)}><strong>{label}</strong><code>{formula}</code></button>)}</div></details>)}</div>}
         {panel === "project" && <div className="project-panel"><button onClick={saveProject}>Enregistrer maintenant</button><button onClick={exportProject}>Exporter le projet JSON</button><button onClick={() => fileInputRef.current?.click()}>Importer un projet JSON</button><input ref={fileInputRef} hidden type="file" accept=".json,.sketch2latex.json,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importProject(file); event.currentTarget.value = ""; }} /><h2>Projets enregistrés</h2>{savedProjects.length ? savedProjects.map((project) => <button className="saved-project" key={`${project.name}-${project.updatedAt}`} onClick={() => loadProject(project.name)}><strong>{project.name}</strong><small>{new Date(project.updatedAt).toLocaleString()}</small></button>) : <p>Aucun projet nommé. Le brouillon courant reste autosauvegardé.</p>}</div>}
