@@ -8,9 +8,33 @@ import { parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 
-test("converts circuit connectors using circuitikz", () => {
+test("exports circuit connectors with the exact canvas geometry", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
-  assert.equal(output, "\\draw (0.00,0.00) to[R] (2.00,0.00);");
+  assert.match(output, /shift=\{\(1\.00,0\.00\)\}, rotate=0/);
+  assert.match(output, /\(-0\.36,-0\.16\) rectangle \(0\.36,0\.16\)/);
+  assert.match(output, /\\node at \(0,0\.26\) \{R\}/);
+  assert.doesNotMatch(output, /to\[R\]/);
+});
+
+test("keeps resistor and inductor proportions and labels in every direction", () => {
+  const resistor = objectToLatex({ id: "r", kind: "resistor", x: 50, y: 150, x2: 50, y2: 0, annotations: { main: "R₁" } });
+  const inductor = objectToLatex({ id: "l", kind: "inductor", x: 50, y: 150, x2: 50, y2: 0, annotations: { main: "L" } });
+  assert.match(resistor, /rotate=90/);
+  assert.match(resistor, /\{R\$_\{1\}\$\}/);
+  assert.match(inductor, /rotate=90/);
+  assert.match(inductor, /\(-0\.40,0\).*\(0\.40,0\)/s);
+  assert.match(inductor, /\\node at \(0,0\.38\) \{L\}/);
+  assert.doesNotMatch(inductor, /to\[L\]/);
+});
+
+test("exports the other electrical symbols without Circuitikz substitutions", () => {
+  const capacitor = objectToLatex({ id: "c", kind: "capacitor", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "C₁" } });
+  const battery = objectToLatex({ id: "b", kind: "battery", x: 0, y: 0, x2: 100, y2: 0 });
+  const circuitSwitch = objectToLatex({ id: "s", kind: "switch", x: 0, y: 0, x2: 100, y2: 0 });
+  assert.match(capacitor, /\\node at \(0,-0\.42\) \{C\$_\{1\}\$\}/);
+  assert.match(battery, /\(-0\.10,-0\.30\) -- \(-0\.10,0\.30\)/);
+  assert.match(circuitSwitch, /\(-0\.24,0\) -- \(0\.24,0\.24\)/);
+  for (const output of [capacitor, battery, circuitSwitch]) assert.doesNotMatch(output, /to\[/);
 });
 
 test("flips canvas y coordinates and anchors graph bounds", () => {

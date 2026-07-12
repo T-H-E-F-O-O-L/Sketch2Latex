@@ -1,0 +1,7 @@
+export const circuitGeometry = {
+  resistor: { halfBody: 18, halfHeight: 8, labelOffset: 13 },
+  capacitor: { negativePlateOffset: 5, positivePlateOffset: 6, halfPlate: 12, labelOffset: 21 },
+  battery: { negativePlateOffset: 5, positivePlateOffset: 6, negativeHalfPlate: 15, positiveHalfPlate: 9 },
+  inductor: { halfBody: 20, halfHeight: 15, turns: 4, labelOffset: 19 },
+  switch: { leftGap: 12, rightGap: 14, bladeLength: 12, bladeLift: 12 },
+} as const;
