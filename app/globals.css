@@ -75,12 +75,14 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .category-chips { padding: 5px 0; }
 .category-chips button { padding: 4px 7px; font-size: 11px; }
 .project-panel, .document-panel { display: grid; gap: 7px; padding: 10px; }
-.math-panel { height: calc(100% - 48px); overflow: auto; padding: 10px; }
+.math-panel { height: calc(100% - 48px); overflow: auto; padding: 12px; }
 .math-panel > p { margin: 4px 0 8px; color: #5c6670; font-size: 11px; line-height: 1.4; }
-.math-input { min-height: 105px; max-height: 220px; padding: 8px; font-family: Consolas, "Courier New", monospace; font-size: 11px; white-space: pre-wrap; }
-.math-live-preview { display: flex; align-items: center; justify-content: center; min-height: 82px; margin: 8px 0; padding: 8px; overflow: auto; border: 1px solid #d4d9df; border-radius: 5px; background: #fbfbfb; font-size: 14px; }
+.math-editor-field { display: grid; gap: 6px; margin: 12px 0 14px; color: #27313a; font-size: 12px; font-weight: 700; }
+.math-input { display: block; min-height: 150px; max-height: 300px; margin: 0; padding: 10px; font-family: Consolas, "Courier New", monospace; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
+.math-section-label { display: block; margin: 0 0 6px; color: #27313a; font-size: 12px; font-weight: 700; }
+.math-live-preview { display: flex; align-items: center; justify-content: center; min-height: 100px; margin: 0 0 14px; padding: 10px; overflow: auto; border: 1px solid #d4d9df; border-radius: 5px; background: #fbfbfb; font-size: 14px; }
 .math-live-preview .katex-display { margin: 0; }
-.math-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.math-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 14px; }
 .math-actions button:last-child { grid-column: 1 / -1; }
 .math-token-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding-bottom: 7px; }
 .math-token-grid button { overflow: hidden; padding: 5px; text-align: left; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
