@@ -1,5 +1,6 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
+import { symbolPresetMap } from "./symbol-presets";
 
 const SCALE = 50;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -48,6 +49,34 @@ function connectorScope(object: CanvasObject, body: string) {
   return `\\begin{scope}[shift={${midpoint}}, rotate=${matrixNumber(rotation)}]\n${body}\n\\end{scope}`;
 }
 
+function symbolBody(object: CanvasObject) {
+  const id = object.symbol ?? ""; const preset = symbolPresetMap.get(id); const a = (fallback: string) => componentLabel(annotation(object, "main", fallback));
+  if (id === "diode" || id === "led" || id === "zener-diode") return `\\draw (-0.8,0) -- (-0.44,0); \\draw[fill=white] (-0.44,-0.22) -- (0.08,0) -- (-0.44,0.22) -- cycle; \\draw (0.08,-0.24) -- (0.08,0.24); \\draw (0.08,0) -- (0.8,0); \\node[below] at (0,-0.28) {${a("D")}};`;
+  if (id === "voltage-source") return `\\draw (0,0) circle (0.42); \\draw (-0.18,0) sin (-0.09,0.16) cos (0,0) sin (0.09,-0.16) cos (0.18,0); \\node[below] at (0,-0.5) {${a("u(t)")}};`;
+  if (id === "current-source") return `\\draw (0,0) circle (0.42); \\draw[->] (0,-0.22) -- (0,0.22); \\node[below] at (0,-0.5) {${a("i(t)")}};`;
+  if (id === "junction") return "\\fill (0,0) circle (0.12);";
+  if (id === "port") return `\\draw (0,0) circle (0.28); \\node at (0,0) {${a("A")}};`;
+  if (id === "transformer") return `\\draw (-0.75,-0.55) .. controls (-1.1,-0.35) and (-0.4,-0.15) .. (-0.75,0.05) .. controls (-1.1,0.25) and (-0.4,0.45) .. (-0.75,0.65); \\draw (0.75,-0.55) .. controls (0.4,-0.35) and (1.1,-0.15) .. (0.75,0.05) .. controls (0.4,0.25) and (1.1,0.45) .. (0.75,0.65); \\draw (-0.18,-0.75) -- (-0.18,0.75); \\draw (0.18,-0.75) -- (0.18,0.75); \\node[below] at (0,-0.9) {${componentLabel(annotation(object, "left", "N₁"))}/${componentLabel(annotation(object, "right", "N₂"))}};`;
+  if (id === "npn-transistor" || id === "pnp-transistor") return `\\draw (0,-0.7) -- (0,0.7); \\draw (0,0.32) -- (0.62,0.62); \\draw (0,-0.32) -- (0.62,-0.62); \\draw (-0.62,0) -- (0,0); \\draw[->] (0.33,${id === "npn-transistor" ? "-0.25" : "0.25"}) -- (0.62,${id === "npn-transistor" ? "-0.38" : "0.38"}); \\node[below] at (0,-0.9) {${a(id === "npn-transistor" ? "NPN" : "PNP")}};`;
+  if (id === "nmos" || id === "pmos") return `\\draw (0,-0.65) -- (0,0.65); \\draw (0,0.32) -- (0.55,0.5); \\draw (0,-0.32) -- (0.55,-0.5); \\draw (-0.55,0) -- (0,0); \\draw (-0.25,-0.32) -- (-0.25,0.32); \\node[below] at (0,-0.85) {${a(id === "nmos" ? "NMOS" : "PMOS")}};`;
+  if (id === "optical-source") return `\\draw (0,0) circle (0.3); \\node at (0,0) {${a("S")}};`;
+  if (id === "optical-screen" || id === "spherical-mirror") return `\\draw[very thick] (0,-0.75) -- (0,0.75); \\node[below] at (0,-0.9) {${a(id === "optical-screen" ? "E" : "M")}};`;
+  if (id === "optical-fiber") return `\\draw[fill=blue!8] (-1,-0.3) rectangle (1,0.3); \\draw[fill=white] (-1,-0.12) rectangle (1,0.12); \\node[below] at (0,-0.5) {${a("n₁,n₂")}};`;
+  if (id === "photon") return `\\draw[decorate,decoration={snake,amplitude=0.12cm,segment length=0.25cm}] (-1,0) -- (1,0); \\node[below] at (0,-0.25) {${a("hν")}};`;
+  if (id === "bohr-atom") return `\\draw (0,0) circle (0.16); \\draw (0,0) ellipse (0.75 and 0.28); \\draw (0,0) ellipse (0.35 and 0.7); \\node[below] at (0,-0.9) {${a("E_n")}};`;
+  if (id === "coordinate-system" || id === "frenet-frame") return `\\draw[-{Latex}] (0,0) -- (1,0) node[right] {${a(id === "coordinate-system" ? "x" : "t")}}; \\draw[-{Latex}] (0,0) -- (0,0.8) node[above] {${componentLabel(annotation(object, "main", id === "coordinate-system" ? "y" : "n"))}}; \\fill (0,0) circle (0.05);`;
+  if (id === "force-vector" || id === "friction" || id === "torque" || id === "heat-source") return `\\draw[-{Latex}] (-0.8,0) -- (0.9,0.35) node[right] {${a(id === "force-vector" ? "\\vec F" : id === "torque" ? "\\vec M_O" : id === "heat-source" ? "Q" : "\\vec f")}};`;
+  if (id === "piston") return `\\draw (-0.6,-0.6) -- (-0.6,0.6) -- (0.6,0.6) -- (0.6,-0.6); \\draw[very thick] (-0.7,0.2) -- (0.7,0.2); \\draw (0,0.2) -- (0,0.85); \\node at (0,-0.2) {${a("P,V,T")}};`;
+  if (id === "thermostat") return `\\draw (0,0) circle (0.45); \\node at (0,0) {${a("T")}};`;
+  if (id === "refrigerator") return `\\draw[rounded corners] (-0.7,-0.45) rectangle (0.7,0.45); \\draw[-{Latex}] (-1,0) -- (-0.7,0); \\draw[-{Latex}] (0.7,0) -- (1,0); \\node at (0,0) {${a("COP")}};`;
+  if (id === "carnot-cycle") return `\\draw[-{Latex}] (-0.8,-0.5) -- (-0.8,0.5) .. controls (0,0.85) and (0.8,0.5) .. (0.8,-0.5) .. controls (0,-0.85) and (-0.8,-0.5) .. cycle; \\node at (0,0) {${a("η")}};`;
+  if (id === "lewis-molecule" || id === "lewis-ion" || id === "molecular-geometry" || id === "molecular-dipole" || id === "hydrogen-bond" || id === "van-der-waals" || id === "redox") return `\\node[draw,circle,fill=white] (a) at (-0.45,0) {A}; \\node[draw,circle,fill=white] (b) at (0.45,0) {B}; \\draw${id === "hydrogen-bond" || id === "van-der-waals" ? "[dashed]" : ""} (a) -- (b); \\node[below] at (0,-0.35) {${a(preset?.annotations?.main ?? "AB")}};`;
+  if (id === "equilibrium-table") return `\\draw (0,0) grid (3,2); \\node at (1.5,1) {${a("ξ")}};`;
+  if (id === "periodic-table") return `\\draw (0,0) grid (6,3); \\node at (3,1.5) {${a("Z")}};`;
+  if (id === "crystal-cell" || id === "tetrahedral-site" || id === "octahedral-site") return `\\draw (-0.6,-0.5) rectangle (0.6,0.5); \\draw (-0.6,0.5) -- (-0.25,0.8) -- (0.95,0.8) -- (0.6,0.5); \\draw (0.6,-0.5) -- (0.95,-0.2) -- (0.95,0.8); \\node[below] at (0,-0.7) {${a(preset?.annotations?.main ?? "CFC")}};`;
+  return `\\draw[rounded corners] (-0.9,-0.55) rectangle (0.9,0.55); \\node at (0,0) {${a(preset?.annotations?.main ?? preset?.title ?? "CPGE")}};`;
+}
+
 function electricalConnector(object: CanvasObject) {
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const length = Math.hypot(x2 - object.x, y2 - object.y);
   const halfLength = n(length / 2); const label = (fallback: string) => componentLabel(annotation(object, "main", fallback));
@@ -91,6 +120,7 @@ function stamp(object: CanvasObject) {
   const a = (key: string, fallback: string) => safeText(annotation(object, key, fallback));
   const frame = (body: string, baseWidth = 80) => `\\begin{scope}[shift={(${x},${y})}, scale=${(Math.round((width / baseWidth) * 100) / 100).toFixed(2)}]\n${body}\n\\end{scope}`;
   switch (object.kind) {
+    case "symbol": return frame(symbolBody(object), Math.max(60, width));
     case "ground": return frame("\\draw (0,0) node[ground] {};", 44);
     case "op-amp": case "op-amp-comparator": case "op-amp-inverting": case "op-amp-non-inverting": case "op-amp-summing": case "op-amp-integrator": case "op-amp-differentiator": case "op-amp-schmitt": {
       const feedback = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"].includes(object.kind) ? " \\draw (0.9,0) -- (0.9,0.65) -- (-0.42,0.65) -- (-0.42,0.18);" : "";
@@ -232,7 +262,7 @@ export function documentFor(objects: CanvasObject[], snippetOnly = false, settin
   return `\\documentclass[tikz,border=5pt]{standalone}
 % Sketch2LaTeX document: ${settings?.width ?? 900} x ${settings?.height ?? 560}px, ${settings?.orientation ?? "landscape"}, unit ${settings?.unit ?? "cm"}
 \\usepackage{tikz}
-\\usepackage{circuitikz}
+\\usepackage[european]{circuitikz}
 \\usepackage{pgfplots}
 \\usepackage{amsmath,amssymb}
 \\pgfplotsset{compat=1.18}

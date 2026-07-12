@@ -6,6 +6,7 @@ import { graphPathFor } from "../app/lib/graph";
 import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from "../app/lib/latex";
 import { parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
+import { symbolObject, symbolPresets } from "../app/lib/symbol-presets";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 
 test("exports circuit connectors with the exact canvas geometry", () => {
@@ -138,7 +139,7 @@ test("applies an edited ion label from the visible generated TikZ node", () => {
 
 test("returns a self-contained document with required STEM packages", () => {
   const output = documentFor([{ id: "b1", kind: "bond-double", x: 0, y: 0, x2: 50, y2: 0 }]);
-  assert.match(output, /\\usepackage\{circuitikz\}/);
+  assert.match(output, /\\usepackage(?:\[european\])?\{circuitikz\}/);
   assert.match(output, /\\usepackage\{pgfplots\}/);
   assert.match(output, /\\begin\{tikzpicture\}/);
 });
@@ -156,6 +157,18 @@ test("emits LaTeX for every MPSI component exposed in the toolbar", () => {
     return { id: kind, kind, x, y: 30, width: 40, height: 40 };
   });
   for (const object of objects) assert.notEqual(objectToLatex(object).trim(), "", object.kind);
+});
+
+test("exports every French CPGE library symbol and exposes the requested model groups", () => {
+  for (const preset of symbolPresets) {
+    const output = objectToLatex(symbolObject(preset, 100, 100));
+    assert.notEqual(output.trim(), "", preset.id);
+  }
+  for (const category of ["Ondes et signaux", "Optique", "Mécanique", "Thermodynamique", "Chimie"]) {
+    assert.ok(diagramTemplates.some((template) => template.category === category), category);
+  }
+  assert.ok(diagramTemplates.some((template) => template.title === "Réponse d’un circuit RC à un échelon"));
+  assert.ok(diagramTemplates.some((template) => template.title === "Structure de Lewis d’une molécule"));
 });
 
 test("imports ordinary TikZ lines, rectangles and labels when metadata is absent", () => {
