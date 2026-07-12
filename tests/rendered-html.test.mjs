@@ -45,8 +45,8 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /mathSymbolGroups/);
   assert.match(page, /physicsFormulaGroups/);
   assert.match(page, /addMathEquation/);
-  assert.match(page, /data-export-only/);
-  assert.match(page, /data-equation-html/);
+  assert.match(page, /data-export-formula/);
+  assert.match(page, /getMathJaxRenderer/);
   assert.match(page, /formulaForTypesetting/);
   assert.doesNotMatch(page, /\/api\/compile/);
   assert.match(css, /\.editor-layout/);

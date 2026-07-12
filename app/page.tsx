@@ -172,19 +172,24 @@ const formulaForTypesetting = (value: string) => {
   const source = value.trim() || "x";
   return isPlainTextFormula(source) ? `\\text{${source.replace(/[{}]/g, "\\$&")}}` : source;
 };
-const formulaFallbackText = (value: string) => (isPlainTextFormula(value) ? value : value
-  .replace(/\\text\{([^{}]*)\}/g, "$1")
-  .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "($1)/($2)")
-  .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
-  .replace(/\\,/g, " ")
-  .replace(/\\(?:cdot|times)/g, "·")
-  .replace(/\\(?:leq|le)/g, "≤")
-  .replace(/\\(?:geq|ge)/g, "≥")
-  .replace(/\\neq/g, "≠")
-  .replace(/\\([a-zA-Z]+)/g, "$1")
-  .replace(/[{}]/g, "")
-  .replace(/\s+/g, " ")
-  .trim());
+type MathJaxRenderer = (formula: string) => string;
+let mathJaxRenderer: Promise<MathJaxRenderer> | undefined;
+
+function getMathJaxRenderer() {
+  if (!mathJaxRenderer) mathJaxRenderer = Promise.all([
+    import("mathjax-full/js/mathjax.js"),
+    import("mathjax-full/js/input/tex.js"),
+    import("mathjax-full/js/input/tex/AllPackages.js"),
+    import("mathjax-full/js/output/svg.js"),
+    import("mathjax-full/js/adaptors/browserAdaptor.js"),
+    import("mathjax-full/js/handlers/html.js"),
+  ]).then(([{ mathjax }, { TeX }, { AllPackages }, { SVG }, { browserAdaptor }, { RegisterHTMLHandler }]) => {
+    const adaptor = browserAdaptor(); RegisterHTMLHandler(adaptor);
+    const document = mathjax.document("", { InputJax: new TeX({ packages: AllPackages }), OutputJax: new SVG({ fontCache: "none" }) });
+    return (formula: string) => adaptor.outerHTML(adaptor.firstChild(document.convert(formula, { display: true })));
+  });
+  return mathJaxRenderer;
+}
 
 async function canvasPdfImage(svg: SVGSVGElement) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
@@ -270,7 +275,7 @@ function stampPreview(object: CanvasObject, selected: boolean) {
     const formula = formulaForTypesetting(object.text || "x");
     try { html = katex.renderToString(formula, { throwOnError: false, displayMode: true, output: "html" }); }
     catch { html = `<span>${object.text || "x"}</span>`; }
-    return <g><foreignObject data-equation-html="true" x={x + 4} y={y + 4} width={Math.max(10, w - 8)} height={Math.max(10, h - 8)} pointerEvents="all"><div className="equation-render" dangerouslySetInnerHTML={{ __html: html }} /></foreignObject><text data-export-only="true" x={x + 4} y={y + Math.max(18, h / 2 + 5)} fontFamily="Times New Roman, Times, serif" fontSize="16" fill="#111" style={{ display: "none" }}>{formulaFallbackText(object.text || "x")}</text></g>;
+    return <g><foreignObject data-equation-html="true" x={x + 4} y={y + 4} width={Math.max(10, w - 8)} height={Math.max(10, h - 8)} pointerEvents="all"><div className="equation-render" dangerouslySetInnerHTML={{ __html: html }} /></foreignObject><g data-export-formula={object.text || "x"} data-export-x={x + 4} data-export-y={y + 4} data-export-width={Math.max(10, w - 8)} data-export-height={Math.max(10, h - 8)} /></g>;
   }
   if (object.kind === "raw-tikz") {
     const summary = (object.rawTikz ?? "TikZ").replace(/\s+/g, " ").slice(0, 58);
@@ -407,11 +412,21 @@ function resolveConnections(objects: CanvasObject[]): CanvasObject[] {
 
 const snapPoint = (point: Point, settings: DocumentSettings, bypass = false): Point => !settings.snapToGrid || bypass ? point : ({ x: Math.round(point.x / settings.gridSize) * settings.gridSize, y: Math.round(point.y / settings.gridSize) * settings.gridSize });
 
-function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
+async function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.querySelectorAll("[data-export-ignore]").forEach((element) => element.remove());
   copy.querySelectorAll("[data-equation-html]").forEach((element) => element.remove());
-  copy.querySelectorAll<SVGElement>("[data-export-only]").forEach((element) => { element.removeAttribute("data-export-only"); element.style.removeProperty("display"); });
+  const renderFormula = await getMathJaxRenderer();
+  copy.querySelectorAll<SVGGElement>("[data-export-formula]").forEach((placeholder) => {
+    const formula = formulaForTypesetting(placeholder.dataset.exportFormula || "x");
+    const parsed = new DOMParser().parseFromString(renderFormula(formula), "image/svg+xml");
+    const rendered = copy.ownerDocument.importNode(parsed.documentElement, true) as SVGSVGElement;
+    const x = Number(placeholder.dataset.exportX); const y = Number(placeholder.dataset.exportY); const width = Number(placeholder.dataset.exportWidth); const height = Number(placeholder.dataset.exportHeight);
+    const viewBox = (rendered.getAttribute("viewBox") || "0 0 1 1").trim().split(/\s+/).map(Number); const ratio = viewBox[2] / viewBox[3] || 1;
+    const renderedWidth = Math.min(width, height * ratio); const renderedHeight = renderedWidth / ratio;
+    rendered.setAttribute("x", String(x + (width - renderedWidth) / 2)); rendered.setAttribute("y", String(y + (height - renderedHeight) / 2)); rendered.setAttribute("width", String(renderedWidth)); rendered.setAttribute("height", String(renderedHeight)); rendered.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    placeholder.replaceWith(rendered);
+  });
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg"); copy.setAttribute("width", String(width)); copy.setAttribute("height", String(height)); copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
   return copy;
 }
@@ -905,11 +920,11 @@ export default function Home() {
 
   const applyLatexToCanvas = () => { try { const result = objectsFromLatex(latexSource, objects); const protectedCount = result.objects.filter((object) => object.kind === "raw-tikz").length; commitObjects(result.objects, `${result.applied} objet${result.applied > 1 ? "s" : ""} appliqué${result.applied > 1 ? "s" : ""} depuis le TikZ${protectedCount ? ` · ${protectedCount} bloc(s) non reconnu(s) conservé(s) sans perte` : ""}.`); setSelectedIds([]); setLatexDraft(undefined); } catch (error) { setNotice(error instanceof Error ? error.message : "TikZ invalide."); } };
   const copyLatex = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copié."); };
-  const exportSvg = () => { if (!svgRef.current) return; const copy = cleanSvg(svgRef.current, settings.width, settings.height); downloadText("schema-mpsi.svg", new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("SVG vectoriel exporté."); };
+  const exportSvg = async () => { if (!svgRef.current) return; try { const copy = await cleanSvg(svgRef.current, settings.width, settings.height); downloadText("schema-mpsi.svg", new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("SVG vectoriel exporté."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export SVG impossible."); } };
   const exportPdf = async () => {
     if (!svgRef.current) return; setNotice("Création du PDF vectoriel…");
-    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); const svg = cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: settings.width, height: settings.height }); pdf.save("schema-mpsi.pdf"); setNotice("PDF vectoriel exporté sans poignées de sélection."); }
-    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(cleanSvg(svgRef.current!, settings.width, settings.height)); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); pdf.addImage(image, "PNG", 0, 0, settings.width, settings.height); pdf.save("schema-mpsi.pdf"); setNotice("PDF exporté en mode de compatibilité."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export PDF impossible."); } }
+    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); const svg = await cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: settings.width, height: settings.height }); pdf.save("schema-mpsi.pdf"); setNotice("PDF vectoriel exporté sans poignées de sélection."); }
+    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(await cleanSvg(svgRef.current!, settings.width, settings.height)); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); pdf.addImage(image, "PNG", 0, 0, settings.width, settings.height); pdf.save("schema-mpsi.pdf"); setNotice("PDF exporté en mode de compatibilité."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export PDF impossible."); } }
   };
 
   const clearCanvas = () => { if (!objects.length || !window.confirm("Effacer tout le canevas ? Vous pourrez encore utiliser Annuler.")) return; commitObjects([], "Canevas effacé. Cliquez sur Annuler pour le restaurer."); setSelectedIds([]); };
