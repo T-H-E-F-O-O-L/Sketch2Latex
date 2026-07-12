@@ -57,6 +57,8 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(css, /\.endpoint-handle/);
   assert.match(css, /\.math-calculator/);
   assert.match(css, /\.math-keyboard-grid/);
+  assert.match(css, /\.canvas-wrap > svg/);
+  assert.doesNotMatch(css, /\.canvas-wrap svg/);
   assert.match(templates, /Circuit RLC série/);
   assert.match(templates, /Dispersion par un prisme/);
   assert.match(templates, /Pile électrochimique/);
