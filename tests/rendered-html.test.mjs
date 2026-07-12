@@ -26,12 +26,13 @@ test("server-renders the Sketch2LaTeX editor", async () => {
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
-  const [page, css, templates, project, latex, packageJson] = await Promise.all([
+  const [page, css, templates, project, latex, simpleMath, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/templates.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/project.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/latex.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/simple-math.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(page, /AUTOSAVE_KEY/);
@@ -45,17 +46,23 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /mathSymbolGroups/);
   assert.match(page, /physicsFormulaGroups/);
   assert.match(page, /addMathEquation/);
+  assert.match(page, /simpleMathToLatex/);
+  assert.match(page, /Langage simple/);
+  assert.match(page, /sans API/);
   assert.match(page, /data-export-formula/);
   assert.match(page, /getMathJaxRenderer/);
   assert.match(page, /formulaForTypesetting/);
   assert.doesNotMatch(page, /\/api\/compile/);
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
+  assert.match(css, /\.simple-math-editor/);
   assert.match(templates, /Circuit RLC série/);
   assert.match(templates, /Dispersion par un prisme/);
   assert.match(templates, /Pile électrochimique/);
   assert.match(project, /PROJECT_VERSION/);
   assert.match(latex, /tikz-rect-/);
   assert.match(latex, /raw-tikz/);
+  assert.match(simpleMath, /simpleMathToLatex/);
+  assert.doesNotMatch(simpleMath, /fetch\(|\/api\//);
   assert.match(packageJson, /"svg2pdf\.js"/);
 });

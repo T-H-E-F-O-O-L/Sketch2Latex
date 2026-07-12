@@ -10,7 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "test:latex": "node --import tsx --test tests/latex.test.ts",
+    "test:latex": "node --import tsx --test tests/latex.test.ts tests/simple-math.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },

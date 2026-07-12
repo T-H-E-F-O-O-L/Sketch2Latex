@@ -77,6 +77,16 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .project-panel, .document-panel { display: grid; gap: 7px; padding: 10px; }
 .math-panel { height: calc(100% - 48px); overflow: auto; padding: 12px; }
 .math-panel > p { margin: 4px 0 8px; color: #5c6670; font-size: 11px; line-height: 1.4; }
+.simple-math-editor { margin: 12px 0 14px; padding: 10px; border: 1px solid #b9c7d4; border-radius: 6px; background: #f7fafc; }
+.simple-math-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.simple-math-heading h3 { margin: 0; font-size: 12px; }
+.simple-math-heading span { color: #2f6f50; font-size: 10px; font-weight: 700; }
+.simple-math-editor textarea { display: block; width: 100%; min-height: 92px; max-height: 190px; margin: 0; padding: 9px; resize: vertical; font: 12px/1.45 Arial, sans-serif; }
+.simple-math-status { min-height: 16px; margin: 6px 0; font-size: 10px; line-height: 1.35; }
+.simple-math-status.ok { color: #247044; }
+.simple-math-status.error { color: #a53c32; }
+.simple-math-examples { display: flex; flex-wrap: wrap; gap: 4px; }
+.simple-math-examples button { padding: 4px 6px; font-size: 10px; }
 .math-editor-field { display: grid; gap: 6px; margin: 12px 0 14px; color: #27313a; font-size: 12px; font-weight: 700; }
 .math-input { display: block; min-height: 150px; max-height: 300px; margin: 0; padding: 10px; font-family: Consolas, "Courier New", monospace; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
 .math-section-label { display: block; margin: 0 0 6px; color: #27313a; font-size: 12px; font-weight: 700; }
