@@ -81,7 +81,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     license: "Création originale inspirée des conventions TikZ",
     objects: [
       o("lens-axis", { kind: "line", x: 80, y: 300, x2: 820, y2: 300 }),
-      o("lens", { kind: "lens", x: 420, y: 170, width: 60, height: 260 }),
+      o("lens", { kind: "lens", x: 450, y: 170, x2: 450, y2: 430 }),
       o("object", { kind: "arrow", x: 230, y: 300, x2: 230, y2: 175, style: { stroke: "#111111", strokeWidth: 3 } }),
       o("parallel", { kind: "light-ray", x: 230, y: 175, x2: 450, y2: 175, style: { stroke: "#1769aa", strokeWidth: 2 } }),
       o("refracted", { kind: "light-ray", x: 450, y: 175, x2: 700, y2: 385, style: { stroke: "#1769aa", strokeWidth: 2 } }),

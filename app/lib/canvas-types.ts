@@ -77,13 +77,14 @@ export const annotation = (object: CanvasObject, key: string, fallback: string) 
 
 export const connectorKinds: ObjectKind[] = [
   "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
+  "lens", "diverging-lens",
   "spring", "force", "light-ray", "wave", "heat-arrow", "work-arrow", "bond-single", "bond-double", "bond-triple",
   "reaction-arrow", "equilibrium-arrow", "hydrogen-bond", "dipole",
 ];
 
 export const stampKinds: ObjectKind[] = [
   "point", "equation", "ground", "gbf", "oscilloscope", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "symbol",
-  "lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
+  "plane-mirror", "screen", "prism", "fiber", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
   "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
   "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",

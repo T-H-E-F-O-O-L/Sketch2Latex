@@ -95,28 +95,27 @@ test("applies editable generated LaTeX text back to the canvas", () => {
 });
 
 test("keeps complex generated symbols while applying editable LaTeX", () => {
-  const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120 }];
+  const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 60, y: 160, x2: 60, y2: 40 }];
   const result = objectsFromLatex(documentFor(objects), objects);
-  assert.equal(result.applied, 0);
+  assert.equal(result.applied, 1);
   assert.deepEqual(result.objects, objects);
 });
 
-test("uses double-sided French CPGE arrows for converging and diverging lenses", () => {
-  const converging = objectToLatex({ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120 });
-  const diverging = objectToLatex({ id: "lens-2", kind: "diverging-lens", x: 30, y: 40, width: 60, height: 120 });
-  assert.match(converging, /\\fill \(-0\.12,0\.60\) -- \(0,0\.82\) -- \(0\.12,0\.60\)/);
-  assert.match(converging, /\\fill \(-0\.12,-0\.60\) -- \(0,-0\.82\) -- \(0\.12,-0\.60\)/);
-  assert.match(diverging, /\\fill \(-0\.12,0\.82\) -- \(0,0\.60\) -- \(0\.12,0\.82\)/);
-  assert.match(diverging, /\\fill \(-0\.12,-0\.82\) -- \(0,-0\.60\) -- \(0\.12,-0\.82\)/);
+test("uses draggable double-sided French CPGE arrows for converging and diverging lenses", () => {
+  const converging = objectToLatex({ id: "lens-1", kind: "lens", x: 50, y: 150, x2: 50, y2: 0 });
+  const diverging = objectToLatex({ id: "lens-2", kind: "diverging-lens", x: 50, y: 150, x2: 50, y2: 0 });
+  assert.match(converging, /\\draw \(1\.00,-3\.00\) -- \(1\.00,0\.00\)/);
+  assert.match(converging, /\\fill \(1\.18,-2\.64\) -- \(1\.00,-3\.00\)/);
+  assert.match(diverging, /\\fill \(1\.18,-3\.00\) -- \(1\.00,-2\.64\)/);
   assert.doesNotMatch(converging, /Latex|node\[below right\]/);
 });
 
 test("applies editable metadata for every generated canvas property", () => {
-  const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 30, y: 40, width: 60, height: 120, rotation: 0 }];
+  const objects: CanvasObject[] = [{ id: "lens-1", kind: "lens", x: 30, y: 40, x2: 30, y2: 160, rotation: 0 }];
   const edited = documentFor(objects).replace('"x":30', '"x":180').replace('"rotation":0', '"rotation":35');
   const result = objectsFromLatex(edited, objects);
   assert.equal(result.applied, 1);
-  assert.deepEqual(result.objects[0], { id: "lens-1", kind: "lens", x: 180, y: 40, width: 60, height: 120, rotation: 35 });
+  assert.deepEqual(result.objects[0], { id: "lens-1", kind: "lens", x: 180, y: 40, x2: 30, y2: 160, rotation: 35 });
 });
 
 test("adds a complete object written in a generated LaTeX semantic block", () => {

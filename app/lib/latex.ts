@@ -77,6 +77,16 @@ function symbolBody(object: CanvasObject) {
   return `\\draw[rounded corners] (-0.9,-0.55) rectangle (0.9,0.55); \\node at (0,0) {${a(preset?.annotations?.main ?? preset?.title ?? "CPGE")}};`;
 }
 
+function lensConnector(object: CanvasObject) {
+  const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const dx = x2 - object.x; const dy = y2 - object.y; const length = Math.hypot(dx, dy) || 1; const ux = dx / length; const uy = dy / length; const px = -uy; const py = ux;
+  const arrowLength = Math.min(18, Math.max(8, length * .25)); const arrowWidth = Math.min(9, Math.max(5, arrowLength * .55));
+  const pointAt = (base: Point, along: number, across: number) => ({ x: base.x + ux * along + px * across, y: base.y + uy * along + py * across });
+  const startTip = pointAt({ x: object.x, y: object.y }, object.kind === "lens" ? 0 : arrowLength, 0); const startBase = pointAt({ x: object.x, y: object.y }, object.kind === "lens" ? arrowLength : 0, 0);
+  const endTip = pointAt({ x: x2, y: y2 }, object.kind === "lens" ? 0 : -arrowLength, 0); const endBase = pointAt({ x: x2, y: y2 }, object.kind === "lens" ? -arrowLength : 0, 0);
+  const triangle = (tip: Point, base: Point) => `\\fill ${point(base.x + px * arrowWidth, base.y + py * arrowWidth)} -- ${point(tip.x, tip.y)} -- ${point(base.x - px * arrowWidth, base.y - py * arrowWidth)} -- cycle;`;
+  return `\\draw ${point(object.x, object.y)} -- ${point(x2, y2)}; ${triangle(startTip, startBase)} ${triangle(endTip, endBase)}`;
+}
+
 function electricalConnector(object: CanvasObject) {
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const length = Math.hypot(x2 - object.x, y2 - object.y);
   const halfLength = n(length / 2); const label = (fallback: string) => componentLabel(annotation(object, "main", fallback));
@@ -190,6 +200,7 @@ function objectToLatexBase(object: CanvasObject): string {
     case "point": return `\\fill ${point(object.x + (object.width ?? 18) / 2, object.y + (object.height ?? 18) / 2)} circle (0.06);`;
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
+    case "lens": case "diverging-lens": return lensConnector(object);
     case "voltmeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "V"))}};`;
     case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "A"))}};`;
     case "spring": return `\\draw[decorate, decoration={coil, aspect=0.3}] ${origin} -- ${end(object)};`;
