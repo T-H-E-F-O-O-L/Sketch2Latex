@@ -26,13 +26,14 @@ test("server-renders the Sketch2LaTeX editor", async () => {
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
-  const [page, css, templates, project, latex, simpleMath, packageJson] = await Promise.all([
+  const [page, css, templates, project, latex, mathKeyboard, mathCalculator, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/templates.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/project.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/latex.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/lib/simple-math.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/math-keyboard.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/math-calculator.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(page, /AUTOSAVE_KEY/);
@@ -43,26 +44,34 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /makeAopCircuit/);
   assert.match(page, /roundTripReport/);
   assert.match(page, /templateMode/);
-  assert.match(page, /mathSymbolGroups/);
   assert.match(page, /physicsFormulaGroups/);
   assert.match(page, /addMathEquation/);
-  assert.match(page, /simpleMathToLatex/);
-  assert.match(page, /Langage simple/);
-  assert.match(page, /sans API/);
+  assert.match(page, /MathCalculator/);
+  assert.match(page, /Éditeur visuel de formule/);
+  assert.doesNotMatch(page, /Langage simple/);
   assert.match(page, /data-export-formula/);
   assert.match(page, /getMathJaxRenderer/);
   assert.match(page, /formulaForTypesetting/);
   assert.doesNotMatch(page, /\/api\/compile/);
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
-  assert.match(css, /\.simple-math-editor/);
+  assert.match(css, /\.math-calculator/);
+  assert.match(css, /\.math-keyboard-grid/);
   assert.match(templates, /Circuit RLC série/);
   assert.match(templates, /Dispersion par un prisme/);
   assert.match(templates, /Pile électrochimique/);
   assert.match(project, /PROJECT_VERSION/);
   assert.match(latex, /tikz-rect-/);
   assert.match(latex, /raw-tikz/);
-  assert.match(simpleMath, /simpleMathToLatex/);
-  assert.doesNotMatch(simpleMath, /fetch\(|\/api\//);
+  assert.match(mathKeyboard, /mathKeyboardLayouts/);
+  assert.match(mathKeyboard, /label: "123"/);
+  assert.match(mathKeyboard, /label: "f\(x\)"/);
+  assert.match(mathKeyboard, /label: "ABC"/);
+  assert.match(mathCalculator, /math-field/);
+  assert.match(mathCalculator, /Code LaTeX \(avancé\)/);
+  assert.match(mathCalculator, /delete-backward/);
+  assert.match(mathCalculator, /import\("mathlive"\)/);
+  assert.match(mathCalculator, /mathLiveStatus/);
   assert.match(packageJson, /"svg2pdf\.js"/);
+  assert.match(packageJson, /"mathlive"/);
 });
