@@ -218,6 +218,15 @@ test("round-trips equations and protected TikZ without losing source", () => {
   assert.deepEqual(roundTripReport(source, objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
+test("exports complex multi-line mathematical demonstrations", () => {
+  const text = String.raw`\begin{aligned}E&=u_R+u_C\\&=RC\frac{du_C}{dt}+u_C\\\Rightarrow u_C(t)&=E\left(1-e^{-t/(RC)}\right)\end{aligned}`;
+  const equation: CanvasObject = { id: "proof", kind: "equation", x: 40, y: 50, width: 520, height: 220, text };
+  const output = objectToLatex(equation);
+  assert.match(output, /\\begin\{aligned\}E&=u_R\+u_C/);
+  assert.match(output, /\\frac\{du_C\}\{dt\}/);
+  assert.deepEqual(roundTripReport(documentFor([equation]), [equation]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("builds every AOP configuration from editable grouped components", () => {
   const kinds: AopConfiguration[] = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"];
   for (const kind of kinds) {

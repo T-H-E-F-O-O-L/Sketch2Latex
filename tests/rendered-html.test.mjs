@@ -18,6 +18,7 @@ test("server-renders the Sketch2LaTeX editor", async () => {
   assert.match(html, /Éditeur scientifique CPGE/);
   assert.match(html, /Bibliothèque/);
   assert.match(html, /Modèles/);
+  assert.match(html, /Maths &amp; Physique/);
   assert.match(html, /Canevas scientifique interactif/);
   assert.match(html, /Ajouter un graphe/);
   assert.match(html, /SVG vectoriel/);
@@ -41,6 +42,9 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /makeAopCircuit/);
   assert.match(page, /roundTripReport/);
   assert.match(page, /templateMode/);
+  assert.match(page, /mathSymbolGroups/);
+  assert.match(page, /physicsFormulaGroups/);
+  assert.match(page, /addMathEquation/);
   assert.doesNotMatch(page, /\/api\/compile/);
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
