@@ -7,12 +7,13 @@ import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from ".
 import { parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
+import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 
 test("exports circuit connectors with the exact canvas geometry", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
   assert.match(output, /shift=\{\(1\.00,0\.00\)\}, rotate=0/);
   assert.match(output, /\(-0\.36,-0\.16\) rectangle \(0\.36,0\.16\)/);
-  assert.match(output, /\\node at \(0,0\.26\) \{R\}/);
+  assert.match(output, /\\node at \(0,0\.26\) \{\$R\$\}/);
   assert.doesNotMatch(output, /to\[R\]/);
 });
 
@@ -20,10 +21,10 @@ test("keeps resistor and inductor proportions and labels in every direction", ()
   const resistor = objectToLatex({ id: "r", kind: "resistor", x: 50, y: 150, x2: 50, y2: 0, annotations: { main: "R₁" } });
   const inductor = objectToLatex({ id: "l", kind: "inductor", x: 50, y: 150, x2: 50, y2: 0, annotations: { main: "L" } });
   assert.match(resistor, /rotate=90/);
-  assert.match(resistor, /\{R\$_\{1\}\$\}/);
+  assert.match(resistor, /\{\$R_\{1\}\$\}/);
   assert.match(inductor, /rotate=90/);
   assert.match(inductor, /\(-0\.40,0\).*\(0\.40,0\)/s);
-  assert.match(inductor, /\\node at \(0,0\.38\) \{L\}/);
+  assert.match(inductor, /\\node at \(0,0\.38\) \{\$L\$\}/);
   assert.doesNotMatch(inductor, /to\[L\]/);
 });
 
@@ -31,8 +32,9 @@ test("exports the other electrical symbols without Circuitikz substitutions", ()
   const capacitor = objectToLatex({ id: "c", kind: "capacitor", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "C₁" } });
   const battery = objectToLatex({ id: "b", kind: "battery", x: 0, y: 0, x2: 100, y2: 0 });
   const circuitSwitch = objectToLatex({ id: "s", kind: "switch", x: 0, y: 0, x2: 100, y2: 0 });
-  assert.match(capacitor, /\\node at \(0,-0\.42\) \{C\$_\{1\}\$\}/);
-  assert.match(battery, /\(-0\.10,-0\.30\) -- \(-0\.10,0\.30\)/);
+  assert.match(capacitor, /\\node at \(0,-0\.42\) \{\$C_\{1\}\$\}/);
+  assert.match(battery, /\(0\.12,-0\.30\) -- \(0\.12,0\.30\)/);
+  assert.match(battery, /\(-0\.10,-0\.18\) -- \(-0\.10,0\.18\)/);
   assert.match(circuitSwitch, /\(-0\.24,0\) -- \(0\.24,0\.24\)/);
   for (const output of [capacitor, battery, circuitSwitch]) assert.doesNotMatch(output, /to\[/);
 });
@@ -65,7 +67,7 @@ test("exports editable drawing color and line width", () => {
   const objects: CanvasObject[] = [{ id: "colored-line", kind: "line", x: 0, y: 0, x2: 100, y2: 0, style: { stroke: "#c62828", strokeWidth: 4 } }];
   const output = documentFor(objects);
   assert.match(output, /color=\{rgb,255:red,198;green,40;blue,40\}/);
-  assert.match(output, /line width=1\.60pt/);
+  assert.match(output, /line width=2\.27pt/);
   const edited = output.replace('"stroke":"#c62828"', '"stroke":"#1769aa"');
   assert.deepEqual(objectsFromLatex(edited, objects).objects[0].style, { stroke: "#1769aa", strokeWidth: 4 });
 });
@@ -80,10 +82,10 @@ test("applies editable generated LaTeX coordinates back to the canvas", () => {
 
 test("exports and applies editable Bézier curves", () => {
   const objects: CanvasObject[] = [{ id: "curve-1", kind: "curve", x: 0, y: 0, x2: 100, y2: 100, control: { x: 80, y: 0 } }];
-  assert.match(objectToLatex(objects[0]), /controls \(1\.60,0\.00\) and \(1\.60,0\.00\)/);
-  const edited = documentFor(objects).replace("(1.60,0.00) and (1.60,0.00)", "(2.00,-1.00) and (2.00,-1.00)");
+  assert.match(objectToLatex(objects[0]), /controls \(1\.07,0\.00\) and \(1\.73,-0\.67\)/);
+  const edited = documentFor(objects).replace("(1.07,0.00) and (1.73,-0.67)", "(2.00,-1.00) and (2.00,-1.00)");
   const result = objectsFromLatex(edited, objects);
-  assert.deepEqual(result.objects[0], { id: "curve-1", kind: "curve", x: 0, y: 0, x2: 100, y2: 100, control: { x: 100, y: 50 } });
+  assert.deepEqual(result.objects[0], { id: "curve-1", kind: "curve", x: 0, y: 0, x2: 100, y2: 100, control: { x: 150, y: 75 } });
 });
 
 test("applies editable generated LaTeX text back to the canvas", () => {
@@ -139,9 +141,11 @@ test("applies an edited ion label from the visible generated TikZ node", () => {
 
 test("returns a self-contained document with required STEM packages", () => {
   const output = documentFor([{ id: "b1", kind: "bond-double", x: 0, y: 0, x2: 50, y2: 0 }]);
-  assert.match(output, /\\usepackage\{circuitikz\}/);
+  assert.match(output, /\\usepackage\[european\]\{circuitikz\}/);
   assert.match(output, /\\usepackage\{pgfplots\}/);
   assert.match(output, /\\begin\{tikzpicture\}/);
+  assert.match(output, /border=0pt/);
+  assert.match(output, /use as bounding box.*\(18\.00,-11\.20\)/);
 });
 
 test("emits LaTeX for every MPSI component exposed in the toolbar", () => {
@@ -235,4 +239,21 @@ test("converts editable dimensions between cm, mm, pt and TikZ units", () => {
   assert.equal(toWorkingUnit(50, "mm"), 10);
   assert.equal(toWorkingUnit(50, "tikz"), 1);
   assert.ok(Math.abs(fromWorkingUnit(toWorkingUnit(50, "pt"), "pt") - 50) < .01);
+});
+
+test("uses one physical page scale for SVG, PDF and TikZ", () => {
+  assert.equal(canvasUnitsToCentimeters(900), 18);
+  assert.ok(Math.abs(canvasUnitsToPoints(900) - 510.23622047) < .0001);
+  const source = documentFor([], false, { width: 900, height: 560, unit: "cm", orientation: "landscape", gridSize: 20, showGrid: true, snapToGrid: true });
+  assert.match(source, /line width=1\.13pt/);
+  assert.match(source, />=\{Latex\[length=4\.54pt,width=3\.00pt\]\}/);
+});
+
+test("exports semantic French scientific arrows", () => {
+  const force = objectToLatex({ id: "f", kind: "force", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "F" } });
+  const equilibrium = objectToLatex({ id: "eq", kind: "equilibrium-arrow", x: 0, y: 0, x2: 100, y2: 0 });
+  const dipole = objectToLatex({ id: "mu", kind: "dipole", x: 0, y: 0, x2: 100, y2: 0 });
+  assert.match(force, /node\[midway,above\] \{\$F\$\}/);
+  assert.equal((equilibrium.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 2);
+  assert.match(dipole, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\)/);
 });

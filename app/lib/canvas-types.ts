@@ -59,6 +59,7 @@ export const defaultDocumentSettings: DocumentSettings = {
 };
 
 const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = {
+  arrow: { main: "" }, force: { main: "F" },
   voltmeter: { main: "V" }, ammeter: { main: "A" }, gbf: { main: "GBF" }, oscilloscope: { main: "oscillo" }, mass: { main: "m" },
   "reference-frame": { x: "x", y: "y", origin: "O" }, "circular-trajectory": { origin: "O" }, "gravity-field": { main: "g" },
   "electric-field": { main: "E" }, "bar-magnet": { north: "N", south: "S" }, "laplace-rails": { velocity: "v" }, "charged-particle": { main: "q" },

@@ -1,7 +1,8 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
+import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, tikzStrokeWidth } from "./concours-style";
 
-const SCALE = 50;
+const SCALE = CANVAS_UNITS_PER_CM;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
 const isPlainTextFormula = (value: string) => /\p{L}/u.test(value) && /^[\p{L}\p{N}\s.,;:!?'’"()-]+$/u.test(value);
 const latexFormula = (value: string) => {
@@ -20,9 +21,9 @@ function componentLabel(value: string) {
   if (value.includes("$")) return value;
   const unicodeSubscripts: Record<string, string> = { "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9", "₊": "+", "₋": "-" };
   const unicode = value.match(/^(.*?)([₀-₉₊₋]+)$/u);
-  if (unicode) return `${safeText(unicode[1])}$_{${[...unicode[2]].map((character) => unicodeSubscripts[character]).join("")}}$`;
+  if (unicode) return `$${safeText(unicode[1])}_{${[...unicode[2]].map((character) => unicodeSubscripts[character]).join("")}}$`;
   const underscore = value.match(/^(.*?)_([^_]+)$/);
-  return underscore ? `${safeText(underscore[1])}$_{${safeText(underscore[2])}}$` : safeText(value);
+  return underscore ? `$${safeText(underscore[1])}_{${safeText(underscore[2])}}$` : `$${safeText(value)}$`;
 }
 
 function simplify(points: Point[], tolerance = 1.5): Point[] {
@@ -96,7 +97,7 @@ function tikzStyle(object: CanvasObject) {
     options.push(`color={rgb,255:red,${red};green,${green};blue,${blue}}`);
   }
   const strokeWidth = object.style?.strokeWidth;
-  if (strokeWidth !== undefined && strokeWidth !== 2) options.push(`line width=${(strokeWidth * .4).toFixed(2)}pt`);
+  if (strokeWidth !== undefined && strokeWidth !== 2) options.push(`line width=${tikzStrokeWidth(strokeWidth).toFixed(2)}pt`);
   return options.join(",");
 }
 
@@ -167,11 +168,20 @@ function objectToLatexBase(object: CanvasObject): string {
   const origin = point(object.x, object.y);
   switch (object.kind) {
     case "line": return `\\draw ${origin} -- ${end(object)};`;
-    case "dashed-line": return `\\draw[dashed] ${origin} -- ${end(object)};`;
-    case "curve": { const control = object.control ?? { x: (object.x + (object.x2 ?? object.x)) / 2, y: (object.y + (object.y2 ?? object.y)) / 2 }; return `\\draw ${origin} .. controls ${point(control.x, control.y)} and ${point(control.x, control.y)} .. ${end(object)};`; }
-    case "arrow": case "force": case "light-ray": return `\\draw[-{Latex}] ${origin} -- ${end(object)};`;
+    case "dashed-line": return `\\draw[dash pattern=${TIKZ_DASH_PATTERN}] ${origin} -- ${end(object)};`;
+    case "curve": {
+      const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y;
+      const control = object.control ?? { x: (object.x + x2) / 2, y: (object.y + y2) / 2 };
+      const control1 = { x: object.x + (2 / 3) * (control.x - object.x), y: object.y + (2 / 3) * (control.y - object.y) };
+      const control2 = { x: x2 + (2 / 3) * (control.x - x2), y: y2 + (2 / 3) * (control.y - y2) };
+      return `\\draw ${origin} .. controls ${point(control1.x, control1.y)} and ${point(control2.x, control2.y)} .. ${end(object)};`;
+    }
+    case "arrow": case "force": case "light-ray": {
+      const label = annotation(object, "main", object.kind === "force" ? "F" : "").trim();
+      return `\\draw[-{Latex}] ${origin} -- ${end(object)}${label ? ` node[midway,above] {${componentLabel(label)}}` : ""};`;
+    }
     case "double-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
-    case "dimension": return `\\draw[<->] ${origin} -- ${end(object)} node[midway,above,fill=white,inner sep=1pt] {${safeText(annotation(object, "main", "d"))}};`;
+    case "dimension": return `\\draw[|<->|] ${origin} -- ${end(object)} node[midway,above,fill=white,inner sep=1pt] {${componentLabel(annotation(object, "main", "d"))}};`;
     case "point": return `\\fill ${point(object.x + (object.width ?? 18) / 2, object.y + (object.height ?? 18) / 2)} circle (0.06);`;
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
@@ -180,12 +190,18 @@ function objectToLatexBase(object: CanvasObject): string {
     case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "A"))}};`;
     case "spring": return `\\draw[decorate, decoration={coil, aspect=0.3}] ${origin} -- ${end(object)};`;
     case "wave": return `\\draw[decorate, decoration={snake, amplitude=0.08cm, segment length=0.25cm}] ${origin} -- ${end(object)};`;
-    case "heat-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${safeText(annotation(object, "main", "Q"))}};`;
-    case "work-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${safeText(annotation(object, "main", "W"))}};`;
+    case "heat-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${componentLabel(annotation(object, "main", "Q"))}};`;
+    case "work-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${componentLabel(annotation(object, "main", "W"))}};`;
     case "reaction-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)};`;
-    case "equilibrium-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
+    case "equilibrium-arrow": {
+      const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2);
+      return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0.06) -- (${halfLength},0.06);\n\\draw[-{Latex}] (${halfLength},-0.06) -- (-${halfLength},-0.06);`);
+    }
     case "hydrogen-bond": return `\\draw[dashed] ${origin} -- ${end(object)};`;
-    case "dipole": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${safeText(annotation(object, "main", "μ"))}};`;
+    case "dipole": {
+      const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2);
+      return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0) -- (${halfLength},0) node[midway,above] {${componentLabel(annotation(object, "main", "μ"))}};\n\\draw (-${halfLength},-0.10) -- (-${halfLength},0.10);`);
+    }
     case "bond-single": return bondLines(object, 1);
     case "bond-double": return bondLines(object, 2);
     case "bond-triple": return bondLines(object, 3);
@@ -201,7 +217,7 @@ function objectToLatexBase(object: CanvasObject): string {
       const expressions = graph?.expressions?.length ? graph.expressions : graph?.expression?.trim() ? [graph.expression.trim()] : [];
       const domain = `${graph?.xMin ?? -5}:${graph?.xMax ?? 5}`;
       const plots = expressions.map((expression, index) => `  \\addplot[domain=${domain}, samples=100, smooth${expressions.length > 1 ? `, color=${["blue", "red", "green!60!black", "orange", "violet"][index % 5]}` : ""}] {${expression}};`).join("\n");
-      return `\\begin{axis}[at={${origin}}, anchor=north west, width=${width}cm, height=${height}cm, xmin=${graph?.xMin ?? -5}, xmax=${graph?.xMax ?? 5}, ymin=${graph?.yMin ?? -5}, ymax=${graph?.yMax ?? 5}, axis lines=middle, grid=${graph?.showGrid === false ? "none" : "both"}, xlabel={${safeText(graph?.xLabel ?? "$x$")}}, ylabel={${safeText(graph?.yLabel ?? "$y$")}}]\n${plots}\n\\end{axis}`;
+      return `\\begin{axis}[at={${origin}}, anchor=north west, width=${width}cm, height=${height}cm, xmin=${graph?.xMin ?? -5}, xmax=${graph?.xMax ?? 5}, ymin=${graph?.yMin ?? -5}, ymax=${graph?.yMax ?? 5}, axis lines=middle, grid=${graph?.showGrid === true ? "both" : "none"}, xlabel={${safeText(graph?.xLabel ?? "$x$")}}, ylabel={${safeText(graph?.yLabel ?? "$y$")}}]\n${plots}\n\\end{axis}`;
     }
     default: return stamp(object);
   }
@@ -242,13 +258,17 @@ export function documentFor(objects: CanvasObject[], snippetOnly = false, settin
   const unit = settings?.unit ?? "cm";
   const axisUnit = unit === "tikz" ? "cm" : unit;
   const unitScale = unit === "mm" ? 10 : unit === "pt" ? 28.3464567 : 1;
-  const scaledBody = unitScale === 1 ? body : `\\begin{scope}[scale=${matrixNumber(unitScale)}]\n${body}\n\\end{scope}`;
-  const picture = `\\begin{tikzpicture}[x=1${axisUnit},y=1${axisUnit}]\n  ${scaledBody}\n\\end{tikzpicture}`;
+  const width = settings?.width ?? 900; const height = settings?.height ?? 560;
+  const page = `\\path[use as bounding box] (0,0) rectangle (${n(width)},${n(-height)});\n\\fill[white] (0,0) rectangle (${n(width)},${n(-height)});\n\\clip (0,0) rectangle (${n(width)},${n(-height)});\n${body}`;
+  const scaledBody = unitScale === 1 ? page : `\\begin{scope}[scale=${matrixNumber(unitScale)}]\n${page}\n\\end{scope}`;
+  const picture = `\\begin{tikzpicture}[x=1${axisUnit},y=1${axisUnit},line width=${TIKZ_NORMAL_STROKE},line cap=round,line join=round,>={${TIKZ_ARROW_TIP}},every node/.style={font=\\fontsize{${TIKZ_LABEL_SIZE}}{9.5pt}\\selectfont}]\n  ${scaledBody}\n\\end{tikzpicture}`;
   if (snippetOnly) return picture;
-  return `\\documentclass[tikz,border=5pt]{standalone}
+  return `\\documentclass[tikz,border=0pt]{standalone}
 % Sketch2LaTeX document: ${settings?.width ?? 900} x ${settings?.height ?? 560}px, ${settings?.orientation ?? "landscape"}, unit ${settings?.unit ?? "cm"}
+\\usepackage[T1]{fontenc}
+\\usepackage{lmodern}
 \\usepackage{tikz}
-\\usepackage{circuitikz}
+\\usepackage[european]{circuitikz}
 \\usepackage{pgfplots}
 \\usepackage{amsmath,amssymb}
 \\pgfplotsset{compat=1.18}
@@ -325,7 +345,11 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
   const withAnnotations = annotationsFromLatexBlock(original, block);
   if (block.includes("\\begin{scope}[cm=")) return withAnnotations;
   const points = pointsFromLatex(block);
-  if (original.kind === "curve" && points.length >= 4) return { ...withAnnotations, x: points[0].x, y: points[0].y, control: points[1], x2: points[3].x, y2: points[3].y };
+  if (original.kind === "curve" && points.length >= 4) {
+    const start = points[0]; const control1 = points[1]; const finish = points[3];
+    const control = { x: start.x + 1.5 * (control1.x - start.x), y: start.y + 1.5 * (control1.y - start.y) };
+    return { ...withAnnotations, x: start.x, y: start.y, control, x2: finish.x, y2: finish.y };
+  }
   if (connectorKinds.includes(original.kind) && points.length >= 2) return { ...withAnnotations, x: points[0].x, y: points[0].y, x2: points[1].x, y2: points[1].y };
   if (original.kind === "rect" && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, width: points[1].x - points[0].x, height: points[1].y - points[0].y };
   if (original.kind === "circle" && points.length) {

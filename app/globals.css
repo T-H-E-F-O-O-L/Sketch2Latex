@@ -123,15 +123,17 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .app-shell .canvas-wrap.tool-select > svg { cursor: default; }
 .app-shell .canvas-wrap.tool-pan > svg { cursor: grab; }
 .app-shell .canvas-wrap.tool-eraser > svg { cursor: not-allowed; }
+.app-shell .canvas-wrap > svg .diagram-object { stroke-linecap: round; stroke-linejoin: round; }
+.app-shell .canvas-wrap > svg .diagram-object.editor-locked { opacity: .55; }
 .marquee { fill: rgba(49,90,166,.08); stroke: #315aa6; stroke-width: 1.5; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
 .endpoint-handle, .control-handle, .free-point-handle { fill: #fff; stroke: #1769aa; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }
 .control-handle { fill: #e8f2ff; }
 .free-point-handle { fill: #fff7d6; stroke: #a56a00; }
 .control-line { fill: none; stroke: #1769aa; stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
-.app-shell .canvas-wrap > svg text { font-family: "Times New Roman", Times, serif; font-weight: 400; }
-.app-shell .canvas-wrap > svg .diagram-label { font-size: 15px; font-weight: 600; letter-spacing: .01em; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
-.app-shell .canvas-wrap > svg .diagram-sign { font-size: 17px; font-weight: 600; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
-.app-shell .canvas-wrap > svg .diagram-output-label { font-size: 13px; font-style: italic; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.app-shell .canvas-wrap > svg text { font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", "Times New Roman", serif; font-weight: 400; }
+.app-shell .canvas-wrap > svg .diagram-label { font-size: 14px; font-style: italic; font-weight: 400; letter-spacing: .01em; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.app-shell .canvas-wrap > svg .diagram-sign { font-size: 17px; font-weight: 400; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.app-shell .canvas-wrap > svg .diagram-output-label { font-size: 13px; font-style: italic; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
 .equation-render { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: hidden; color: #111; font-size: 16px; }
 .equation-render .katex-display { margin: 0; }
 .canvas-help { padding: 6px 3px; color: #5f6973; font-size: 11px; }

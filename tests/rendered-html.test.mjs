@@ -26,12 +26,13 @@ test("server-renders the Sketch2LaTeX editor", async () => {
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
-  const [page, css, templates, project, latex, mathKeyboard, mathCalculator, packageJson] = await Promise.all([
+  const [page, css, templates, project, latex, concoursStyle, mathKeyboard, mathCalculator, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/templates.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/project.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/latex.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/concours-style.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/math-keyboard.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/math-calculator.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -52,6 +53,9 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /data-export-formula/);
   assert.match(page, /getMathJaxRenderer/);
   assert.match(page, /formulaForTypesetting/);
+  assert.match(page, /canvasUnitsToPoints/);
+  assert.match(page, /EXPORTED_SVG_STYLE/);
+  assert.match(page, /editor-locked/);
   assert.doesNotMatch(page, /\/api\/compile/);
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
@@ -65,6 +69,10 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(project, /PROJECT_VERSION/);
   assert.match(latex, /tikz-rect-/);
   assert.match(latex, /raw-tikz/);
+  assert.match(latex, /use as bounding box/);
+  assert.match(latex, /usepackage\[european\]\{circuitikz\}/);
+  assert.match(concoursStyle, /CANVAS_UNITS_PER_CM = 50/);
+  assert.match(concoursStyle, /Latin Modern Roman/);
   assert.match(mathKeyboard, /mathKeyboardLayouts/);
   assert.match(mathKeyboard, /label: "123"/);
   assert.match(mathKeyboard, /label: "f\(x\)"/);

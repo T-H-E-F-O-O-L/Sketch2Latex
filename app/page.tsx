@@ -10,6 +10,7 @@ import { MathCalculator } from "./components/math-calculator";
 import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type DocumentSettings, type ObjectKind, type Point } from "./lib/canvas-types";
 import { isCompleteAopConfiguration, makeAopCircuit } from "./lib/aop-circuits";
 import { circuitGeometry } from "./lib/circuit-geometry";
+import { CONCOURS_ARROW, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
 import { graphPathFor, graphPathsFor } from "./lib/graph";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
@@ -61,8 +62,8 @@ const canvasPoint = (event: PointerEvent<SVGSVGElement>, svg: SVGSVGElement, wid
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const scaleXFor = (object: CanvasObject) => object.scaleX ?? object.scale ?? 1;
 const scaleYFor = (object: CanvasObject) => object.scaleY ?? object.scale ?? 1;
-const strokeFor = (object: CanvasObject) => object.style?.stroke ?? "#111111";
-const strokeWidthFor = (object: CanvasObject, selected = false) => Math.max(1, object.style?.strokeWidth ?? 2) + (selected ? .75 : 0);
+const strokeFor = (object: CanvasObject) => object.style?.stroke ?? CONCOURS_INK;
+const strokeWidthFor = (object: CanvasObject, selected = false) => { void selected; return Math.max(1, object.style?.strokeWidth ?? 2); };
 
 function boundsFor(object: CanvasObject): CanvasBounds {
   if (connectorKinds.includes(object.kind)) {
@@ -192,11 +193,11 @@ function getMathJaxRenderer() {
   return mathJaxRenderer;
 }
 
-async function canvasPdfImage(svg: SVGSVGElement) {
+async function canvasPdfImage(svg: SVGSVGElement, width: number, height: number) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  copy.setAttribute("width", String(canvasWidth));
-  copy.setAttribute("height", String(canvasHeight));
+  copy.setAttribute("width", String(width));
+  copy.setAttribute("height", String(height));
   const source = new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml;charset=utf-8" });
   const objectUrl = URL.createObjectURL(source);
   try {
@@ -208,8 +209,8 @@ async function canvasPdfImage(svg: SVGSVGElement) {
     });
     const scale = 2;
     const canvas = document.createElement("canvas");
-    canvas.width = canvasWidth * scale;
-    canvas.height = canvasHeight * scale;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Le navigateur ne peut pas créer le PDF.");
     context.fillStyle = "#ffffff";
@@ -233,9 +234,9 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
     const control = object.control ?? { x: midX, y: midY };
     return <path {...common} d={`M ${object.x} ${object.y} Q ${control.x} ${control.y} ${x2} ${y2}`} />;
   }
-  if (object.kind === "dashed-line") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} strokeDasharray="7 5" />;
+  if (object.kind === "dashed-line") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} strokeDasharray={`${CONCOURS_DASH.on} ${CONCOURS_DASH.off}`} />;
   if (object.kind === "double-arrow") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" />;
-  if (object.kind === "dimension") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><text x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fontSize="14" fill={color} stroke="white" strokeWidth="4" paintOrder="stroke">{a("main", "d")}</text></g>;
+  if (object.kind === "dimension") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} /><line {...common} x1={x2 - 5 * px} y1={y2 - 5 * py} x2={x2 + 5 * px} y2={y2 + 5 * py} /><text className="diagram-label" x={midX + 10 * px} y={midY + 10 * py} textAnchor="middle" fill={color}>{a("main", "d")}</text></g>;
   if (object.kind === "resistor") { const g = circuitGeometry.resistor; return <g transform={`translate(${midX} ${midY}) rotate(${rotation})`}><line {...common} x1={-length / 2} y1="0" x2={length / 2} y2="0" /><rect x={-g.halfBody} y={-g.halfHeight} width={g.halfBody * 2} height={g.halfHeight * 2} rx="1.5" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text className="diagram-label" x="0" y={-g.labelOffset} textAnchor="middle" fill={color}>{a("main", "R")}</text></g>; }
   if (object.kind === "battery" || object.kind === "capacitor") {
     const g = object.kind === "battery" ? circuitGeometry.battery : circuitGeometry.capacitor;
@@ -259,6 +260,12 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
     const offsets = object.kind === "bond-single" ? [0] : object.kind === "bond-double" ? [-1, 1] : [-2, 0, 2];
     return <g>{offsets.map((offset) => <line key={offset} {...common} x1={object.x + px * offset * 4} y1={object.y + py * offset * 4} x2={x2 + px * offset * 4} y2={y2 + py * offset * 4} />)}</g>;
   }
+  if (object.kind === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
+  if (object.kind === "force" || object.kind === "arrow") {
+    const label = a("main", object.kind === "force" ? "F" : "").trim();
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && <text className="diagram-label" x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fill={color}>{label}</text>}</g>;
+  }
+  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} /><text className="diagram-label" x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fill={color}>{a("main", "\u03bc")}</text></g>;
   const markerEnd = ["arrow", "force", "light-ray", "heat-arrow", "work-arrow", "reaction-arrow", "dipole"].includes(object.kind) ? "url(#arrowhead)" : undefined;
   const markerStart = object.kind === "equilibrium-arrow" ? "url(#arrowhead)" : undefined;
   const dashed = object.kind === "hydrogen-bond" ? "5 4" : undefined;
@@ -363,12 +370,12 @@ function preview(object: CanvasObject, selected: boolean) {
   if (object.kind === "text") return <text x={object.x} y={object.y} fill={color} fontSize="17" pointerEvents="all">{object.text}</text>;
   if (object.kind === "axes") {
     const width = object.width ?? 0; const height = object.height ?? 0; const xMin = object.graph?.xMin ?? -5; const xMax = object.graph?.xMax ?? 5;
-    const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const graphPath = graphPathFor(object); const graphPaths = graphPathsFor(object); const clipId = `graph-clip-${object.id}`;
+    const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const yMin = object.graph?.yMin ?? -5; const yMax = object.graph?.yMax ?? 5; const horizontalAxis = object.y + clamp((yMax - 0) / Math.max(.0001, yMax - yMin), 0, 1) * height; const graphPath = graphPathFor(object); const graphPaths = graphPathsFor(object); const clipId = `graph-clip-${object.id}`;
     if (graphPaths.length > 1) {
-      const yMin = object.graph?.yMin ?? -5; const yMax = object.graph?.yMax ?? 5; const horizontalAxis = object.y + clamp((yMax - 0) / Math.max(.0001, yMax - yMin), 0, 1) * height; const colors = [color, "#c62828", "#2e7d32", "#ef6c00", "#6a1b9a"];
-      return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{object.graph?.showGrid !== false && Array.from({ length: 9 }, (_, index) => <g key={index} opacity=".12"><line x1={object.x + width * index / 8} y1={object.y} x2={object.x + width * index / 8} y2={object.y + height} stroke={color} /><line x1={object.x} y1={object.y + height * index / 8} x2={object.x + width} y2={object.y + height * index / 8} stroke={color} /></g>)}{graphPaths.map((path, index) => <path key={path} d={path} fill="none" stroke={colors[index % colors.length]} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />)}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /></g>;
+      const colors = [color, "#c62828", "#2e7d32", "#ef6c00", "#6a1b9a"];
+      return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} />{object.graph?.showGrid === true && Array.from({ length: 9 }, (_, index) => <g key={index} opacity=".12"><line x1={object.x + width * index / 8} y1={object.y} x2={object.x + width * index / 8} y2={object.y + height} stroke={color} /><line x1={object.x} y1={object.y + height * index / 8} x2={object.x + width} y2={object.y + height * index / 8} stroke={color} /></g>)}{graphPaths.map((path, index) => <path key={path} d={path} fill="none" stroke={colors[index % colors.length]} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />)}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /></g>;
     }
-    return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} strokeDasharray="3 3" />{graphPath && <path d={graphPath} fill="none" stroke={color} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={object.y + height / 2} x2={object.x + width} y2={object.y + height / 2} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14" fill={color}>{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
+    return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} />{graphPath && <path d={graphPath} fill="none" stroke={color} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14" fill={color}>{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
   }
   return stampPreview(object, selected);
 }
@@ -416,6 +423,7 @@ const snapPoint = (point: Point, settings: DocumentSettings, bypass = false): Po
 async function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.querySelectorAll("[data-export-ignore]").forEach((element) => element.remove());
+  copy.querySelectorAll(".editor-locked").forEach((element) => { element.classList.remove("editor-locked"); element.removeAttribute("opacity"); });
   copy.querySelectorAll("[data-equation-html]").forEach((element) => element.remove());
   const renderFormula = await getMathJaxRenderer();
   copy.querySelectorAll<SVGGElement>("[data-export-formula]").forEach((placeholder) => {
@@ -428,7 +436,8 @@ async function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
     rendered.setAttribute("x", String(x + (width - renderedWidth) / 2)); rendered.setAttribute("y", String(y + (height - renderedHeight) / 2)); rendered.setAttribute("width", String(renderedWidth)); rendered.setAttribute("height", String(renderedHeight)); rendered.setAttribute("preserveAspectRatio", "xMidYMid meet");
     placeholder.replaceWith(rendered);
   });
-  copy.setAttribute("xmlns", "http://www.w3.org/2000/svg"); copy.setAttribute("width", String(width)); copy.setAttribute("height", String(height)); copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const style = copy.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "style"); style.textContent = EXPORTED_SVG_STYLE; copy.insertBefore(style, copy.firstChild);
+  copy.setAttribute("xmlns", "http://www.w3.org/2000/svg"); copy.setAttribute("width", `${canvasUnitsToCentimeters(width)}cm`); copy.setAttribute("height", `${canvasUnitsToCentimeters(height)}cm`); copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
   return copy;
 }
 
@@ -601,7 +610,7 @@ function LegacyHome() {
     if (!svg) { setNotice("Le canevas n’est pas disponible."); return; }
     setNotice("Création du PDF du schéma…");
     try {
-      const [{ jsPDF }, image] = await Promise.all([import("jspdf"), canvasPdfImage(svg)]);
+      const [{ jsPDF }, image] = await Promise.all([import("jspdf"), canvasPdfImage(svg, canvasWidth, canvasHeight)]);
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [canvasWidth, canvasHeight] });
       pdf.addImage(image, "PNG", 0, 0, canvasWidth, canvasHeight, undefined, "FAST");
       pdf.save("schema-mpsi.pdf");
@@ -777,7 +786,7 @@ export default function Home() {
     if (kind === "equation") return { id: objectId(), kind, x: point.x - 110, y: point.y - 35, width: 220, height: 70, text: "\\vec{F}=m\\vec{a}", style: drawingStyle };
     if (stampKinds.includes(kind)) { const size = stampSize(kind); return { id: objectId(), kind, x: point.x - size.width / 2, y: point.y - size.height / 2, annotations: defaultAnnotations(kind), style: drawingStyle, ...size }; }
     if (kind === "text") return { id: objectId(), kind, x: point.x, y: point.y, text: "Étiquette", style: drawingStyle };
-    if (kind === "axes") return { id: objectId(), kind, x: point.x, y: point.y, width: 300, height: 210, graph: { expression: "", expressions: [], xMin: -5, xMax: 5, yMin: -5, yMax: 5, xLabel: "x", yLabel: "y", showGrid: true }, style: drawingStyle };
+    if (kind === "axes") return { id: objectId(), kind, x: point.x, y: point.y, width: 300, height: 210, graph: { expression: "", expressions: [], xMin: -5, xMax: 5, yMin: -5, yMax: 5, xLabel: "x", yLabel: "y", showGrid: false }, style: drawingStyle };
     if (kind === "freehand") return { id: objectId(), kind, x: point.x, y: point.y, points: [point], style: drawingStyle };
     if (connectorKinds.includes(kind)) { const startTarget = bindableAt(objects, point); const start = startTarget ? connectionPoint(startTarget, point) : point; return { id: objectId(), kind, x: start.x, y: start.y, x2: start.x, y2: start.y, annotations: defaultAnnotations(kind), bindings: startTarget ? { startId: startTarget.id } : undefined, style: drawingStyle }; }
     return { id: objectId(), kind, x: point.x, y: point.y, width: 0, height: 0, style: drawingStyle };
@@ -874,7 +883,7 @@ export default function Home() {
 
   const addFunction = () => {
     const [xMin, xMax] = xRange.split(":").map(Number); const [yMin, yMax] = yRange.split(":").map(Number); const expressions = expression.split(";").map((value) => value.trim()).filter(Boolean);
-    const next: CanvasObject = { id: objectId(), kind: "axes", x: 90, y: 80, width: 520, height: 360, graph: { expression: expressions[0] ?? "", expressions, xMin, xMax, yMin, yMax, xLabel: "x", yLabel: "y", showGrid: true }, style: drawingStyle };
+    const next: CanvasObject = { id: objectId(), kind: "axes", x: 90, y: 80, width: 520, height: 360, graph: { expression: expressions[0] ?? "", expressions, xMin, xMax, yMin, yMax, xLabel: "x", yLabel: "y", showGrid: false }, style: drawingStyle };
     if (!expressions.length || !Number.isFinite(xMin) || !Number.isFinite(xMax) || !Number.isFinite(yMin) || !Number.isFinite(yMax) || graphPathsFor(next).length !== expressions.length) { setNotice("Expression ou domaine invalide. Séparez plusieurs fonctions par un point-virgule."); return; }
     commitObjects([...objects, next], "Graphe ajouté."); setSelectedIds([next.id]);
   };
@@ -910,9 +919,10 @@ export default function Home() {
   const copyLatex = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copié."); };
   const exportSvg = async () => { if (!svgRef.current) return; try { const copy = await cleanSvg(svgRef.current, settings.width, settings.height); downloadText("schema-mpsi.svg", new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("SVG vectoriel exporté."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export SVG impossible."); } };
   const exportPdf = async () => {
+    const pageWidth = canvasUnitsToPoints(settings.width); const pageHeight = canvasUnitsToPoints(settings.height);
     if (!svgRef.current) return; setNotice("Création du PDF vectoriel…");
-    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); const svg = await cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: settings.width, height: settings.height }); pdf.save("schema-mpsi.pdf"); setNotice("PDF vectoriel exporté sans poignées de sélection."); }
-    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(await cleanSvg(svgRef.current!, settings.width, settings.height)); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [settings.width, settings.height] }); pdf.addImage(image, "PNG", 0, 0, settings.width, settings.height); pdf.save("schema-mpsi.pdf"); setNotice("PDF exporté en mode de compatibilité."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export PDF impossible."); } }
+    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); const svg = await cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: pageWidth, height: pageHeight }); pdf.save("schema-mpsi.pdf"); setNotice("PDF vectoriel exporté sans poignées de sélection."); }
+    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(await cleanSvg(svgRef.current!, settings.width, settings.height), settings.width, settings.height); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); pdf.addImage(image, "PNG", 0, 0, pageWidth, pageHeight); pdf.save("schema-mpsi.pdf"); setNotice("PDF exporté en mode de compatibilité."); } catch (error) { setNotice(error instanceof Error ? error.message : "Export PDF impossible."); } }
   };
 
   const clearCanvas = () => { if (!objects.length || !window.confirm("Effacer tout le canevas ? Vous pourrez encore utiliser Annuler.")) return; commitObjects([], "Canevas effacé. Cliquez sur Annuler pour le restaurer."); setSelectedIds([]); };
@@ -942,10 +952,10 @@ export default function Home() {
       </aside>
       <section className="canvas-column">
         {selectedIds.length > 1 && <div className="selection-toolbar"><strong>{selectedIds.length} objets</strong><button onClick={groupSelection}>Grouper</button><button onClick={ungroupSelection}>Dissocier</button><button onClick={() => alignSelection("left")}>Aligner à gauche</button><button onClick={() => alignSelection("center")}>Centrer horizontalement</button><button onClick={() => alignSelection("top")}>Aligner en haut</button><button onClick={() => alignSelection("middle")}>Centrer verticalement</button><button onClick={() => reorder(true)}>Premier plan</button><button onClick={() => reorder(false)}>Arrière-plan</button></div>}
-        <div className={`canvas-wrap tool-${tool}`}><svg ref={svgRef} tabIndex={0} viewBox={`${view.x} ${view.y} ${settings.width / view.zoom} ${settings.height / view.zoom}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDoubleClick={onDoubleClick} onWheel={onWheel} aria-label="Canevas scientifique interactif">
-          <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker><pattern id="small-grid" width={settings.gridSize} height={settings.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${settings.gridSize} 0 L 0 0 0 ${settings.gridSize}`} fill="none" stroke="#d8dde3" strokeWidth="1" /></pattern></defs>
+        <div className={`canvas-wrap tool-${tool}`}><svg ref={svgRef} tabIndex={0} shapeRendering="geometricPrecision" viewBox={`${view.x} ${view.y} ${settings.width / view.zoom} ${settings.height / view.zoom}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDoubleClick={onDoubleClick} onWheel={onWheel} aria-label="Canevas scientifique interactif">
+          <defs><marker id="arrowhead" viewBox={`0 0 ${CONCOURS_ARROW.length} ${CONCOURS_ARROW.width}`} refX={CONCOURS_ARROW.length - .5} refY={CONCOURS_ARROW.width / 2} markerWidth={CONCOURS_ARROW.length} markerHeight={CONCOURS_ARROW.width} markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d={`M 0 0 L ${CONCOURS_ARROW.length} ${CONCOURS_ARROW.width / 2} L 0 ${CONCOURS_ARROW.width} z`} fill="context-stroke" /></marker><pattern id="small-grid" width={settings.gridSize} height={settings.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${settings.gridSize} 0 L 0 0 0 ${settings.gridSize}`} fill="none" stroke="#d8dde3" strokeWidth="1" /></pattern></defs>
           <rect width={settings.width} height={settings.height} fill="white" />{settings.showGrid && <rect data-export-ignore="true" width={settings.width} height={settings.height} fill="url(#small-grid)" />}
-          {objects.map((object) => object.hidden ? null : <g key={object.id} data-id={object.id} transform={transformFor(object)} opacity={object.locked ? .55 : 1}>{preview(object, selectedIds.includes(object.id))}</g>)}
+          {objects.map((object) => object.hidden ? null : <g key={object.id} data-id={object.id} className={`diagram-object${object.locked ? " editor-locked" : ""}`} transform={transformFor(object)}>{preview(object, selectedIds.includes(object.id))}</g>)}
           {selectedObjects.map(renderSelectionHandles)}
           {draft && <g opacity=".6" transform={transformFor(draft)}>{preview(draft, true)}</g>}
           {marquee && <rect data-export-ignore="true" className="marquee" x={Math.min(marquee.start.x, marquee.end.x)} y={Math.min(marquee.start.y, marquee.end.y)} width={Math.abs(marquee.end.x - marquee.start.x)} height={Math.abs(marquee.end.y - marquee.start.y)} />}
