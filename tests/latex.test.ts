@@ -9,6 +9,7 @@ import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
+import { scientificSceneFor, scientificSceneToTikz } from "../app/lib/scientific-scene";
 
 test("exports circuit connectors with the exact canvas geometry", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
@@ -293,4 +294,45 @@ test("preserves named terminal bindings in generated metadata", () => {
   ];
   assert.deepEqual(objectsFromLatex(documentFor(objects), objects).objects, objects);
   assert.match(documentFor(objects), /"endPort":"start"/);
+});
+
+test("uses one scientific scene for concours mechanics geometry", () => {
+  const frame: CanvasObject = { id: "frame", kind: "reference-frame", x: 100, y: 80, width: 200, height: 120, annotations: { origin: "O", x: "x", y: "y" } };
+  const scene = scientificSceneFor(frame);
+  assert.ok(scene);
+  assert.equal(scene.length, 6);
+  const tikz = scientificSceneToTikz(scene);
+  assert.match(tikz, /\\draw\[-\{Latex\}\] \(2\.80,-3\.47\) -- \(5\.36,-3\.47\);/);
+  assert.match(tikz, /\\fill \(2\.80,-3\.47\) circle \(0\.04\);/);
+  assert.match(objectToLatex(frame), /\\node at \(2\.60,-3\.81\) \{\$O\$\};/);
+});
+
+test("keeps shared mechanics geometry faithful to independent width and height", () => {
+  const pendulum: CanvasObject = { id: "p", kind: "pendulum", x: 20, y: 30, width: 80, height: 200 };
+  const output = objectToLatex(pendulum);
+  assert.match(output, /\\draw \(1\.20,-0\.72\) -- \(1\.20,-3\.48\);/);
+  assert.match(output, /circle \(0\.27\)/);
+  assert.deepEqual(roundTripReport(documentFor([pendulum]), [pendulum]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("uses French vector notation for concours field diagrams", () => {
+  const gravity = objectToLatex({ id: "g", kind: "gravity-field", x: 0, y: 0, width: 100, height: 80, annotations: { main: "g" } });
+  const electric = objectToLatex({ id: "e", kind: "electric-field", x: 0, y: 0, width: 100, height: 80, annotations: { main: "E" } });
+  const magnetic = objectToLatex({ id: "b", kind: "magnetic-field-in", x: 0, y: 0, width: 90, height: 75 });
+  assert.match(gravity, /\{\$\\vec\{g\}\$\}/);
+  assert.match(electric, /\{\$\\vec\{E\}\$\}/);
+  assert.equal((magnetic.match(/\$\\otimes\$/g) ?? []).length, 6);
+  assert.match(magnetic, /\{\$\\vec\{B\}\$\}/);
+});
+
+test("shares exact electromagnetic apparatus geometry across renderers", () => {
+  const solenoid = objectToLatex({ id: "s", kind: "solenoid", x: 0, y: 0, width: 130, height: 80 });
+  const rails = objectToLatex({ id: "rails", kind: "laplace-rails", x: 0, y: 0, width: 140, height: 90, annotations: { velocity: "v" } });
+  const magnet = objectToLatex({ id: "magnet", kind: "bar-magnet", x: 0, y: 0, width: 110, height: 48, annotations: { north: "N", south: "S" } });
+  assert.equal((solenoid.match(/ellipse/g) ?? []).length, 6);
+  assert.match(solenoid, /\\draw \(0\.04,-0\.80\) -- \(0\.10,-0\.80\);/);
+  assert.match(rails, /line width=2\.27pt/);
+  assert.match(rails, /\{\$\\vec\{v\}\$\}/);
+  assert.match(rails, /\{\$\\vec\{B\}\$\}/);
+  assert.match(magnet, /\\draw \(1\.10,-0\.19\) -- \(1\.10,-0\.77\);/);
 });

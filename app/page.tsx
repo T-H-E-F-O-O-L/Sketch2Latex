@@ -12,6 +12,7 @@ import { isCompleteAopConfiguration, makeAopCircuit } from "./lib/aop-circuits";
 import { circuitGeometry } from "./lib/circuit-geometry";
 import { CONCOURS_ARROW, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor, pointOnWireAt, portFor, portsFor } from "./lib/connection-geometry";
+import { scientificSceneFor, type ScientificPrimitive } from "./lib/scientific-scene";
 import { graphPathFor, graphPathsFor } from "./lib/graph";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
@@ -274,11 +275,31 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd={markerEnd} markerStart={markerStart} strokeDasharray={dashed} />{label && <text x={midX + 8 * px} y={midY + 8 * py} fontSize="14">{label}</text>}</g>;
 }
 
+function scientificScenePreview(scene: ScientificPrimitive[], object: CanvasObject, selected: boolean) {
+  const color = strokeFor(object); const baseWidth = strokeWidthFor(object, selected); const fillFor = (fill?: "none" | "paper" | "ink" | "light") => fill === "ink" ? color : fill === "paper" ? "white" : fill === "light" ? "#e6e6e6" : "none";
+  return <g>{scene.map((primitive, index) => {
+    if (primitive.type === "line") return <line key={index} x1={primitive.x1} y1={primitive.y1} x2={primitive.x2} y2={primitive.y2} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill="none" markerEnd={primitive.arrowEnd ? "url(#arrowhead)" : undefined} />;
+    if (primitive.type === "circle") return <circle key={index} cx={primitive.cx} cy={primitive.cy} r={primitive.r} stroke={primitive.fill === "ink" ? "none" : color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
+    if (primitive.type === "ellipse") return <ellipse key={index} cx={primitive.cx} cy={primitive.cy} rx={primitive.rx} ry={primitive.ry} stroke={primitive.fill === "ink" ? "none" : color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
+    if (primitive.type === "rect") return <rect key={index} x={primitive.x} y={primitive.y} width={primitive.width} height={primitive.height} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
+    if (primitive.type === "arc") {
+      const start = { x: primitive.cx + Math.cos((primitive.start * Math.PI) / 180) * primitive.r, y: primitive.cy + Math.sin((primitive.start * Math.PI) / 180) * primitive.r }; const finish = { x: primitive.cx + Math.cos((primitive.end * Math.PI) / 180) * primitive.r, y: primitive.cy + Math.sin((primitive.end * Math.PI) / 180) * primitive.r }; const large = Math.abs(primitive.end - primitive.start) > 180 ? 1 : 0;
+      return <path key={index} d={`M ${start.x} ${start.y} A ${primitive.r} ${primitive.r} 0 ${large} 1 ${finish.x} ${finish.y}`} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill="none" markerEnd={primitive.arrowEnd ? "url(#arrowhead)" : undefined} />;
+    }
+    const text = <text className="diagram-label" x={primitive.x} y={primitive.y} textAnchor={primitive.anchor ?? "middle"} fontSize={primitive.fontSize ?? 14} fill={color}>{primitive.value}</text>;
+    if (!primitive.vector) return <g key={index}>{text}</g>;
+    const length = Math.max(8, (primitive.fontSize ?? 14) * .7); const arrowY = primitive.y - (primitive.fontSize ?? 14) * .86;
+    return <g key={index}>{text}<line x1={primitive.x - length / 2} y1={arrowY} x2={primitive.x + length / 2} y2={arrowY} stroke={color} strokeWidth="1" markerEnd="url(#arrowhead)" /></g>;
+  })}</g>;
+}
+
 function stampPreview(object: CanvasObject, selected: boolean) {
   const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
   const x = object.x; const y = object.y; const w = object.width ?? 80; const h = object.height ?? 80; const cx = x + w / 2; const cy = y + h / 2;
   const text = (value: string, tx = cx, ty = cy + 5, fontSize = 13) => <text x={tx} y={ty} textAnchor="middle" fontSize={fontSize} fill={color} stroke="#fff" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" pointerEvents="all">{value}</text>;
   const a = (key: string, fallback: string) => annotation(object, key, fallback);
+  const scientificScene = scientificSceneFor(object);
+  if (scientificScene) return scientificScenePreview(scientificScene, object, selected);
   if (object.kind === "equation") {
     let html: string;
     const formula = formulaForTypesetting(object.text || "x");

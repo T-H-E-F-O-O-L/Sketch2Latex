@@ -2,6 +2,7 @@ import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObje
 import { circuitGeometry } from "./circuit-geometry";
 import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
+import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
 
 const SCALE = CANVAS_UNITS_PER_CM;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -166,6 +167,8 @@ function stamp(object: CanvasObject) {
 }
 
 function objectToLatexBase(object: CanvasObject): string {
+  const scientificScene = scientificSceneFor(object);
+  if (scientificScene) return scientificSceneToTikz(scientificScene);
   const origin = point(object.x, object.y);
   switch (object.kind) {
     case "line": return `\\draw ${origin} -- ${end(object)};`;
