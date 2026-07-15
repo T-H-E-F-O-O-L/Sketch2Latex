@@ -13,7 +13,7 @@ import { circuitGeometry } from "./lib/circuit-geometry";
 import { CONCOURS_ARROW, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor, pointOnWireAt, portFor, portsFor } from "./lib/connection-geometry";
 import { scientificSceneFor, type ScientificPrimitive } from "./lib/scientific-scene";
-import { graphPathFor, graphPathsFor } from "./lib/graph";
+import { GRAPH_CANVAS_DASHES, graphPathFor, graphPathsFor } from "./lib/graph";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
@@ -387,6 +387,12 @@ function stampPreview(object: CanvasObject, selected: boolean) {
   return <g {...common}><rect x={x} y={y} width={w} height={h} />{text(a("main", labels[object.kind]))}</g>;
 }
 
+function concoursGraphPreview(object: CanvasObject, selected: boolean) {
+  const color = strokeFor(object); const width = object.width ?? 0; const height = object.height ?? 0; const xMin = object.graph?.xMin ?? -5; const xMax = object.graph?.xMax ?? 5; const yMin = object.graph?.yMin ?? -5; const yMax = object.graph?.yMax ?? 5;
+  const verticalAxis = object.x + clamp((0 - xMin) / Math.max(.0001, xMax - xMin), 0, 1) * width; const horizontalAxis = object.y + clamp((yMax - 0) / Math.max(.0001, yMax - yMin), 0, 1) * height; const paths = graphPathsFor(object); const clipId = `graph-clip-${object.id}`; const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
+  return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs>{object.graph?.showGrid === true && Array.from({ length: 9 }, (_, index) => <g key={index} opacity=".14"><line x1={object.x + width * index / 8} y1={object.y} x2={object.x + width * index / 8} y2={object.y + height} stroke={color} /><line x1={object.x} y1={object.y + height * index / 8} x2={object.x + width} y2={object.y + height * index / 8} stroke={color} /></g>)}{paths.map((path, index) => <path key={`${object.id}-${index}`} d={path} fill="none" stroke={color} strokeWidth={strokeWidthFor(object)} strokeDasharray={GRAPH_CANVAS_DASHES[index % GRAPH_CANVAS_DASHES.length]} clipPath={`url(#${clipId})`} pointerEvents="stroke" />)}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text className="diagram-label" x={object.x + width - 4} y={horizontalAxis - 8} textAnchor="end" fontSize="14" fill={color}>{object.graph?.xLabel ?? "x"}</text><text className="diagram-label" x={verticalAxis + 9} y={object.y + 15} fontSize="14" fill={color}>{object.graph?.yLabel ?? "y"}</text></g>;
+}
+
 function preview(object: CanvasObject, selected: boolean) {
   const color = strokeFor(object); const common = { stroke: color, strokeWidth: strokeWidthFor(object, selected), fill: "none", pointerEvents: "stroke" as const };
   if (connectorKinds.includes(object.kind)) return connectorPreview(object, selected);
@@ -395,15 +401,7 @@ function preview(object: CanvasObject, selected: boolean) {
   if (object.kind === "ellipse") return <ellipse {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} rx={Math.abs(object.width ?? 0) / 2} ry={Math.abs(object.height ?? 0) / 2} />;
   if (object.kind === "freehand") return <polyline {...common} points={(object.points ?? []).map((p) => `${p.x},${p.y}`).join(" ")} />;
   if (object.kind === "text") return <text x={object.x} y={object.y} fill={color} fontSize="17" pointerEvents="all">{object.text}</text>;
-  if (object.kind === "axes") {
-    const width = object.width ?? 0; const height = object.height ?? 0; const xMin = object.graph?.xMin ?? -5; const xMax = object.graph?.xMax ?? 5;
-    const verticalAxis = object.x + clamp((0 - xMin) / Math.max(0.0001, xMax - xMin), 0, 1) * width; const yMin = object.graph?.yMin ?? -5; const yMax = object.graph?.yMax ?? 5; const horizontalAxis = object.y + clamp((yMax - 0) / Math.max(.0001, yMax - yMin), 0, 1) * height; const graphPath = graphPathFor(object); const graphPaths = graphPathsFor(object); const clipId = `graph-clip-${object.id}`;
-    if (graphPaths.length > 1) {
-      const colors = [color, "#c62828", "#2e7d32", "#ef6c00", "#6a1b9a"];
-      return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} />{object.graph?.showGrid === true && Array.from({ length: 9 }, (_, index) => <g key={index} opacity=".12"><line x1={object.x + width * index / 8} y1={object.y} x2={object.x + width * index / 8} y2={object.y + height} stroke={color} /><line x1={object.x} y1={object.y + height * index / 8} x2={object.x + width} y2={object.y + height * index / 8} stroke={color} /></g>)}{graphPaths.map((path, index) => <path key={path} d={path} fill="none" stroke={colors[index % colors.length]} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />)}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /></g>;
-    }
-    return <g><defs><clipPath id={clipId}><rect x={object.x} y={object.y} width={width} height={height} /></clipPath></defs><rect {...common} x={object.x} y={object.y} width={width} height={height} />{graphPath && <path d={graphPath} fill="none" stroke={color} strokeWidth={strokeWidthFor(object)} clipPath={`url(#${clipId})`} pointerEvents="stroke" />}<line {...common} x1={object.x} y1={horizontalAxis} x2={object.x + width} y2={horizontalAxis} markerEnd="url(#arrowhead)" /><line {...common} x1={verticalAxis} y1={object.y + height} x2={verticalAxis} y2={object.y} markerEnd="url(#arrowhead)" /><text x={object.x + 8} y={object.y + 20} fontSize="14" fill={color}>{object.graph?.expression ? `y = ${object.graph.expression}` : "repère"}</text></g>;
-  }
+  if (object.kind === "axes") return concoursGraphPreview(object, selected);
   return stampPreview(object, selected);
 }
 

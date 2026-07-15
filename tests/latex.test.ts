@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
 import { makeAopCircuit, type AopConfiguration } from "../app/lib/aop-circuits";
-import { graphPathFor } from "../app/lib/graph";
+import { graphPathFor, graphPointSetsFor } from "../app/lib/graph";
 import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from "../app/lib/latex";
 import { parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
@@ -41,10 +41,11 @@ test("exports the other electrical symbols without Circuitikz substitutions", ()
   for (const output of [capacitor, battery, circuitSwitch]) assert.doesNotMatch(output, /to\[/);
 });
 
-test("flips canvas y coordinates and anchors graph bounds", () => {
+test("flips canvas y coordinates and clips shared graph geometry", () => {
   const output = objectToLatex({ id: "g1", kind: "axes", x: 50, y: 350, width: 250, height: 180, graph: { expression: "x^2", xMin: -5, xMax: 5 } });
-  assert.match(output, /at=\{\(1\.00,-7\.00\)\}, anchor=north west/);
-  assert.match(output, /\\addplot\[domain=-5:5, samples=100, smooth\] \{x\^2\};/);
+  assert.match(output, /\\clip \(1\.00,-7\.00\) rectangle \(6\.00,-10\.60\);/);
+  assert.match(output, /\\draw\[solid\] plot coordinates/);
+  assert.doesNotMatch(output, /\\addplot|\\begin\{axis\}/);
 });
 
 test("creates a visible canvas path for supported graph expressions", () => {
@@ -209,6 +210,20 @@ test("round-trips equations and protected TikZ without losing source", () => {
   assert.match(source, /\$\\int_0\^1/);
   assert.match(source, /\\shade\[ball color=red\]/);
   assert.deepEqual(roundTripReport(source, objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("uses monochrome concours line styles and identical sampled graph points", () => {
+  const graph: CanvasObject = { id: "multi", kind: "axes", x: 100, y: 80, width: 320, height: 220, graph: { expression: "sin(x)", expressions: ["sin(x)", "cos(x)", "0.2*x^2-1"], xMin: -5, xMax: 5, yMin: -3, yMax: 3, xLabel: "t", yLabel: "u", showGrid: true } };
+  const sets = graphPointSetsFor(graph); const output = objectToLatex(graph);
+  assert.equal(sets.length, 3);
+  assert.ok(sets.every((segments) => segments.flat().length > 100));
+  assert.match(output, /\\draw\[solid\] plot coordinates/);
+  assert.match(output, /\\draw\[dash pattern=on 4pt off 2pt\] plot coordinates/);
+  assert.match(output, /\\draw\[densely dotted\] plot coordinates/);
+  assert.equal((output.match(/\\draw\[gray!30\]/g) ?? []).length, 18);
+  assert.doesNotMatch(output, /color=blue|color=red|green!|orange|violet/);
+  assert.match(output, /\{\$t\$\}/);
+  assert.match(output, /\{\$u\$\}/);
 });
 
 test("keeps spaces when a plain-text formula is exported", () => {

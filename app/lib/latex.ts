@@ -3,6 +3,7 @@ import { circuitGeometry } from "./circuit-geometry";
 import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
+import { GRAPH_TIKZ_STYLES, graphPointSetsFor } from "./graph";
 
 const SCALE = CANVAS_UNITS_PER_CM;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -217,11 +218,14 @@ function objectToLatexBase(object: CanvasObject): string {
     case "raw-tikz": return object.rawTikz?.trim() ?? "";
     case "freehand": { const points = simplify(object.points ?? []); return points.length > 1 ? `\\draw[smooth, tension=0.7] plot coordinates {${points.map((p) => point(p.x, p.y)).join(" ")}};` : ""; }
     case "axes": {
-      const width = n(object.width ?? 250); const height = n(object.height ?? 180); const graph = object.graph;
-      const expressions = graph?.expressions?.length ? graph.expressions : graph?.expression?.trim() ? [graph.expression.trim()] : [];
-      const domain = `${graph?.xMin ?? -5}:${graph?.xMax ?? 5}`;
-      const plots = expressions.map((expression, index) => `  \\addplot[domain=${domain}, samples=100, smooth${expressions.length > 1 ? `, color=${["blue", "red", "green!60!black", "orange", "violet"][index % 5]}` : ""}] {${expression}};`).join("\n");
-      return `\\begin{axis}[at={${origin}}, anchor=north west, width=${width}cm, height=${height}cm, xmin=${graph?.xMin ?? -5}, xmax=${graph?.xMax ?? 5}, ymin=${graph?.yMin ?? -5}, ymax=${graph?.yMax ?? 5}, axis lines=middle, grid=${graph?.showGrid === true ? "both" : "none"}, xlabel={${safeText(graph?.xLabel ?? "$x$")}}, ylabel={${safeText(graph?.yLabel ?? "$y$")}}]\n${plots}\n\\end{axis}`;
+      const width = object.width ?? 250; const height = object.height ?? 180; const graph = object.graph; const xMin = graph?.xMin ?? -5; const xMax = graph?.xMax ?? 5; const yMin = graph?.yMin ?? -5; const yMax = graph?.yMax ?? 5;
+      const clampRatio = (ratio: number) => Math.max(0, Math.min(1, ratio)); const verticalAxis = object.x + clampRatio((0 - xMin) / Math.max(.0001, xMax - xMin)) * width; const horizontalAxis = object.y + clampRatio((yMax - 0) / Math.max(.0001, yMax - yMin)) * height;
+      const grid = graph?.showGrid === true ? Array.from({ length: 9 }, (_, index) => {
+        const gridX = object.x + width * index / 8; const gridY = object.y + height * index / 8;
+        return `\\draw[gray!30] ${point(gridX, object.y)} -- ${point(gridX, object.y + height)};\n\\draw[gray!30] ${point(object.x, gridY)} -- ${point(object.x + width, gridY)};`;
+      }).join("\n") : "";
+      const plots = graphPointSetsFor(object).flatMap((segments, index) => segments.map((segment) => `\\draw[${GRAPH_TIKZ_STYLES[index % GRAPH_TIKZ_STYLES.length]}] plot coordinates {${segment.map((coordinate) => point(coordinate.x, coordinate.y)).join(" ")}};`)).join("\n");
+      return `\\begin{scope}\n\\clip ${point(object.x, object.y)} rectangle ${point(object.x + width, object.y + height)};\n${grid}\n${plots}\n\\end{scope}\n\\draw[-{Latex}] ${point(object.x, horizontalAxis)} -- ${point(object.x + width, horizontalAxis)};\n\\draw[-{Latex}] ${point(verticalAxis, object.y + height)} -- ${point(verticalAxis, object.y)};\n\\node[anchor=south east] at ${point(object.x + width - 4, horizontalAxis - 8)} {${componentLabel(graph?.xLabel ?? "x")}};\n\\node[anchor=west] at ${point(verticalAxis + 9, object.y + 15)} {${componentLabel(graph?.yLabel ?? "y")}};`;
     }
     default: return stamp(object);
   }

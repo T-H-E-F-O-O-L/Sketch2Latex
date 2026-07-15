@@ -1,4 +1,4 @@
-import type { CanvasObject } from "./canvas-types";
+import type { CanvasObject, Point } from "./canvas-types";
 
 const functions = ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "sqrt", "abs", "exp"];
 const allowedNames = new Set(["x", "pi", "e", "deg", "ln", "log", ...functions]);
@@ -31,7 +31,7 @@ function compileExpression(expression: string): Evaluator | undefined {
   } catch { return undefined; }
 }
 
-function pathForExpression(object: CanvasObject, expression: string): string | undefined {
+function segmentsForExpression(object: CanvasObject, expression: string): Point[][] | undefined {
   const graph = object.graph; const width = object.width ?? 0; const height = object.height ?? 0;
   if (!graph || width <= 0 || height <= 0 || !(graph.xMax > graph.xMin)) return undefined;
   const evaluate = compileExpression(expression);
@@ -39,19 +39,29 @@ function pathForExpression(object: CanvasObject, expression: string): string | u
 
   const yMin = graph.yMin ?? -5; const yMax = graph.yMax ?? 5;
   if (!(yMax > yMin)) return undefined;
-  const samples = 180; let drawing = false; const path: string[] = [];
+  const samples = 240; const segments: Point[][] = []; let segment: Point[] = [];
   for (let index = 0; index <= samples; index += 1) {
     const ratio = index / samples; const xValue = graph.xMin + (graph.xMax - graph.xMin) * ratio; const value = evaluate(xValue);
-    if (value === undefined || Math.abs(value) > 1_000_000) { drawing = false; continue; }
+    if (value === undefined || value < yMin || value > yMax) { if (segment.length > 1) segments.push(segment); segment = []; continue; }
     const x = object.x + width * ratio; const y = object.y + height * (yMax - value) / (yMax - yMin);
-    path.push(`${drawing ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`); drawing = true;
+    const previous = segment.at(-1);
+    if (previous && Math.abs(previous.y - y) > height * .45) { if (segment.length > 1) segments.push(segment); segment = []; }
+    segment.push({ x, y });
   }
-  return path.length ? path.join(" ") : undefined;
+  if (segment.length > 1) segments.push(segment);
+  return segments.length ? segments : undefined;
+}
+
+export const GRAPH_CANVAS_DASHES = [undefined, "8 4", "2 3", "10 3 2 3"] as const;
+export const GRAPH_TIKZ_STYLES = ["solid", "dash pattern=on 4pt off 2pt", "densely dotted", "dash dot"] as const;
+
+export function graphPointSetsFor(object: CanvasObject): Point[][][] {
+  const expressions = object.graph?.expressions?.length ? object.graph.expressions : object.graph?.expression ? [object.graph.expression] : [];
+  return expressions.map((expression) => segmentsForExpression(object, expression) ?? []).filter((segments) => segments.length > 0);
 }
 
 export function graphPathsFor(object: CanvasObject): string[] {
-  const expressions = object.graph?.expressions?.length ? object.graph.expressions : object.graph?.expression ? [object.graph.expression] : [];
-  return expressions.map((expression) => pathForExpression(object, expression)).filter((path): path is string => Boolean(path));
+  return graphPointSetsFor(object).map((segments) => segments.map((segment) => segment.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ")).join(" "));
 }
 
 export function graphPathFor(object: CanvasObject): string | undefined {
