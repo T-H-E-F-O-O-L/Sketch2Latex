@@ -232,6 +232,10 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   const dx = x2 - object.x; const dy = y2 - object.y; const length = Math.hypot(dx, dy) || 1;
   const ux = dx / length; const uy = dy / length; const px = -uy; const py = ux;
   const rotation = Math.atan2(dy, dx) * 180 / Math.PI;
+  const vectorLabel = (value: string, x: number, y: number) => {
+    const arrowLength = Math.max(10, Array.from(value).length * 7); const arrowY = y - 15;
+    return <g><text className="diagram-label" x={x} y={y} textAnchor="middle" fill={color}>{value}</text><line x1={x - arrowLength / 2} y1={arrowY} x2={x + arrowLength / 2} y2={arrowY} stroke={color} strokeWidth="1" markerEnd="url(#arrowhead)" /></g>;
+  };
   if (object.kind === "curve") {
     const control = object.control ?? { x: midX, y: midY };
     return <path {...common} d={`M ${object.x} ${object.y} Q ${control.x} ${control.y} ${x2} ${y2}`} />;
@@ -265,9 +269,9 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
   if (object.kind === "force" || object.kind === "arrow") {
     const label = a("main", object.kind === "force" ? "F" : "").trim();
-    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && <text className="diagram-label" x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fill={color}>{label}</text>}</g>;
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX + 9 * px, midY + 9 * py) : <text className="diagram-label" x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fill={color}>{label}</text>)}</g>;
   }
-  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} /><text className="diagram-label" x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fill={color}>{a("main", "\u03bc")}</text></g>;
+  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX + 9 * px, midY + 9 * py)}</g>;
   const markerEnd = ["arrow", "force", "light-ray", "heat-arrow", "work-arrow", "reaction-arrow", "dipole"].includes(object.kind) ? "url(#arrowhead)" : undefined;
   const markerStart = object.kind === "equilibrium-arrow" ? "url(#arrowhead)" : undefined;
   const dashed = object.kind === "hydrogen-bond" ? "5 4" : undefined;

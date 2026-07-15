@@ -268,10 +268,13 @@ test("uses one physical page scale for SVG, PDF and TikZ", () => {
 
 test("exports semantic French scientific arrows", () => {
   const force = objectToLatex({ id: "f", kind: "force", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "F" } });
+  const indexedForce = objectToLatex({ id: "f1", kind: "force", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "F₁" } });
   const equilibrium = objectToLatex({ id: "eq", kind: "equilibrium-arrow", x: 0, y: 0, x2: 100, y2: 0 });
   const dipole = objectToLatex({ id: "mu", kind: "dipole", x: 0, y: 0, x2: 100, y2: 0 });
-  assert.match(force, /node\[midway,above\] \{\$F\$\}/);
+  assert.match(force, /node\[midway,above\] \{\$\\vec\{F\}\$\}/);
+  assert.match(indexedForce, /node\[midway,above\] \{\$\\vec\{F\}_\{1\}\$\}/);
   assert.equal((equilibrium.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 2);
+  assert.match(dipole, /node\[midway,above\] \{\$\\vec\{μ\}\$\}/);
   assert.match(dipole, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\)/);
 });
 

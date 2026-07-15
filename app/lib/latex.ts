@@ -29,6 +29,13 @@ function componentLabel(value: string) {
   return underscore ? `$${safeText(underscore[1])}_{${safeText(underscore[2])}}$` : `$${safeText(value)}$`;
 }
 
+function vectorComponentLabel(value: string) {
+  const label = componentLabel(value); const math = label.match(/^\$([\s\S]*)\$$/)?.[1] ?? safeText(value);
+  if (/^\\(?:vec|overrightarrow)\{/.test(math)) return `$${math}$`;
+  const subscript = math.match(/^(.*?)(_\{[^{}]+\}|_.+)$/);
+  return subscript ? `$\\vec{${subscript[1]}}${subscript[2]}$` : `$\\vec{${math}}$`;
+}
+
 function simplify(points: Point[], tolerance = 1.5): Point[] {
   if (points.length < 3) return points;
   const first = points[0]; const last = points[points.length - 1];
@@ -183,7 +190,7 @@ function objectToLatexBase(object: CanvasObject): string {
     }
     case "arrow": case "force": case "light-ray": {
       const label = annotation(object, "main", object.kind === "force" ? "F" : "").trim();
-      return `\\draw[-{Latex}] ${origin} -- ${end(object)}${label ? ` node[midway,above] {${componentLabel(label)}}` : ""};`;
+      return `\\draw[-{Latex}] ${origin} -- ${end(object)}${label ? ` node[midway,above] {${object.kind === "force" ? vectorComponentLabel(label) : componentLabel(label)}}` : ""};`;
     }
     case "double-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
     case "dimension": return `\\draw[|<->|] ${origin} -- ${end(object)} node[midway,above,fill=white,inner sep=1pt] {${componentLabel(annotation(object, "main", "d"))}};`;
@@ -205,7 +212,7 @@ function objectToLatexBase(object: CanvasObject): string {
     case "hydrogen-bond": return `\\draw[dashed] ${origin} -- ${end(object)};`;
     case "dipole": {
       const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2);
-      return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0) -- (${halfLength},0) node[midway,above] {${componentLabel(annotation(object, "main", "μ"))}};\n\\draw (-${halfLength},-0.10) -- (-${halfLength},0.10);`);
+      return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0) -- (${halfLength},0) node[midway,above] {${vectorComponentLabel(annotation(object, "main", "μ"))}};\n\\draw (-${halfLength},-0.10) -- (-${halfLength},0.10);`);
     }
     case "bond-single": return bondLines(object, 1);
     case "bond-double": return bondLines(object, 2);
