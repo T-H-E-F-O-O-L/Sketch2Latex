@@ -130,6 +130,8 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .control-handle { fill: #e8f2ff; }
 .free-point-handle { fill: #fff7d6; stroke: #a56a00; }
 .control-line { fill: none; stroke: #1769aa; stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.snap-port { fill: #fff; stroke: #1769aa; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.circuit-junction { fill: #111; stroke: none; pointer-events: none; }
 .app-shell .canvas-wrap > svg text { font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", "Times New Roman", serif; font-weight: 400; }
 .app-shell .canvas-wrap > svg .diagram-label { font-size: 14px; font-style: italic; font-weight: 400; letter-spacing: .01em; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
 .app-shell .canvas-wrap > svg .diagram-sign { font-size: 17px; font-weight: 400; paint-order: stroke; stroke: #fff; stroke-width: 2px; }

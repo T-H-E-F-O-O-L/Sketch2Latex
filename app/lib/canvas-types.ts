@@ -11,6 +11,7 @@ export type ObjectKind =
   | "beaker" | "flask" | "round-bottom-flask" | "distillation-flask" | "test-tube" | "graduated-cylinder" | "burette" | "volumetric-flask" | "separatory-funnel" | "pipette" | "filter-funnel" | "wash-bottle" | "liebig-condenser" | "support-stand" | "magnetic-stirrer" | "thermometer" | "bunsen-burner";
 
 export type Point = { x: number; y: number };
+export type ConnectionPortName = "start" | "end" | "segment" | "ground" | "inverting" | "non-inverting" | "output";
 
 export type CanvasObject = {
   id: string;
@@ -32,7 +33,7 @@ export type CanvasObject = {
   annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; fill?: string };
   graph?: { expression: string; expressions?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
-  bindings?: { startId?: string; endId?: string };
+  bindings?: { startId?: string; endId?: string; startPort?: ConnectionPortName; endPort?: ConnectionPortName; startRatio?: number; endRatio?: number };
   groupId?: string;
   locked?: boolean;
   hidden?: boolean;

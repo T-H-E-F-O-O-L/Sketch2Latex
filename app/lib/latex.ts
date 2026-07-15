@@ -1,6 +1,7 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
 import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, tikzStrokeWidth } from "./concours-style";
+import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 
 const SCALE = CANVAS_UNITS_PER_CM;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -251,10 +252,12 @@ export function objectToLatex(object: CanvasObject): string {
 }
 
 export function documentFor(objects: CanvasObject[], snippetOnly = false, settings?: DocumentSettings): string {
-  const body = objects.flatMap((object) => {
+  const objectBody = objects.flatMap((object) => {
     const rendered = objectToLatex(object);
     return rendered ? [`% sketch2latex id=${object.id}\n% @sketch2latex ${JSON.stringify(object)}\n  ${rendered}`] : [];
   }).join("\n\n  ");
+  const junctionBody = junctionPointsFor(objects).map((junction) => `\\fill ${point(junction.x, junction.y)} circle (${n(JUNCTION_RADIUS)});`).join("\n");
+  const body = [objectBody, junctionBody].filter(Boolean).join("\n\n  ");
   const unit = settings?.unit ?? "cm";
   const axisUnit = unit === "tikz" ? "cm" : unit;
   const unitScale = unit === "mm" ? 10 : unit === "pt" ? 28.3464567 : 1;
@@ -344,6 +347,16 @@ function annotationsFromLatexBlock(original: CanvasObject, block: string): Canva
 function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
   const withAnnotations = annotationsFromLatexBlock(original, block);
   if (block.includes("\\begin{scope}[cm=")) return withAnnotations;
+  const connectorScopeMatch = connectorKinds.includes(original.kind) ? block.match(/\\begin\{scope\}\[shift=\{\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\},\s*rotate=\s*(-?\d+(?:\.\d+)?)/) : undefined;
+  if (connectorScopeMatch) {
+    const localSource = block.slice((connectorScopeMatch.index ?? 0) + connectorScopeMatch[0].length);
+    const localPoints = pointsFromLatex(localSource); const halfLength = Math.max(0, ...localPoints.map((value) => Math.abs(value.x)));
+    if (halfLength > 0) {
+      const center = { x: Number(connectorScopeMatch[1]) * SCALE, y: -Number(connectorScopeMatch[2]) * SCALE };
+      const angle = (-Number(connectorScopeMatch[3]) * Math.PI) / 180; const dx = Math.cos(angle) * halfLength; const dy = Math.sin(angle) * halfLength;
+      return { ...withAnnotations, x: center.x - dx, y: center.y - dy, x2: center.x + dx, y2: center.y + dy };
+    }
+  }
   const points = pointsFromLatex(block);
   if (original.kind === "curve" && points.length >= 4) {
     const start = points[0]; const control1 = points[1]; const finish = points[3];

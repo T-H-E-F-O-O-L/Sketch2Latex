@@ -7,10 +7,11 @@ import { PointerEvent, useCallback, useEffect, useMemo, useReducer, useRef, useS
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { MathCalculator } from "./components/math-calculator";
-import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type DocumentSettings, type ObjectKind, type Point } from "./lib/canvas-types";
+import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ConnectionPortName, type DocumentSettings, type ObjectKind, type Point } from "./lib/canvas-types";
 import { isCompleteAopConfiguration, makeAopCircuit } from "./lib/aop-circuits";
 import { circuitGeometry } from "./lib/circuit-geometry";
 import { CONCOURS_ARROW, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
+import { JUNCTION_RADIUS, junctionPointsFor, pointOnWireAt, portFor, portsFor } from "./lib/connection-geometry";
 import { graphPathFor, graphPathsFor } from "./lib/graph";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
@@ -392,7 +393,12 @@ function selectionOverlay(object: CanvasObject) {
 
 const deepCloneObjects = (objects: CanvasObject[]) => objects.map((object) => ({ ...object, style: object.style ? { ...object.style } : undefined, annotations: object.annotations ? { ...object.annotations } : undefined, graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined, points: object.points?.map((point) => ({ ...point })), control: object.control ? { ...object.control } : undefined, bindings: object.bindings ? { ...object.bindings } : undefined }));
 
-function connectionPoint(object: CanvasObject, toward: Point): Point {
+type ConnectionTarget = { object: CanvasObject; port?: ConnectionPortName; ratio?: number };
+
+function connectionPoint(object: CanvasObject, toward: Point, port?: ConnectionPortName, ratio?: number): Point {
+  if (port === "segment" && ratio !== undefined) return pointOnWireAt(object, ratio) ?? toward;
+  const terminal = portFor(object, port, toward);
+  if (terminal) return { x: terminal.x, y: terminal.y };
   const bounds = boundsFor(object); const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
   const dx = toward.x - center.x; const dy = toward.y - center.y;
   if (!dx && !dy) return center;
@@ -400,11 +406,26 @@ function connectionPoint(object: CanvasObject, toward: Point): Point {
   return { x: center.x + dx * factor, y: center.y + dy * factor };
 }
 
-function bindableAt(objects: CanvasObject[], point: Point, excludeId?: string) {
-  return [...objects].reverse().find((object) => object.id !== excludeId && !connectorKinds.includes(object.kind) && !object.hidden && !object.locked && (() => {
-    const bounds = boundsFor(object); const dx = Math.max(bounds.x - point.x, 0, point.x - bounds.x - bounds.width); const dy = Math.max(bounds.y - point.y, 0, point.y - bounds.y - bounds.height);
+function bindableAt(objects: CanvasObject[], point: Point, excludeId?: string): ConnectionTarget | undefined {
+  const candidates: Array<ConnectionTarget & { distance: number }> = [];
+  for (const object of objects) {
+    if (object.id === excludeId || object.hidden || object.locked) continue;
+    for (const port of portsFor(object)) candidates.push({ object, port: port.name, distance: Math.hypot(port.x - point.x, port.y - point.y) });
+    if (object.kind === "wire") {
+      const [start, end] = portsFor(object); const dx = end.x - start.x; const dy = end.y - start.y; const lengthSquared = dx * dx + dy * dy;
+      if (lengthSquared > 0) {
+        const ratio = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared, 0, 1); const projected = pointOnWireAt(object, ratio)!;
+        if (ratio > .08 && ratio < .92) candidates.push({ object, port: "segment", ratio, distance: Math.hypot(projected.x - point.x, projected.y - point.y) });
+      }
+    }
+  }
+  const nearest = candidates.filter((target) => target.distance <= 18).toSorted((a, b) => a.distance - b.distance)[0];
+  if (nearest) return { object: nearest.object, port: nearest.port, ratio: nearest.ratio };
+  const object = [...objects].reverse().find((candidate) => candidate.id !== excludeId && !connectorKinds.includes(candidate.kind) && portsFor(candidate).length === 0 && !candidate.hidden && !candidate.locked && (() => {
+    const bounds = boundsFor(candidate); const dx = Math.max(bounds.x - point.x, 0, point.x - bounds.x - bounds.width); const dy = Math.max(bounds.y - point.y, 0, point.y - bounds.y - bounds.height);
     return Math.hypot(dx, dy) <= 28;
   })());
+  return object ? { object } : undefined;
 }
 
 function resolveConnections(objects: CanvasObject[]): CanvasObject[] {
@@ -412,8 +433,8 @@ function resolveConnections(objects: CanvasObject[]): CanvasObject[] {
   return objects.map((object) => {
     if (!connectorKinds.includes(object.kind) || !object.bindings) return object;
     let next = object; const start = object.bindings.startId ? lookup.get(object.bindings.startId) : undefined; const end = object.bindings.endId ? lookup.get(object.bindings.endId) : undefined;
-    if (start) { const point = connectionPoint(start, { x: object.x2 ?? object.x, y: object.y2 ?? object.y }); next = { ...next, x: point.x, y: point.y }; }
-    if (end) { const point = connectionPoint(end, { x: next.x, y: next.y }); next = { ...next, x2: point.x, y2: point.y }; }
+    if (start) { const point = connectionPoint(start, { x: object.x2 ?? object.x, y: object.y2 ?? object.y }, object.bindings.startPort, object.bindings.startRatio); next = { ...next, x: point.x, y: point.y }; }
+    if (end) { const point = connectionPoint(end, { x: next.x, y: next.y }, object.bindings.endPort, object.bindings.endRatio); next = { ...next, x2: point.x, y2: point.y }; }
     return next;
   });
 }
@@ -746,7 +767,7 @@ export default function Home() {
 
   const deleteSelected = useCallback(() => {
     if (!selectedIds.length) return;
-    const ids = new Set(selectedIds); commitObjects(objects.filter((object) => !ids.has(object.id)).map((object) => object.bindings ? { ...object, bindings: { startId: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startId, endId: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endId } } : object), "Sélection supprimée. Utilisez Annuler pour la restaurer."); setSelectedIds([]);
+    const ids = new Set(selectedIds); commitObjects(objects.filter((object) => !ids.has(object.id)).map((object) => object.bindings ? { ...object, bindings: { startId: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startId, startPort: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startPort, startRatio: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startRatio, endId: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endId, endPort: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endPort, endRatio: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endRatio } } : object), "Sélection supprimée. Utilisez Annuler pour la restaurer."); setSelectedIds([]);
   }, [commitObjects, objects, selectedIds]);
 
   const copySelection = useCallback(() => {
@@ -756,7 +777,7 @@ export default function Home() {
   const pasteSelection = useCallback(() => {
     if (!clipboardRef.current.length) return;
     const idMap = new Map(clipboardRef.current.map((object) => [object.id, objectId()]));
-    const pasted = clipboardRef.current.map((object) => ({ ...translateObject(object, 24, 24), id: idMap.get(object.id)!, groupId: object.groupId ? `group-${objectId()}` : undefined, bindings: object.bindings ? { startId: idMap.get(object.bindings.startId ?? ""), endId: idMap.get(object.bindings.endId ?? "") } : undefined }));
+    const pasted = clipboardRef.current.map((object) => ({ ...translateObject(object, 24, 24), id: idMap.get(object.id)!, groupId: object.groupId ? `group-${objectId()}` : undefined, bindings: object.bindings ? { startId: idMap.get(object.bindings.startId ?? ""), startPort: idMap.has(object.bindings.startId ?? "") ? object.bindings.startPort : undefined, startRatio: idMap.has(object.bindings.startId ?? "") ? object.bindings.startRatio : undefined, endId: idMap.get(object.bindings.endId ?? ""), endPort: idMap.has(object.bindings.endId ?? "") ? object.bindings.endPort : undefined, endRatio: idMap.has(object.bindings.endId ?? "") ? object.bindings.endRatio : undefined } : undefined }));
     commitObjects([...objects, ...pasted], "Copie collée avec un décalage de 24 px."); setSelectedIds(pasted.map((object) => object.id));
   }, [commitObjects, objects]);
   const duplicateSelection = useCallback(() => { copySelection(); window.setTimeout(pasteSelection, 0); }, [copySelection, pasteSelection]);
@@ -788,7 +809,7 @@ export default function Home() {
     if (kind === "text") return { id: objectId(), kind, x: point.x, y: point.y, text: "Étiquette", style: drawingStyle };
     if (kind === "axes") return { id: objectId(), kind, x: point.x, y: point.y, width: 300, height: 210, graph: { expression: "", expressions: [], xMin: -5, xMax: 5, yMin: -5, yMax: 5, xLabel: "x", yLabel: "y", showGrid: false }, style: drawingStyle };
     if (kind === "freehand") return { id: objectId(), kind, x: point.x, y: point.y, points: [point], style: drawingStyle };
-    if (connectorKinds.includes(kind)) { const startTarget = bindableAt(objects, point); const start = startTarget ? connectionPoint(startTarget, point) : point; return { id: objectId(), kind, x: start.x, y: start.y, x2: start.x, y2: start.y, annotations: defaultAnnotations(kind), bindings: startTarget ? { startId: startTarget.id } : undefined, style: drawingStyle }; }
+    if (connectorKinds.includes(kind)) { const startTarget = bindableAt(objects, point); const start = startTarget ? connectionPoint(startTarget.object, point, startTarget.port, startTarget.ratio) : point; return { id: objectId(), kind, x: start.x, y: start.y, x2: start.x, y2: start.y, annotations: defaultAnnotations(kind), bindings: startTarget ? { startId: startTarget.object.id, startPort: startTarget.port, startRatio: startTarget.ratio } : undefined, style: drawingStyle }; }
     return { id: objectId(), kind, x: point.x, y: point.y, width: 0, height: 0, style: drawingStyle };
   };
 
@@ -835,8 +856,8 @@ export default function Home() {
         if (object.id !== drag.id) return object;
         if (drag.mode === "resize" && drag.corner) return resizeFromCorner(original, drag.corner, point, event.shiftKey);
         if (drag.mode === "rotate") return { ...original, rotation: Math.round(((original.rotation ?? 0) + (Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 };
-        if (drag.mode === "endpoint-start") return { ...original, x: point.x, y: point.y, bindings: { ...original.bindings, startId: undefined } };
-        if (drag.mode === "endpoint-end") return { ...original, x2: point.x, y2: point.y, bindings: { ...original.bindings, endId: undefined } };
+        if (drag.mode === "endpoint-start") return { ...original, x: point.x, y: point.y, bindings: { ...original.bindings, startId: undefined, startPort: undefined, startRatio: undefined } };
+        if (drag.mode === "endpoint-end") return { ...original, x2: point.x, y2: point.y, bindings: { ...original.bindings, endId: undefined, endPort: undefined, endRatio: undefined } };
         if (drag.mode === "control") return { ...original, control: point };
         if (drag.mode === "free-point" && original.points && drag.pointIndex !== undefined) return { ...original, points: original.points.map((value, index) => index === drag.pointIndex ? point : value) };
         return object;
@@ -854,10 +875,10 @@ export default function Home() {
     const svg = svgRef.current; const point = svg ? canvasPoint(event, svg, settings.width, settings.height) : { x: 0, y: 0 };
     if (panDragRef.current) panDragRef.current = undefined;
     if (marquee) { const x = Math.min(marquee.start.x, marquee.end.x); const y = Math.min(marquee.start.y, marquee.end.y); const width = Math.abs(marquee.end.x - marquee.start.x); const height = Math.abs(marquee.end.y - marquee.start.y); if (width > 4 || height > 4) setSelectedIds(objects.filter((object) => { const bounds = boundsFor(object); return !object.hidden && !object.locked && bounds.x >= x && bounds.y >= y && bounds.x + bounds.width <= x + width && bounds.y + bounds.height <= y + height; }).map((object) => object.id)); setMarquee(undefined); }
-    if (draft && tool !== "curve") { let complete = draft; if (connectorKinds.includes(draft.kind)) { const target = bindableAt(objects, point); if (target) { const end = connectionPoint(target, { x: draft.x, y: draft.y }); complete = { ...draft, x2: end.x, y2: end.y, bindings: { ...draft.bindings, endId: target.id } }; } } commitObjects([...objects, complete], `${labels[complete.kind]} ajouté.`); setSelectedIds([complete.id]); setDraft(undefined); if (!standardDrawingTools.includes(complete.kind)) setTool("select"); }
+    if (draft && tool !== "curve") { let complete = draft; if (connectorKinds.includes(draft.kind)) { const target = bindableAt(objects, point); if (target) { const end = connectionPoint(target.object, { x: draft.x, y: draft.y }, target.port, target.ratio); complete = { ...draft, x2: end.x, y2: end.y, bindings: { ...draft.bindings, endId: target.object.id, endPort: target.port, endRatio: target.ratio } }; } } commitObjects([...objects, complete], `${labels[complete.kind]} ajouté.`); setSelectedIds([complete.id]); setDraft(undefined); if (!standardDrawingTools.includes(complete.kind)) setTool("select"); }
     else if (drag && dragChangedRef.current) {
       let finalObjects = objects;
-      if (drag.mode === "endpoint-start" || drag.mode === "endpoint-end") { const target = bindableAt(objects, point, drag.id); if (target) finalObjects = objects.map((object) => object.id !== drag.id ? object : drag.mode === "endpoint-start" ? { ...object, bindings: { ...object.bindings, startId: target.id } } : { ...object, bindings: { ...object.bindings, endId: target.id } }); }
+      if (drag.mode === "endpoint-start" || drag.mode === "endpoint-end") { const target = bindableAt(objects, point, drag.id); if (target) finalObjects = objects.map((object) => object.id !== drag.id ? object : drag.mode === "endpoint-start" ? { ...object, bindings: { ...object.bindings, startId: target.object.id, startPort: target.port, startRatio: target.ratio } } : { ...object, bindings: { ...object.bindings, endId: target.object.id, endPort: target.port, endRatio: target.ratio } }); }
       dispatchHistory({ type: "transient", objects: resolveConnections(finalObjects) }); dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
     }
     setDrag(undefined); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -956,6 +977,8 @@ export default function Home() {
           <defs><marker id="arrowhead" viewBox={`0 0 ${CONCOURS_ARROW.length} ${CONCOURS_ARROW.width}`} refX={CONCOURS_ARROW.length - .5} refY={CONCOURS_ARROW.width / 2} markerWidth={CONCOURS_ARROW.length} markerHeight={CONCOURS_ARROW.width} markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d={`M 0 0 L ${CONCOURS_ARROW.length} ${CONCOURS_ARROW.width / 2} L 0 ${CONCOURS_ARROW.width} z`} fill="context-stroke" /></marker><pattern id="small-grid" width={settings.gridSize} height={settings.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${settings.gridSize} 0 L 0 0 0 ${settings.gridSize}`} fill="none" stroke="#d8dde3" strokeWidth="1" /></pattern></defs>
           <rect width={settings.width} height={settings.height} fill="white" />{settings.showGrid && <rect data-export-ignore="true" width={settings.width} height={settings.height} fill="url(#small-grid)" />}
           {objects.map((object) => object.hidden ? null : <g key={object.id} data-id={object.id} className={`diagram-object${object.locked ? " editor-locked" : ""}`} transform={transformFor(object)}>{preview(object, selectedIds.includes(object.id))}</g>)}
+          {junctionPointsFor(objects).map((point, index) => <circle key={`junction-${index}`} className="circuit-junction" cx={point.x} cy={point.y} r={JUNCTION_RADIUS} />)}
+          {(connectorKinds.includes(tool as ObjectKind) || drag?.mode === "endpoint-start" || drag?.mode === "endpoint-end") && <g data-export-ignore="true">{objects.filter((object) => !object.hidden && !object.locked).flatMap((object) => portsFor(object).map((port) => <circle key={`port-${object.id}-${port.name}`} className="snap-port" cx={port.x} cy={port.y} r="5" />))}</g>}
           {selectedObjects.map(renderSelectionHandles)}
           {draft && <g opacity=".6" transform={transformFor(draft)}>{preview(draft, true)}</g>}
           {marquee && <rect data-export-ignore="true" className="marquee" x={Math.min(marquee.start.x, marquee.end.x)} y={Math.min(marquee.start.y, marquee.end.y)} width={Math.abs(marquee.end.x - marquee.start.x)} height={Math.abs(marquee.end.y - marquee.start.y)} />}

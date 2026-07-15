@@ -8,6 +8,7 @@ import { parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
+import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
 
 test("exports circuit connectors with the exact canvas geometry", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
@@ -256,4 +257,40 @@ test("exports semantic French scientific arrows", () => {
   assert.match(force, /node\[midway,above\] \{\$F\$\}/);
   assert.equal((equilibrium.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 2);
   assert.match(dipole, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\)/);
+});
+
+test("defines precise named terminals for French circuit symbols", () => {
+  const resistor: CanvasObject = { id: "r", kind: "resistor", x: 20, y: 40, x2: 180, y2: 40 };
+  const ground: CanvasObject = { id: "g", kind: "ground", x: 100, y: 200, width: 44, height: 42 };
+  assert.deepEqual(portsFor(resistor), [{ name: "start", x: 20, y: 40 }, { name: "end", x: 180, y: 40 }]);
+  assert.deepEqual(portsFor(ground), [{ name: "ground", x: 122, y: 200 }]);
+  assert.deepEqual(portsFor({ id: "aop", kind: "op-amp", x: 0, y: 0, width: 150, height: 105 }).map((port) => port.name), ["inverting", "non-inverting", "output"]);
+  assert.deepEqual(portsFor({ id: "rotated", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0, rotation: 90 }).map(({ name, x, y }) => ({ name, x: Math.round(x), y: Math.round(y) })), [{ name: "start", x: 50, y: -50 }, { name: "end", x: 50, y: 50 }]);
+});
+
+test("renders the same automatic circuit junctions in TikZ", () => {
+  const objects: CanvasObject[] = [
+    { id: "w1", kind: "wire", x: 0, y: 0, x2: 100, y2: 0 },
+    { id: "w2", kind: "wire", x: 100, y: 0, x2: 180, y2: 0 },
+    { id: "w3", kind: "wire", x: 100, y: 0, x2: 100, y2: 80 },
+  ];
+  assert.deepEqual(junctionPointsFor(objects), [{ x: 100, y: 0 }]);
+  assert.match(documentFor(objects), /\\fill \(2\.00,0\.00\) circle \(0\.06\);/);
+});
+
+test("supports precise T-junctions on the middle of a wire", () => {
+  const main: CanvasObject = { id: "main", kind: "wire", x: 0, y: 0, x2: 200, y2: 0 };
+  const branch: CanvasObject = { id: "branch", kind: "wire", x: 100, y: 0, x2: 100, y2: 100, bindings: { startId: "main", startPort: "segment", startRatio: .5 } };
+  assert.deepEqual(pointOnWireAt(main, .5), { x: 100, y: 0 });
+  assert.deepEqual(junctionPointsFor([main, branch]), [{ x: 100, y: 0 }]);
+  assert.match(documentFor([main, branch]), /"startPort":"segment","startRatio":0\.5/);
+});
+
+test("preserves named terminal bindings in generated metadata", () => {
+  const objects: CanvasObject[] = [
+    { id: "r", kind: "resistor", x: 100, y: 100, x2: 220, y2: 100 },
+    { id: "w", kind: "wire", x: 20, y: 100, x2: 100, y2: 100, bindings: { endId: "r", endPort: "start" } },
+  ];
+  assert.deepEqual(objectsFromLatex(documentFor(objects), objects).objects, objects);
+  assert.match(documentFor(objects), /"endPort":"start"/);
 });
