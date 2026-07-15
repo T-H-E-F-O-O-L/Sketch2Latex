@@ -4,17 +4,18 @@ import { CANVAS_UNITS_PER_CM, tikzStrokeWidth } from "./concours-style";
 type FillRole = "none" | "paper" | "ink" | "light";
 
 export type ScientificPrimitive =
-  | { type: "line"; x1: number; y1: number; x2: number; y2: number; arrowEnd?: boolean; strokeWidth?: number }
+  | { type: "line"; x1: number; y1: number; x2: number; y2: number; arrowEnd?: boolean; dashed?: boolean; strokeWidth?: number }
   | { type: "circle"; cx: number; cy: number; r: number; fill?: FillRole; strokeWidth?: number }
   | { type: "ellipse"; cx: number; cy: number; rx: number; ry: number; fill?: FillRole; strokeWidth?: number }
   | { type: "rect"; x: number; y: number; width: number; height: number; fill?: FillRole; strokeWidth?: number }
   | { type: "polyline"; points: Point[]; closed?: boolean; fill?: FillRole; strokeWidth?: number }
-  | { type: "bezier"; start: Point; control1: Point; control2: Point; end: Point; arrowEnd?: boolean; strokeWidth?: number }
+  | { type: "bezier"; start: Point; control1: Point; control2: Point; end: Point; arrowEnd?: boolean; dashed?: boolean; strokeWidth?: number }
   | { type: "arc"; cx: number; cy: number; r: number; start: number; end: number; arrowEnd?: boolean; strokeWidth?: number }
-  | { type: "text"; x: number; y: number; value: string; latex?: string; anchor?: "start" | "middle" | "end"; fontSize?: number; vector?: boolean; math?: boolean };
+  | { type: "text"; x: number; y: number; value: string; latex?: string; anchor?: "start" | "middle" | "end"; fontSize?: number; vector?: boolean; math?: boolean | "raw" };
 
 export const sharedScientificKinds: ObjectKind[] = [
   "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
+  "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
 ];
 
 export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] | undefined {
@@ -115,6 +116,152 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     { type: "text", x: cx + 10, y: y + height * .94, value: label("cold", "Qc"), latex: label("cold", "Qc") === "Qc" ? "Q_c" : undefined, anchor: "middle", fontSize: 11 },
     { type: "text", x: x + width * .92, y: cy - 5, value: label("work", "W"), anchor: "middle", fontSize: 11 },
   ];
+  if (object.kind === "ion") return [
+    { type: "circle", cx, cy, r: Math.min(width, height) * .34, fill: "paper" },
+    { type: "text", x: cx, y: cy + 5, value: label("main", "ion"), anchor: "middle", fontSize: 13, math: "raw" },
+  ];
+  if (object.kind === "lone-pair") return [
+    { type: "circle", cx: cx - width * .17, cy, r: Math.max(2.4, Math.min(width, height) * .07), fill: "ink" },
+    { type: "circle", cx: cx + width * .17, cy, r: Math.max(2.4, Math.min(width, height) * .07), fill: "ink" },
+  ];
+  if (object.kind === "crystal-fcc") {
+    const atoms = [[.14, .28], [.72, .28], [.14, .83], [.72, .83], [.36, .1], [.94, .1], [.94, .65], [.43, .55]];
+    return [
+      { type: "rect", x: x + width * .14, y: y + height * .28, width: width * .58, height: height * .55 },
+      { type: "polyline", points: [{ x: x + width * .14, y: y + height * .28 }, { x: x + width * .36, y: y + height * .1 }, { x: x + width * .94, y: y + height * .1 }, { x: x + width * .72, y: y + height * .28 }] },
+      { type: "polyline", points: [{ x: x + width * .72, y: y + height * .28 }, { x: x + width * .94, y: y + height * .1 }, { x: x + width * .94, y: y + height * .65 }, { x: x + width * .72, y: y + height * .83 }] },
+      ...atoms.map(([ax, ay]): ScientificPrimitive => ({ type: "circle", cx: x + width * ax, cy: y + height * ay, r: Math.max(3, Math.min(width, height) * .04), fill: "ink" })),
+    ];
+  }
+  if (object.kind === "precipitate") return [
+    { type: "polyline", points: [{ x: x + width * .22, y: y + height * .88 }, { x: x + width * .78, y: y + height * .88 }, { x: x + width * .73, y: y + height * .67 }, { x: x + width * .27, y: y + height * .67 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .12, y: y + height * .1 }, { x: x + width * .22, y: y + height * .88 }, { x: x + width * .78, y: y + height * .88 }, { x: x + width * .88, y: y + height * .1 }] },
+  ];
+  if (object.kind === "electrochemical-cell") return [
+    { type: "polyline", points: [{ x: x + width * .1, y: y + height * .59 }, { x: x + width * .13, y: y + height * .81 }, { x: x + width * .38, y: y + height * .81 }, { x: x + width * .41, y: y + height * .59 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .59, y: y + height * .59 }, { x: x + width * .62, y: y + height * .81 }, { x: x + width * .87, y: y + height * .81 }, { x: x + width * .9, y: y + height * .59 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .06, y: y + height * .2 }, { x: x + width * .12, y: y + height * .84 }, { x: x + width * .39, y: y + height * .84 }, { x: x + width * .45, y: y + height * .2 }] },
+    { type: "polyline", points: [{ x: x + width * .55, y: y + height * .2 }, { x: x + width * .61, y: y + height * .84 }, { x: x + width * .88, y: y + height * .84 }, { x: x + width * .94, y: y + height * .2 }] },
+    { type: "line", x1: x + width * .25, y1: y + height * .12, x2: x + width * .25, y2: y + height * .72, strokeWidth: 4 },
+    { type: "line", x1: x + width * .75, y1: y + height * .12, x2: x + width * .75, y2: y + height * .72, strokeWidth: 4 },
+    { type: "line", x1: x + width * .31, y1: y + height * .66, x2: x + width * .31, y2: y + height * .35, strokeWidth: 4 },
+    { type: "bezier", start: { x: x + width * .31, y: y + height * .35 }, control1: { x: x + width * .42, y: y + height * .16 }, control2: { x: x + width * .58, y: y + height * .16 }, end: { x: x + width * .69, y: y + height * .35 }, strokeWidth: 4 },
+    { type: "line", x1: x + width * .69, y1: y + height * .35, x2: x + width * .69, y2: y + height * .66, strokeWidth: 4 },
+    { type: "line", x1: x + width * .25, y1: y + height * .12, x2: x + width * .75, y2: y + height * .12, dashed: true },
+    { type: "text", x: x + width * .25, y: y + height * .96, value: label("anode", "anode (-)"), anchor: "middle", fontSize: 11, math: false },
+    { type: "text", x: x + width * .75, y: y + height * .96, value: label("cathode", "cathode (+)"), anchor: "middle", fontSize: 11, math: false },
+    { type: "text", x: cx, y: y + height * .25, value: label("bridge", "pont salin"), anchor: "middle", fontSize: 11, math: false },
+  ];
+  if (object.kind === "beaker") return [
+    { type: "polyline", points: [{ x: x + width * .18, y: y + height * .58 }, { x: x + width * .22, y: y + height * .86 }, { x: x + width * .78, y: y + height * .86 }, { x: x + width * .82, y: y + height * .58 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .14, y: y + height * .1 }, { x: x + width * .2, y: y + height * .9 }, { x: x + width * .8, y: y + height * .9 }, { x: x + width * .86, y: y + height * .1 }] },
+    ...[.32, .44, .56].map((position): ScientificPrimitive => ({ type: "line", x1: x + width * .29, y1: y + height * position, x2: x + width * .38, y2: y + height * position })),
+  ];
+  if (object.kind === "flask") return [
+    { type: "polyline", points: [{ x: x + width * .24, y: y + height * .7 }, { x: x + width * .16, y: y + height * .87 }, { x: x + width * .84, y: y + height * .87 }, { x: x + width * .76, y: y + height * .7 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .42, y: y + height * .06 }, { x: x + width * .42, y: y + height * .32 }, { x: x + width * .14, y: y + height * .9 }, { x: x + width * .86, y: y + height * .9 }, { x: x + width * .58, y: y + height * .32 }, { x: x + width * .58, y: y + height * .06 }] },
+  ];
+  if (object.kind === "round-bottom-flask" || object.kind === "distillation-flask") {
+    const centerX = object.kind === "distillation-flask" ? x + width * .47 : cx; const radius = Math.min(width, height) * (object.kind === "distillation-flask" ? .31 : .35);
+    const scene: ScientificPrimitive[] = [
+      { type: "polyline", points: [{ x: centerX - radius * .72, y: y + height * .68 }, { x: centerX, y: y + height * .78 }, { x: centerX + radius * .72, y: y + height * .68 }], closed: true, fill: "light" },
+      { type: "line", x1: centerX - width * .08, y1: y + height * .06, x2: centerX - width * .08, y2: y + height * .31 },
+      { type: "line", x1: centerX + width * .08, y1: y + height * .06, x2: centerX + width * .08, y2: y + height * .31 },
+      { type: "circle", cx: centerX, cy: y + height * .62, r: radius },
+    ];
+    if (object.kind === "distillation-flask") scene.push(
+      { type: "line", x1: x + width * .67, y1: y + height * .48, x2: x + width * .94, y2: y + height * .34 },
+      { type: "line", x1: x + width * .7, y1: y + height * .57, x2: x + width * .96, y2: y + height * .45 },
+      { type: "line", x1: x + width * .94, y1: y + height * .34, x2: x + width * .96, y2: y + height * .45 },
+    );
+    return scene;
+  }
+  if (object.kind === "test-tube") return [
+    { type: "polyline", points: [{ x: x + width * .38, y: y + height * .63 }, { x: x + width * .38, y: y + height * .72 }, { x: cx, y: y + height * .84 }, { x: x + width * .62, y: y + height * .72 }, { x: x + width * .62, y: y + height * .63 }], closed: true, fill: "light" },
+    { type: "line", x1: x + width * .36, y1: y + height * .06, x2: x + width * .36, y2: y + height * .72 },
+    { type: "bezier", start: { x: x + width * .36, y: y + height * .72 }, control1: { x: x + width * .36, y: y + height * .9 }, control2: { x: x + width * .64, y: y + height * .9 }, end: { x: x + width * .64, y: y + height * .72 } },
+    { type: "line", x1: x + width * .64, y1: y + height * .72, x2: x + width * .64, y2: y + height * .06 },
+  ];
+  if (object.kind === "graduated-cylinder") return [
+    { type: "rect", x: x + width * .34, y: y + height * .58, width: width * .32, height: height * .29, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .32, y: y + height * .05 }, { x: x + width * .35, y: y + height * .87 }, { x: x + width * .65, y: y + height * .87 }, { x: x + width * .68, y: y + height * .05 }] },
+    { type: "line", x1: x + width * .18, y1: y + height * .93, x2: x + width * .82, y2: y + height * .93, strokeWidth: 3 },
+    ...Array.from({ length: 7 }, (_, index): ScientificPrimitive => ({ type: "line", x1: x + width * .35, y1: y + height * (.16 + index * .09), x2: x + width * (index % 2 ? .48 : .44), y2: y + height * (.16 + index * .09) })),
+  ];
+  if (object.kind === "burette") return [
+    { type: "rect", x: x + width * .4, y: y + height * .04, width: width * .2, height: height * .7 },
+    ...Array.from({ length: 8 }, (_, index): ScientificPrimitive => ({ type: "line", x1: x + width * .4, y1: y + height * (.12 + index * .07), x2: x + width * (index % 2 ? .5 : .47), y2: y + height * (.12 + index * .07) })),
+    { type: "circle", cx, cy: y + height * .78, r: width * .11, fill: "paper" },
+    { type: "line", x1: x + width * .25, y1: y + height * .78, x2: x + width * .75, y2: y + height * .78, strokeWidth: 3 },
+    { type: "line", x1: cx, y1: y + height * .89, x2: cx, y2: y + height * .98 },
+  ];
+  if (object.kind === "volumetric-flask") return [
+    { type: "polyline", points: [{ x: x + width * .28, y: y + height * .62 }, { x: x + width * .2, y: y + height * .86 }, { x: x + width * .8, y: y + height * .86 }, { x: x + width * .72, y: y + height * .62 }], closed: true, fill: "light" },
+    { type: "line", x1: x + width * .43, y1: y + height * .05, x2: x + width * .43, y2: y + height * .34 },
+    { type: "line", x1: x + width * .57, y1: y + height * .05, x2: x + width * .57, y2: y + height * .34 },
+    { type: "bezier", start: { x: x + width * .43, y: y + height * .34 }, control1: { x: x + width * .38, y: y + height * .45 }, control2: { x: x + width * .15, y: y + height * .58 }, end: { x: x + width * .2, y: y + height * .82 } },
+    { type: "bezier", start: { x: x + width * .2, y: y + height * .82 }, control1: { x: x + width * .25, y: y + height * .98 }, control2: { x: x + width * .75, y: y + height * .98 }, end: { x: x + width * .8, y: y + height * .82 } },
+    { type: "bezier", start: { x: x + width * .8, y: y + height * .82 }, control1: { x: x + width * .85, y: y + height * .58 }, control2: { x: x + width * .62, y: y + height * .45 }, end: { x: x + width * .57, y: y + height * .34 } },
+    { type: "line", x1: x + width * .35, y1: y + height * .25, x2: x + width * .65, y2: y + height * .25 },
+  ];
+  if (object.kind === "separatory-funnel") return [
+    { type: "rect", x: x + width * .38, y: y + height * .03, width: width * .24, height: height * .1, fill: "paper" },
+    { type: "polyline", points: [{ x: cx, y: y + height * .14 }, { x: x + width * .79, y: y + height * .44 }, { x: cx, y: y + height * .77 }, { x: x + width * .21, y: y + height * .44 }], closed: true },
+    { type: "polyline", points: [{ x: x + width * .3, y: y + height * .56 }, { x: cx, y: y + height * .73 }, { x: x + width * .7, y: y + height * .56 }], closed: true, fill: "light" },
+    { type: "line", x1: x + width * .34, y1: y + height * .78, x2: x + width * .66, y2: y + height * .78 },
+    { type: "circle", cx, cy: y + height * .78, r: width * .09, fill: "paper" },
+    { type: "line", x1: cx, y1: y + height * .87, x2: cx, y2: y + height * .98 },
+  ];
+  if (object.kind === "pipette") return [
+    { type: "line", x1: cx, y1: y + height * .04, x2: cx, y2: y + height * .3 },
+    { type: "ellipse", cx, cy: y + height * .48, rx: width * .18, ry: height * .2 },
+    { type: "line", x1: cx, y1: y + height * .68, x2: cx, y2: y + height * .92 },
+    { type: "polyline", points: [{ x: cx, y: y + height * .98 }, { x: cx - width * .06, y: y + height * .9 }, { x: cx + width * .06, y: y + height * .9 }], closed: true, fill: "ink" },
+    { type: "line", x1: x + width * .36, y1: y + height * .23, x2: x + width * .64, y2: y + height * .23 },
+  ];
+  if (object.kind === "filter-funnel") return [
+    { type: "polyline", points: [{ x: x + width * .24, y: y + height * .16 }, { x: x + width * .76, y: y + height * .16 }, { x: cx, y: y + height * .47 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .12, y: y + height * .1 }, { x: x + width * .88, y: y + height * .1 }, { x: cx, y: y + height * .55 }], closed: true },
+    { type: "line", x1: cx, y1: y + height * .55, x2: cx, y2: y + height * .96 },
+  ];
+  if (object.kind === "wash-bottle") return [
+    { type: "polyline", points: [{ x: x + width * .23, y: y + height * .65 }, { x: x + width * .24, y: y + height * .83 }, { x: cx, y: y + height * .9 }, { x: x + width * .76, y: y + height * .83 }, { x: x + width * .77, y: y + height * .65 }], closed: true, fill: "light" },
+    { type: "bezier", start: { x: x + width * .25, y: y + height * .28 }, control1: { x: x + width * .18, y: y + height * .42 }, control2: { x: x + width * .18, y: y + height * .8 }, end: { x: x + width * .24, y: y + height * .84 } },
+    { type: "bezier", start: { x: x + width * .24, y: y + height * .84 }, control1: { x: x + width * .4, y: y + height * .96 }, control2: { x: x + width * .7, y: y + height * .96 }, end: { x: x + width * .82, y: y + height * .84 } },
+    { type: "bezier", start: { x: x + width * .82, y: y + height * .84 }, control1: { x: x + width * .82, y: y + height * .42 }, control2: { x: x + width * .77, y: y + height * .32 }, end: { x: x + width * .7, y: y + height * .28 } },
+    { type: "polyline", points: [{ x: x + width * .43, y: y + height * .28 }, { x: x + width * .43, y: y + height * .1 }, { x: x + width * .56, y: y + height * .05 }, { x: x + width * .72, y: y + height * .14 }, { x: x + width * .88, y: y + height * .08 }] },
+  ];
+  if (object.kind === "liebig-condenser") return [
+    { type: "rect", x: x + width * .08, y: y + height * .32, width: width * .84, height: height * .36 },
+    { type: "line", x1: x + width * .02, y1: cy, x2: x + width * .98, y2: cy },
+    { type: "line", x1: x + width * .22, y1: y + height * .32, x2: x + width * .14, y2: y + height * .14 },
+    { type: "line", x1: x + width * .78, y1: y + height * .68, x2: x + width * .86, y2: y + height * .86 },
+  ];
+  if (object.kind === "support-stand") return [
+    { type: "rect", x: x + width * .1, y: y + height * .88, width: width * .8, height: height * .08, fill: "light" },
+    { type: "line", x1: x + width * .28, y1: y + height * .88, x2: x + width * .28, y2: y + height * .08, strokeWidth: 4 },
+    { type: "rect", x: x + width * .24, y: y + height * .38, width: width * .16, height: height * .08, fill: "paper" },
+    { type: "line", x1: x + width * .4, y1: y + height * .42, x2: x + width * .78, y2: y + height * .42 },
+    { type: "arc", cx: x + width * .72, cy: y + height * .5, r: Math.min(width, height) * .08, start: -90, end: 90 },
+  ];
+  if (object.kind === "magnetic-stirrer") return [
+    { type: "rect", x: x + width * .08, y: y + height * .72, width: width * .84, height: height * .18, fill: "light" },
+    { type: "circle", cx: x + width * .22, cy: y + height * .81, r: width * .045, fill: "paper" },
+    { type: "polyline", points: [{ x: x + width * .34, y: y + height * .57 }, { x: x + width * .36, y: y + height * .68 }, { x: x + width * .64, y: y + height * .68 }, { x: x + width * .66, y: y + height * .57 }], closed: true, fill: "light" },
+    { type: "polyline", points: [{ x: x + width * .3, y: y + height * .72 }, { x: x + width * .35, y: y + height * .25 }, { x: x + width * .65, y: y + height * .25 }, { x: x + width * .7, y: y + height * .72 }] },
+    { type: "ellipse", cx, cy: y + height * .62, rx: width * .1, ry: Math.max(2, height * .018), fill: "ink" },
+  ];
+  if (object.kind === "thermometer") return [
+    { type: "rect", x: x + width * .4, y: y + 4, width: width * .2, height: height * .68, fill: "paper" },
+    { type: "circle", cx, cy: y + height * .82, r: width * .18, fill: "light" },
+    { type: "line", x1: cx, y1: y + height * .62, x2: cx, y2: y + height * .18, strokeWidth: 3 },
+  ];
+  if (object.kind === "bunsen-burner") return [
+    { type: "rect", x: x + width * .15, y: y + height * .75, width: width * .7, height: height * .15, fill: "paper" },
+    { type: "rect", x: x + width * .4, y: y + height * .28, width: width * .2, height: height * .47, fill: "paper" },
+    { type: "bezier", start: { x: cx, y: y + height * .28 }, control1: { x: x + width * .27, y: y + height * .08 }, control2: { x: x + width * .42, y: y + 2 }, end: { x: cx, y: y + 2 } },
+    { type: "bezier", start: { x: cx, y: y + 2 }, control1: { x: x + width * .58, y: y + 2 }, control2: { x: x + width * .73, y: y + height * .08 }, end: { x: cx, y: y + height * .28 } },
+  ];
   const glyph = object.kind === "magnetic-field-in" ? "⊗" : "⊙"; const latex = object.kind === "magnetic-field-in" ? "\\otimes" : "\\odot";
   return [
     ...[.25, .5, .75].flatMap((column) => [.3, .7].map((row): ScientificPrimitive => ({ type: "text", x: x + width * column, y: y + height * row, value: glyph, latex, anchor: "middle", fontSize: 20 }))),
@@ -127,6 +274,7 @@ const point = (x: number, y: number) => `(${value(x)},${value(-y)})`;
 const escapeLatex = (text: string) => text.replace(/\\/g, "\\textbackslash{} ").replace(/([#%&_{}])/g, "\\$1");
 const labelLatex = (primitive: Extract<ScientificPrimitive, { type: "text" }>) => {
   if (primitive.latex) return `$${primitive.latex}$`;
+  if (primitive.math === "raw") return escapeLatex(primitive.value);
   if (primitive.math === false) return `\\text{${escapeLatex(primitive.value)}}`;
   if (primitive.value.includes("$")) return primitive.value;
   return primitive.vector ? `$\\vec{${escapeLatex(primitive.value)}}$` : `$${escapeLatex(primitive.value)}$`;
@@ -136,7 +284,7 @@ const drawOptions = (...options: Array<string | undefined>) => { const kept = op
 
 export function scientificSceneToTikz(scene: ScientificPrimitive[]): string {
   return scene.map((primitive) => {
-    if (primitive.type === "line") return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, widthOption(primitive.strokeWidth))} ${point(primitive.x1, primitive.y1)} -- ${point(primitive.x2, primitive.y2)};`;
+    if (primitive.type === "line") return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, primitive.dashed ? "dashed" : undefined, widthOption(primitive.strokeWidth))} ${point(primitive.x1, primitive.y1)} -- ${point(primitive.x2, primitive.y2)};`;
     if (primitive.type === "circle") {
       const command = primitive.fill === "ink" ? "\\fill" : "\\draw"; const fill = primitive.fill === "paper" ? "fill=white" : primitive.fill === "light" ? "fill=gray!12" : undefined;
       return `${command}${drawOptions(fill, widthOption(primitive.strokeWidth))} ${point(primitive.cx, primitive.cy)} circle (${value(primitive.r)});`;
@@ -153,7 +301,7 @@ export function scientificSceneToTikz(scene: ScientificPrimitive[]): string {
       const fill = primitive.fill === "paper" ? "fill=white" : primitive.fill === "light" ? "fill=gray!12" : primitive.fill === "ink" ? "fill=black" : undefined; const path = primitive.points.map((value) => point(value.x, value.y)).join(" -- ");
       return `\\draw${drawOptions(fill, widthOption(primitive.strokeWidth))} ${path}${primitive.closed ? " -- cycle" : ""};`;
     }
-    if (primitive.type === "bezier") return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, widthOption(primitive.strokeWidth))} ${point(primitive.start.x, primitive.start.y)} .. controls ${point(primitive.control1.x, primitive.control1.y)} and ${point(primitive.control2.x, primitive.control2.y)} .. ${point(primitive.end.x, primitive.end.y)};`;
+    if (primitive.type === "bezier") return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, primitive.dashed ? "dashed" : undefined, widthOption(primitive.strokeWidth))} ${point(primitive.start.x, primitive.start.y)} .. controls ${point(primitive.control1.x, primitive.control1.y)} and ${point(primitive.control2.x, primitive.control2.y)} .. ${point(primitive.end.x, primitive.end.y)};`;
     if (primitive.type === "arc") {
       const startX = primitive.cx + Math.cos((primitive.start * Math.PI) / 180) * primitive.r; const startY = primitive.cy + Math.sin((primitive.start * Math.PI) / 180) * primitive.r;
       return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, widthOption(primitive.strokeWidth))} ${point(startX, startY)} arc[start angle=${-primitive.start},end angle=${-primitive.end},radius=${value(primitive.r)}cm];`;

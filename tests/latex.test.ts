@@ -350,6 +350,36 @@ test("shares exact French concours optics geometry across renderers", () => {
   assert.match(fiber, /\(0\.08,-0\.39\).*\(2\.70,-0\.81\)/s);
 });
 
+test("shares French chemistry symbols and electrochemical-cell geometry", () => {
+  const ion: CanvasObject = { id: "ion", kind: "ion", x: 20, y: 30, width: 60, height: 44, annotations: { main: "Cl−" } };
+  const cell: CanvasObject = { id: "cell", kind: "electrochemical-cell", x: 0, y: 0, width: 240, height: 160, annotations: { anode: "anode (-)", cathode: "cathode (+)", bridge: "pont salin" } };
+  const crystal = objectToLatex({ id: "cfc", kind: "crystal-fcc", x: 0, y: 0, width: 110, height: 100 });
+  const ionOutput = objectToLatex(ion); const cellOutput = objectToLatex(cell);
+  assert.match(ionOutput, /circle \(0\.30\)/);
+  assert.match(ionOutput, /\{Cl−\};/);
+  assert.equal((crystal.match(/\\fill /g) ?? []).length, 8);
+  assert.equal((cellOutput.match(/fill=gray!12/g) ?? []).length, 2);
+  assert.match(cellOutput, /\\draw\[dashed\]/);
+  assert.equal((cellOutput.match(/line width=2\.27pt/g) ?? []).length, 5);
+  assert.match(cellOutput, /\{\\text\{pont salin\}\}/);
+  assert.deepEqual(roundTripReport(documentFor([ion, cell]), [ion, cell]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("uses one print-safe scene for all French CPGE laboratory apparatus", () => {
+  const kinds: ObjectKind[] = ["beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner"];
+  const objects = kinds.map((kind, index): CanvasObject => ({ id: `lab-${index}`, kind, x: 10 + index * 5, y: 20, ...stampSize(kind) }));
+  for (const object of objects) {
+    const scene = scientificSceneFor(object);
+    assert.ok(scene?.length, object.kind);
+    assert.doesNotMatch(scientificSceneToTikz(scene), /blue|red|orange/i, object.kind);
+  }
+  const beaker = objectToLatex({ id: "beaker", kind: "beaker", x: 0, y: 0, width: 100, height: 180 });
+  assert.match(beaker, /fill=gray!12/);
+  assert.match(beaker, /\(0\.28,-0\.36\).*\(1\.72,-0\.36\)/s);
+  assert.equal(scientificSceneFor({ id: "cylinder", kind: "graduated-cylinder", x: 0, y: 0, width: 54, height: 200 })?.length, 10);
+  assert.deepEqual(roundTripReport(documentFor(objects), objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("shares thermodynamic apparatus and uses correct quantity notation", () => {
   const piston: CanvasObject = { id: "piston", kind: "piston-cylinder", x: 0, y: 0, width: 120, height: 180, annotations: { main: "P, V, T" } };
   const engine: CanvasObject = { id: "engine", kind: "heat-engine", x: 0, y: 0, width: 120, height: 100, annotations: { main: "machine", hot: "Qh", cold: "Qc", work: "W" } };
