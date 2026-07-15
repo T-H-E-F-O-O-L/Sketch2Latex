@@ -16,6 +16,7 @@ export type ScientificPrimitive =
 export const sharedScientificKinds: ObjectKind[] = [
   "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
+  "ground", "gbf", "oscilloscope", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
 ];
 
 export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] | undefined {
@@ -262,6 +263,60 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     { type: "bezier", start: { x: cx, y: y + height * .28 }, control1: { x: x + width * .27, y: y + height * .08 }, control2: { x: x + width * .42, y: y + 2 }, end: { x: cx, y: y + 2 } },
     { type: "bezier", start: { x: cx, y: y + 2 }, control1: { x: x + width * .58, y: y + 2 }, control2: { x: x + width * .73, y: y + height * .08 }, end: { x: cx, y: y + height * .28 } },
   ];
+  if (object.kind === "ground") return [
+    { type: "line", x1: cx, y1: y, x2: cx, y2: y + height * .35 },
+    { type: "line", x1: x + 6, y1: y + height * .35, x2: x + width - 6, y2: y + height * .35 },
+    { type: "line", x1: x + 11, y1: y + height * .53, x2: x + width - 11, y2: y + height * .53 },
+    { type: "line", x1: x + 17, y1: y + height * .71, x2: x + width - 17, y2: y + height * .71 },
+  ];
+  if (object.kind === "gbf" || object.kind === "oscilloscope") {
+    const left = x + width * .22; const right = x + width * .78; const amplitude = height * .14; const wave: ScientificPrimitive[] = Array.from({ length: 3 }, (_, index): ScientificPrimitive => {
+      const startX = left + ((right - left) / 3) * index; const endX = left + ((right - left) / 3) * (index + 1); const direction = index % 2 === 0 ? -1 : 1;
+      return { type: "bezier", start: { x: startX, y: cy }, control1: { x: startX + (endX - startX) * .3, y: cy + amplitude * direction }, control2: { x: startX + (endX - startX) * .7, y: cy + amplitude * direction }, end: { x: endX, y: cy } };
+    });
+    return [
+      object.kind === "gbf" ? { type: "circle", cx, cy, r: Math.min(width, height) * .36, fill: "paper" } : { type: "rect", x, y, width, height, fill: "paper" },
+      ...wave,
+      { type: "text", x: cx, y: y + height * .88, value: label("main", object.kind === "gbf" ? "GBF" : "oscillo"), anchor: "middle", fontSize: 11, math: false },
+    ];
+  }
+  if (object.kind.startsWith("op-amp")) {
+    const topInput = y + height * .37; const bottomInput = y + height * .66; const boxLeft = x + width * .28; const boxRight = x + width * .8; const outputX = x + width * .96;
+    const feedback = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"].includes(object.kind);
+    const variant = object.kind === "op-amp-comparator" ? "Comparateur" : object.kind === "op-amp-inverting" ? "Inverseur" : object.kind === "op-amp-non-inverting" ? "Non-inverseur" : object.kind === "op-amp-summing" ? "Sommateur" : object.kind === "op-amp-integrator" ? "Intégrateur" : object.kind === "op-amp-differentiator" ? "Dérivateur" : object.kind === "op-amp-schmitt" ? "Schmitt" : "AOP";
+    const scene: ScientificPrimitive[] = [
+      { type: "rect", x: boxLeft, y: y + height * .15, width: boxRight - boxLeft, height: height * .7, fill: "paper" },
+      { type: "line", x1: x + width * .04, y1: topInput, x2: boxLeft, y2: topInput },
+      { type: "line", x1: x + width * .04, y1: bottomInput, x2: boxLeft, y2: bottomInput },
+      { type: "line", x1: boxRight, y1: cy, x2: outputX, y2: cy },
+      { type: "text", x: boxLeft + 11, y: topInput + 5, value: "−", latex: "-", anchor: "middle", fontSize: 15 },
+      { type: "text", x: boxLeft + 11, y: bottomInput + 5, value: "+", anchor: "middle", fontSize: 15 },
+      { type: "polyline", points: [{ x: x + width * .49, y: cy - 10 }, { x: x + width * .49, y: cy + 10 }, { x: x + width * .57, y: cy }], closed: true },
+      { type: "text", x: x + width * .67, y: cy + 6, value: "∞", latex: "\\infty", anchor: "middle", fontSize: 19 },
+      { type: "text", x: x + width * .55, y: y + height * .96, value: variant, anchor: "middle", fontSize: 10, math: false },
+    ];
+    if (object.kind === "op-amp-summing") scene.push(
+      { type: "line", x1: x + width * .04, y1: y + height * .2, x2: boxLeft, y2: topInput },
+      { type: "line", x1: x + width * .04, y1: y + height * .5, x2: boxLeft, y2: topInput },
+    );
+    if (object.kind === "op-amp-inverting" || object.kind === "op-amp-differentiator") scene.push(
+      { type: "line", x1: x + width * .04, y1: topInput, x2: x + width * .1, y2: topInput },
+      { type: "rect", x: x + width * .1, y: topInput - 7, width: width * .12, height: 14, fill: "paper" },
+      { type: "line", x1: x + width * .22, y1: topInput, x2: boxLeft, y2: topInput },
+    );
+    if (object.kind === "op-amp-differentiator") scene.push(
+      { type: "line", x1: x + width * .11, y1: topInput - 13, x2: x + width * .11, y2: topInput + 13 },
+      { type: "line", x1: x + width * .16, y1: topInput - 13, x2: x + width * .16, y2: topInput + 13 },
+    );
+    if (feedback) scene.push({ type: "polyline", points: [{ x: outputX, y: cy }, { x: outputX, y: y + height * .06 }, { x: x + width * .2, y: y + height * .06 }, { x: x + width * .2, y: topInput }] });
+    if (object.kind === "op-amp-integrator") scene.push(
+      { type: "line", x1: x + width * .44, y1: y + height * .02, x2: x + width * .44, y2: y + height * .1 },
+      { type: "line", x1: x + width * .49, y1: y + height * .02, x2: x + width * .49, y2: y + height * .1 },
+    );
+    if (object.kind === "op-amp-schmitt") scene.push({ type: "polyline", points: [{ x: x + width * .18, y: bottomInput }, { x: x + width * .18, y: y + height * .94 }, { x: outputX, y: y + height * .94 }, { x: outputX, y: cy }] });
+    if (object.kind === "op-amp-comparator") scene.push({ type: "text", x: outputX - 2, y: cy - 8, value: "Vs", latex: "V_s", anchor: "end", fontSize: 11 });
+    return scene;
+  }
   const glyph = object.kind === "magnetic-field-in" ? "⊗" : "⊙"; const latex = object.kind === "magnetic-field-in" ? "\\otimes" : "\\odot";
   return [
     ...[.25, .5, .75].flatMap((column) => [.3, .7].map((row): ScientificPrimitive => ({ type: "text", x: x + width * column, y: y + height * row, value: glyph, latex, anchor: "middle", fontSize: 20 }))),

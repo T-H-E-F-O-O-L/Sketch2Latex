@@ -391,3 +391,17 @@ test("shares thermodynamic apparatus and uses correct quantity notation", () => 
   assert.equal((engineOutput.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 3);
   assert.deepEqual(roundTripReport(documentFor([piston, engine]), [piston, engine]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
+
+test("shares French instruments, ground and every AOP stamp across renderers", () => {
+  const omitted = stampKinds.filter((kind) => !["point", "equation"].includes(kind) && !scientificSceneFor({ id: kind, kind, x: 0, y: 0, ...stampSize(kind) }));
+  assert.deepEqual(omitted, []);
+  const ground = objectToLatex({ id: "ground", kind: "ground", x: 0, y: 0, width: 44, height: 42 });
+  const inverting = objectToLatex({ id: "aop", kind: "op-amp-inverting", x: 0, y: 0, width: 150, height: 105 });
+  const comparator = objectToLatex({ id: "cmp", kind: "op-amp-comparator", x: 0, y: 0, width: 150, height: 105 });
+  assert.equal((ground.match(/\\draw /g) ?? []).length, 4);
+  assert.match(inverting, /rectangle/);
+  assert.match(inverting, /\{\\text\{Inverseur\}\}/);
+  assert.doesNotMatch(inverting, /zigzag|to\[R\]/);
+  assert.match(comparator, /\{\$V_s\$\}/);
+  assert.match(comparator, /\{\\text\{Comparateur\}\}/);
+});
