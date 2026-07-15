@@ -1,4 +1,4 @@
-import { annotation, type CanvasObject, type ObjectKind } from "./canvas-types";
+import { annotation, type CanvasObject, type ObjectKind, type Point } from "./canvas-types";
 import { CANVAS_UNITS_PER_CM, tikzStrokeWidth } from "./concours-style";
 
 type FillRole = "none" | "paper" | "ink" | "light";
@@ -8,11 +8,13 @@ export type ScientificPrimitive =
   | { type: "circle"; cx: number; cy: number; r: number; fill?: FillRole; strokeWidth?: number }
   | { type: "ellipse"; cx: number; cy: number; rx: number; ry: number; fill?: FillRole; strokeWidth?: number }
   | { type: "rect"; x: number; y: number; width: number; height: number; fill?: FillRole; strokeWidth?: number }
+  | { type: "polyline"; points: Point[]; closed?: boolean; fill?: FillRole; strokeWidth?: number }
+  | { type: "bezier"; start: Point; control1: Point; control2: Point; end: Point; arrowEnd?: boolean; strokeWidth?: number }
   | { type: "arc"; cx: number; cy: number; r: number; start: number; end: number; arrowEnd?: boolean; strokeWidth?: number }
-  | { type: "text"; x: number; y: number; value: string; latex?: string; anchor?: "start" | "middle" | "end"; fontSize?: number; vector?: boolean };
+  | { type: "text"; x: number; y: number; value: string; latex?: string; anchor?: "start" | "middle" | "end"; fontSize?: number; vector?: boolean; math?: boolean };
 
 export const sharedScientificKinds: ObjectKind[] = [
-  "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
+  "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
 ];
 
 export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] | undefined {
@@ -82,6 +84,37 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     { type: "circle", cx, cy, r: Math.min(width, height) * .34, fill: "paper" },
     { type: "text", x: cx, y: cy + 5, value: label("main", "q"), anchor: "middle", fontSize: 14 },
   ];
+  if (object.kind === "plane-mirror" || object.kind === "screen") return [
+    { type: "line", x1: cx, y1: y + 4, x2: cx, y2: y + height - 4, strokeWidth: 4 },
+    ...Array.from({ length: 5 }, (_, index): ScientificPrimitive => ({ type: "line", x1: cx, y1: y + 12 + index * height * .17, x2: cx + (object.kind === "plane-mirror" ? 10 : -10), y2: y + 18 + index * height * .17 })),
+  ];
+  if (object.kind === "prism") return [
+    { type: "polyline", points: [{ x: x + 6, y: y + height - 6 }, { x: x + width - 6, y: y + height - 6 }, { x: cx, y: y + 7 }], closed: true, fill: "paper" },
+  ];
+  if (object.kind === "fiber") return [
+    { type: "bezier", start: { x: x + 4, y: y + height * .3 }, control1: { x: x + width * .35, y: y + height * .2 }, control2: { x: x + width * .62, y: y + height * .83 }, end: { x: x + width - 5, y: y + height * .62 } },
+    { type: "bezier", start: { x: x + 4, y: y + height * .52 }, control1: { x: x + width * .35, y: y + height * .42 }, control2: { x: x + width * .62, y: y + height * 1.03 }, end: { x: x + width - 5, y: y + height * .84 } },
+  ];
+  if (object.kind === "piston-cylinder") return [
+    { type: "polyline", points: [{ x: x + width * .18, y: y + height * .9 }, { x: x + width * .18, y: y + height * .12 }, { x: x + width * .82, y: y + height * .12 }, { x: x + width * .82, y: y + height * .9 }] },
+    { type: "line", x1: x + width * .14, y1: y + height * .38, x2: x + width * .86, y2: y + height * .38, strokeWidth: 4 },
+    { type: "line", x1: cx, y1: y + height * .38, x2: cx, y2: y + 3 },
+    { type: "text", x: cx, y: y + height * .73, value: label("main", "P, V, T"), anchor: "middle", fontSize: 12 },
+  ];
+  if (object.kind === "thermal-reservoir") return [
+    { type: "circle", cx, cy, r: Math.min(width, height) * .4, fill: "paper" },
+    { type: "text", x: cx, y: cy + 5, value: label("main", "T"), anchor: "middle", fontSize: 14 },
+  ];
+  if (object.kind === "heat-engine") return [
+    { type: "rect", x: x + width * .2, y: y + height * .28, width: width * .6, height: height * .42, fill: "paper" },
+    { type: "text", x: cx, y: cy + 5, value: label("main", "machine"), anchor: "middle", fontSize: 11, math: false },
+    { type: "line", x1: cx, y1: y + 3, x2: cx, y2: y + height * .25, arrowEnd: true },
+    { type: "line", x1: cx, y1: y + height * .72, x2: cx, y2: y + height - 3, arrowEnd: true },
+    { type: "line", x1: x + width * .82, y1: cy, x2: x + width - 3, y2: cy, arrowEnd: true },
+    { type: "text", x: cx + 10, y: y + height * .18, value: label("hot", "Qh"), latex: label("hot", "Qh") === "Qh" ? "Q_h" : undefined, anchor: "middle", fontSize: 11 },
+    { type: "text", x: cx + 10, y: y + height * .94, value: label("cold", "Qc"), latex: label("cold", "Qc") === "Qc" ? "Q_c" : undefined, anchor: "middle", fontSize: 11 },
+    { type: "text", x: x + width * .92, y: cy - 5, value: label("work", "W"), anchor: "middle", fontSize: 11 },
+  ];
   const glyph = object.kind === "magnetic-field-in" ? "⊗" : "⊙"; const latex = object.kind === "magnetic-field-in" ? "\\otimes" : "\\odot";
   return [
     ...[.25, .5, .75].flatMap((column) => [.3, .7].map((row): ScientificPrimitive => ({ type: "text", x: x + width * column, y: y + height * row, value: glyph, latex, anchor: "middle", fontSize: 20 }))),
@@ -94,6 +127,7 @@ const point = (x: number, y: number) => `(${value(x)},${value(-y)})`;
 const escapeLatex = (text: string) => text.replace(/\\/g, "\\textbackslash{} ").replace(/([#%&_{}])/g, "\\$1");
 const labelLatex = (primitive: Extract<ScientificPrimitive, { type: "text" }>) => {
   if (primitive.latex) return `$${primitive.latex}$`;
+  if (primitive.math === false) return `\\text{${escapeLatex(primitive.value)}}`;
   if (primitive.value.includes("$")) return primitive.value;
   return primitive.vector ? `$\\vec{${escapeLatex(primitive.value)}}$` : `$${escapeLatex(primitive.value)}$`;
 };
@@ -115,6 +149,11 @@ export function scientificSceneToTikz(scene: ScientificPrimitive[]): string {
       const fill = primitive.fill === "paper" ? "fill=white" : primitive.fill === "light" ? "fill=gray!12" : primitive.fill === "ink" ? "fill=black" : undefined;
       return `\\draw${drawOptions(fill, widthOption(primitive.strokeWidth))} ${point(primitive.x, primitive.y)} rectangle ${point(primitive.x + primitive.width, primitive.y + primitive.height)};`;
     }
+    if (primitive.type === "polyline") {
+      const fill = primitive.fill === "paper" ? "fill=white" : primitive.fill === "light" ? "fill=gray!12" : primitive.fill === "ink" ? "fill=black" : undefined; const path = primitive.points.map((value) => point(value.x, value.y)).join(" -- ");
+      return `\\draw${drawOptions(fill, widthOption(primitive.strokeWidth))} ${path}${primitive.closed ? " -- cycle" : ""};`;
+    }
+    if (primitive.type === "bezier") return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, widthOption(primitive.strokeWidth))} ${point(primitive.start.x, primitive.start.y)} .. controls ${point(primitive.control1.x, primitive.control1.y)} and ${point(primitive.control2.x, primitive.control2.y)} .. ${point(primitive.end.x, primitive.end.y)};`;
     if (primitive.type === "arc") {
       const startX = primitive.cx + Math.cos((primitive.start * Math.PI) / 180) * primitive.r; const startY = primitive.cy + Math.sin((primitive.start * Math.PI) / 180) * primitive.r;
       return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, widthOption(primitive.strokeWidth))} ${point(startX, startY)} arc[start angle=${-primitive.start},end angle=${-primitive.end},radius=${value(primitive.r)}cm];`;

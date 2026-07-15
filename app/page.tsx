@@ -282,11 +282,16 @@ function scientificScenePreview(scene: ScientificPrimitive[], object: CanvasObje
     if (primitive.type === "circle") return <circle key={index} cx={primitive.cx} cy={primitive.cy} r={primitive.r} stroke={primitive.fill === "ink" ? "none" : color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
     if (primitive.type === "ellipse") return <ellipse key={index} cx={primitive.cx} cy={primitive.cy} rx={primitive.rx} ry={primitive.ry} stroke={primitive.fill === "ink" ? "none" : color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
     if (primitive.type === "rect") return <rect key={index} x={primitive.x} y={primitive.y} width={primitive.width} height={primitive.height} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
+    if (primitive.type === "polyline") {
+      const points = primitive.points.map((point) => `${point.x},${point.y}`).join(" ");
+      return primitive.closed ? <polygon key={index} points={points} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} /> : <polyline key={index} points={points} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill={fillFor(primitive.fill)} />;
+    }
+    if (primitive.type === "bezier") return <path key={index} d={`M ${primitive.start.x} ${primitive.start.y} C ${primitive.control1.x} ${primitive.control1.y}, ${primitive.control2.x} ${primitive.control2.y}, ${primitive.end.x} ${primitive.end.y}`} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill="none" markerEnd={primitive.arrowEnd ? "url(#arrowhead)" : undefined} />;
     if (primitive.type === "arc") {
       const start = { x: primitive.cx + Math.cos((primitive.start * Math.PI) / 180) * primitive.r, y: primitive.cy + Math.sin((primitive.start * Math.PI) / 180) * primitive.r }; const finish = { x: primitive.cx + Math.cos((primitive.end * Math.PI) / 180) * primitive.r, y: primitive.cy + Math.sin((primitive.end * Math.PI) / 180) * primitive.r }; const large = Math.abs(primitive.end - primitive.start) > 180 ? 1 : 0;
       return <path key={index} d={`M ${start.x} ${start.y} A ${primitive.r} ${primitive.r} 0 ${large} 1 ${finish.x} ${finish.y}`} stroke={color} strokeWidth={primitive.strokeWidth ?? baseWidth} fill="none" markerEnd={primitive.arrowEnd ? "url(#arrowhead)" : undefined} />;
     }
-    const text = <text className="diagram-label" x={primitive.x} y={primitive.y} textAnchor={primitive.anchor ?? "middle"} fontSize={primitive.fontSize ?? 14} fill={color}>{primitive.value}</text>;
+    const text = <text className={primitive.math === false ? "diagram-text" : "diagram-label"} x={primitive.x} y={primitive.y} textAnchor={primitive.anchor ?? "middle"} fontSize={primitive.fontSize ?? 14} fill={color}>{primitive.value}</text>;
     if (!primitive.vector) return <g key={index}>{text}</g>;
     const length = Math.max(8, (primitive.fontSize ?? 14) * .7); const arrowY = primitive.y - (primitive.fontSize ?? 14) * .86;
     return <g key={index}>{text}<line x1={primitive.x - length / 2} y1={arrowY} x2={primitive.x + length / 2} y2={arrowY} stroke={color} strokeWidth="1" markerEnd="url(#arrowhead)" /></g>;

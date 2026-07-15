@@ -340,7 +340,10 @@ function textFromLatex(value: string) {
 function annotationsFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
   const defaults = original.annotations ?? defaultAnnotations(original.kind); const keys = Object.keys(defaults ?? {});
   if (!keys.length) return original;
-  const values = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^{};]+)?\s*\{([^{}]*)\}/g)].map((match) => textFromLatex(match[1]));
+  const values = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^{};]+)?\s*\{([^{}]*)\}/g)].map((match) => {
+    const text = textFromLatex(match[1]); const math = text.match(/^\$([\s\S]*)\$$/)?.[1] ?? text;
+    return math.match(/^\\vec\{([^{}]+)\}$/)?.[1] ?? math;
+  });
   if (values.length < keys.length) return original;
   const annotations = { ...defaults }; let changed = false;
   keys.forEach((key, index) => { if (annotations[key] !== values[index]) { annotations[key] = values[index]; changed = true; } });

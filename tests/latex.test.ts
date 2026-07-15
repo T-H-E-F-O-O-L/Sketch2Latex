@@ -336,3 +336,28 @@ test("shares exact electromagnetic apparatus geometry across renderers", () => {
   assert.match(rails, /\{\$\\vec\{B\}\$\}/);
   assert.match(magnet, /\\draw \(1\.10,-0\.19\) -- \(1\.10,-0\.77\);/);
 });
+
+test("shares exact French concours optics geometry across renderers", () => {
+  const mirror = objectToLatex({ id: "mirror", kind: "plane-mirror", x: 20, y: 30, width: 34, height: 120 });
+  const screen = objectToLatex({ id: "screen", kind: "screen", x: 20, y: 30, width: 34, height: 120 });
+  const prism = objectToLatex({ id: "prism", kind: "prism", x: 0, y: 0, width: 90, height: 80 });
+  const fiber = objectToLatex({ id: "fiber", kind: "fiber", x: 0, y: 0, width: 140, height: 65 });
+  assert.match(mirror, /line width=2\.27pt/);
+  assert.match(mirror, /\\draw \(0\.74,-0\.84\) -- \(0\.94,-0\.96\);/);
+  assert.match(screen, /\\draw \(0\.74,-0\.84\) -- \(0\.54,-0\.96\);/);
+  assert.match(prism, /\(0\.12,-1\.48\) -- \(1\.68,-1\.48\) -- \(0\.90,-0\.14\) -- cycle/);
+  assert.equal((fiber.match(/\.\. controls/g) ?? []).length, 2);
+  assert.match(fiber, /\(0\.08,-0\.39\).*\(2\.70,-0\.81\)/s);
+});
+
+test("shares thermodynamic apparatus and uses correct quantity notation", () => {
+  const piston: CanvasObject = { id: "piston", kind: "piston-cylinder", x: 0, y: 0, width: 120, height: 180, annotations: { main: "P, V, T" } };
+  const engine: CanvasObject = { id: "engine", kind: "heat-engine", x: 0, y: 0, width: 120, height: 100, annotations: { main: "machine", hot: "Qh", cold: "Qc", work: "W" } };
+  const pistonOutput = objectToLatex(piston); const engineOutput = objectToLatex(engine);
+  assert.match(pistonOutput, /\(0\.43,-3\.24\) -- \(0\.43,-0\.43\) -- \(1\.97,-0\.43\) -- \(1\.97,-3\.24\)/);
+  assert.match(engineOutput, /\{\\text\{machine\}\}/);
+  assert.match(engineOutput, /\{\$Q_h\$\}/);
+  assert.match(engineOutput, /\{\$Q_c\$\}/);
+  assert.equal((engineOutput.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 3);
+  assert.deepEqual(roundTripReport(documentFor([piston, engine]), [piston, engine]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});

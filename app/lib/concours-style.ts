@@ -23,6 +23,7 @@ export const EXPORTED_SVG_STYLE = `
 .diagram-object { stroke-linecap: round; stroke-linejoin: round; }
 text { font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", "Times New Roman", serif; font-weight: 400; }
 .diagram-label { font-size: ${CONCOURS_LABEL_SIZE}px; font-style: italic; font-weight: 400; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.diagram-text { font-style: normal; font-weight: 400; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
 .diagram-sign { font-size: 17px; font-weight: 400; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
 .diagram-output-label { font-size: 13px; font-style: italic; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
 `;
