@@ -278,6 +278,20 @@ test("exports semantic French scientific arrows", () => {
   assert.match(dipole, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\)/);
 });
 
+test("exports explicit French dimension lines with matching construction marks", () => {
+  const horizontal: CanvasObject = { id: "d1", kind: "dimension", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "d₁" } };
+  const vertical: CanvasObject = { id: "d2", kind: "dimension", x: 50, y: 50, x2: 50, y2: 200, annotations: { main: "h" } };
+  const output = objectToLatex(horizontal); const rotated = objectToLatex(vertical);
+  assert.match(output, /shift=\{\(1\.00,0\.00\)\}, rotate=0/);
+  assert.match(output, /\\draw\[<->\] \(-1\.00,0\) -- \(1\.00,0\);/);
+  assert.match(output, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\);/);
+  assert.match(output, /\\draw \(1\.00,-0\.10\) -- \(1\.00,0\.10\);/);
+  assert.match(output, /\\node\[fill=white,inner sep=1pt\] at \(0,0\.20\) \{\$d_\{1\}\$\};/);
+  assert.match(rotated, /shift=\{\(1\.00,-2\.50\)\}, rotate=-90/);
+  assert.doesNotMatch(output, /\|<->\|/);
+  assert.deepEqual(roundTripReport(documentFor([horizontal, vertical]), [horizontal, vertical]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("defines precise named terminals for French circuit symbols", () => {
   const resistor: CanvasObject = { id: "r", kind: "resistor", x: 20, y: 40, x2: 180, y2: 40 };
   const ground: CanvasObject = { id: "g", kind: "ground", x: 100, y: 200, width: 44, height: 42 };

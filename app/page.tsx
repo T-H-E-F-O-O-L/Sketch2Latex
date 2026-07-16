@@ -242,7 +242,7 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   }
   if (object.kind === "dashed-line") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} strokeDasharray={`${CONCOURS_DASH.on} ${CONCOURS_DASH.off}`} />;
   if (object.kind === "double-arrow") return <line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" />;
-  if (object.kind === "dimension") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} /><line {...common} x1={x2 - 5 * px} y1={y2 - 5 * py} x2={x2 + 5 * px} y2={y2 + 5 * py} /><text className="diagram-label" x={midX + 10 * px} y={midY + 10 * py} textAnchor="middle" fill={color}>{a("main", "d")}</text></g>;
+  if (object.kind === "dimension") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerStart="url(#arrowhead)" markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} /><line {...common} x1={x2 - 5 * px} y1={y2 - 5 * py} x2={x2 + 5 * px} y2={y2 + 5 * py} /><text className="diagram-label" x={midX - 10 * px} y={midY - 10 * py} textAnchor="middle" fill={color} stroke="white" strokeWidth="3" paintOrder="stroke">{a("main", "d")}</text></g>;
   if (object.kind === "resistor") { const g = circuitGeometry.resistor; return <g transform={`translate(${midX} ${midY}) rotate(${rotation})`}><line {...common} x1={-length / 2} y1="0" x2={length / 2} y2="0" /><rect x={-g.halfBody} y={-g.halfHeight} width={g.halfBody * 2} height={g.halfHeight * 2} rx="1.5" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text className="diagram-label" x="0" y={-g.labelOffset} textAnchor="middle" fill={color}>{a("main", "R")}</text></g>; }
   if (object.kind === "battery" || object.kind === "capacitor") {
     const g = object.kind === "battery" ? circuitGeometry.battery : circuitGeometry.capacitor;
@@ -269,14 +269,14 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
   if (object.kind === "force" || object.kind === "arrow") {
     const label = a("main", object.kind === "force" ? "F" : "").trim();
-    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX + 9 * px, midY + 9 * py) : <text className="diagram-label" x={midX + 9 * px} y={midY + 9 * py} textAnchor="middle" fill={color}>{label}</text>)}</g>;
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX - 9 * px, midY - 9 * py) : <text className="diagram-label" x={midX - 9 * px} y={midY - 9 * py} textAnchor="middle" fill={color}>{label}</text>)}</g>;
   }
-  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX + 9 * px, midY + 9 * py)}</g>;
+  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX - 9 * px, midY - 9 * py)}</g>;
   const markerEnd = ["arrow", "force", "light-ray", "heat-arrow", "work-arrow", "reaction-arrow", "dipole"].includes(object.kind) ? "url(#arrowhead)" : undefined;
   const markerStart = object.kind === "equilibrium-arrow" ? "url(#arrowhead)" : undefined;
   const dashed = object.kind === "hydrogen-bond" ? "5 4" : undefined;
   const label = object.kind === "heat-arrow" ? a("main", "Q") : object.kind === "work-arrow" ? a("main", "W") : object.kind === "dipole" ? a("main", "μ") : undefined;
-  return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd={markerEnd} markerStart={markerStart} strokeDasharray={dashed} />{label && <text x={midX + 8 * px} y={midY + 8 * py} fontSize="14">{label}</text>}</g>;
+  return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd={markerEnd} markerStart={markerStart} strokeDasharray={dashed} />{label && <text x={midX - 8 * px} y={midY - 8 * py} fontSize="14">{label}</text>}</g>;
 }
 
 function scientificScenePreview(scene: ScientificPrimitive[], object: CanvasObject, selected: boolean) {

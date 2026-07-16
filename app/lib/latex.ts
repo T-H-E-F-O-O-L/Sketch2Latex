@@ -64,6 +64,11 @@ function connectorScope(object: CanvasObject, body: string) {
   return `\\begin{scope}[shift={${midpoint}}, rotate=${matrixNumber(rotation)}]\n${body}\n\\end{scope}`;
 }
 
+function dimensionConnector(object: CanvasObject) {
+  const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2); const tick = n(5); const labelOffset = n(10);
+  return connectorScope(object, `\\draw[<->] (-${halfLength},0) -- (${halfLength},0);\n\\draw (-${halfLength},-${tick}) -- (-${halfLength},${tick});\n\\draw (${halfLength},-${tick}) -- (${halfLength},${tick});\n\\node[fill=white,inner sep=1pt] at (0,${labelOffset}) {${componentLabel(annotation(object, "main", "d"))}};`);
+}
+
 function lensConnector(object: CanvasObject) {
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const dx = x2 - object.x; const dy = y2 - object.y; const length = Math.hypot(dx, dy) || 1; const ux = dx / length; const uy = dy / length; const px = -uy; const py = ux;
   const arrowLength = Math.min(18, Math.max(8, length * .25)); const arrowWidth = Math.min(9, Math.max(5, arrowLength * .55));
@@ -193,7 +198,7 @@ function objectToLatexBase(object: CanvasObject): string {
       return `\\draw[-{Latex}] ${origin} -- ${end(object)}${label ? ` node[midway,above] {${object.kind === "force" ? vectorComponentLabel(label) : componentLabel(label)}}` : ""};`;
     }
     case "double-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
-    case "dimension": return `\\draw[|<->|] ${origin} -- ${end(object)} node[midway,above,fill=white,inner sep=1pt] {${componentLabel(annotation(object, "main", "d"))}};`;
+    case "dimension": return dimensionConnector(object);
     case "point": return `\\fill ${point(object.x + (object.width ?? 18) / 2, object.y + (object.height ?? 18) / 2)} circle (0.06);`;
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
@@ -339,7 +344,7 @@ function metadataFromLatexBlock(block: string): CanvasObject | undefined {
 
 function pointsFromLatex(source: string) {
   return [...source.matchAll(numericCoordinate)].map((match) => {
-    const x = Number(match[1]) * SCALE; const y = -Number(match[2]) * SCALE;
+    const x = Math.round(Number(match[1]) * SCALE * 1e9) / 1e9; const y = Math.round(-Number(match[2]) * SCALE * 1e9) / 1e9;
     return { x: Object.is(x, -0) ? 0 : x, y: Object.is(y, -0) ? 0 : y };
   });
 }
@@ -351,13 +356,17 @@ function textFromLatex(value: string) {
 function annotationsFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
   const defaults = original.annotations ?? defaultAnnotations(original.kind); const keys = Object.keys(defaults ?? {});
   if (!keys.length) return original;
-  const values = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^{};]+)?\s*\{([^{}]*)\}/g)].map((match) => {
-    const text = textFromLatex(match[1]); const math = text.match(/^\$([\s\S]*)\$$/)?.[1] ?? text;
+  const rawValues = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^{};]+)?\s*\{([^{}]*)\}/g)].map((match) => textFromLatex(match[1]));
+  const values = rawValues.map((text) => {
+    const math = text.match(/^\$([\s\S]*)\$$/)?.[1] ?? text;
     return math.match(/^\\vec\{([^{}]+)\}$/)?.[1] ?? math;
   });
   if (values.length < keys.length) return original;
   const annotations = { ...defaults }; let changed = false;
-  keys.forEach((key, index) => { if (annotations[key] !== values[index]) { annotations[key] = values[index]; changed = true; } });
+  keys.forEach((key, index) => {
+    const next = rawValues[index] === componentLabel(annotations[key]) ? annotations[key] : values[index];
+    if (annotations[key] !== next) { annotations[key] = next; changed = true; }
+  });
   return changed ? { ...original, annotations } : original;
 }
 
@@ -371,7 +380,8 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
     if (halfLength > 0) {
       const center = { x: Number(connectorScopeMatch[1]) * SCALE, y: -Number(connectorScopeMatch[2]) * SCALE };
       const angle = (-Number(connectorScopeMatch[3]) * Math.PI) / 180; const dx = Math.cos(angle) * halfLength; const dy = Math.sin(angle) * halfLength;
-      return { ...withAnnotations, x: center.x - dx, y: center.y - dy, x2: center.x + dx, y2: center.y + dy };
+      const clean = (value: number) => Math.round(value * 1e9) / 1e9;
+      return { ...withAnnotations, x: clean(center.x - dx), y: clean(center.y - dy), x2: clean(center.x + dx), y2: clean(center.y + dy) };
     }
   }
   const points = pointsFromLatex(block);
