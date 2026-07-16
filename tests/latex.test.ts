@@ -9,7 +9,7 @@ import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
-import { springPointsFor, wavePointsFor } from "../app/lib/connector-paths";
+import { connectorLabelPointFor, springPointsFor, wavePointsFor } from "../app/lib/connector-paths";
 import { simplifyFreehandPoints } from "../app/lib/freehand-path";
 import { scientificSceneFor, scientificSceneToTikz } from "../app/lib/scientific-scene";
 import { parseScientificLabel, scientificLabelToLatex } from "../app/lib/scientific-label";
@@ -101,6 +101,14 @@ test("shares exact spring and progressive-wave paths across renderers", () => {
   assert.equal((waveTikz.match(/\(-?\d+\.\d+,-?\d+\.\d+\)/g) ?? []).length, wavePoints.length);
   assert.doesNotMatch(`${springTikz}\n${waveTikz}`, /decorate|decoration=\{(?:coil|snake)/);
   assert.deepEqual(roundTripReport(documentFor([spring, wave]), [spring, wave]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("keeps concours component labels upright at the connector-normal position", () => {
+  assert.deepEqual(connectorLabelPointFor({ id: "r-h", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 }, -13), { x: 50, y: -13 });
+  assert.deepEqual(connectorLabelPointFor({ id: "l-v", kind: "inductor", x: 50, y: 150, x2: 50, y2: 0 }, -19), { x: 31, y: 75 });
+  const diagonal = connectorLabelPointFor({ id: "r-d", kind: "resistor", x: 0, y: 0, x2: 100, y2: 100 }, -10);
+  assert.ok(Math.abs(diagonal.x - 57.0710678119) < 1e-9);
+  assert.ok(Math.abs(diagonal.y - 42.9289321881) < 1e-9);
 });
 
 test("shares sub-millimetre freehand simplification without smoothing drift", () => {

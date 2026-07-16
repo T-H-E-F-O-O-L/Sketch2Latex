@@ -88,6 +88,7 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(scientificScene, /scientificSceneToTikz/);
   assert.match(scientificLabel, /parseScientificLabel/);
   assert.match(page, /scientificLabelSpans/);
+  assert.match(page, /connectorLabelPointFor\(object, -g\.labelOffset\)/);
   assert.match(mathKeyboard, /mathKeyboardLayouts/);
   assert.match(mathKeyboard, /label: "123"/);
   assert.match(mathKeyboard, /label: "f\(x\)"/);

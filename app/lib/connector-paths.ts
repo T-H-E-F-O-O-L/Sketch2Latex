@@ -11,6 +11,11 @@ const pointAt = (object: CanvasObject, basis: ReturnType<typeof connectorBasis>,
   y: object.y + basis.uy * along + basis.py * across,
 });
 
+export function connectorLabelPointFor(object: CanvasObject, normalOffset: number): Point {
+  const basis = connectorBasis(object);
+  return pointAt(object, basis, basis.length / 2, normalOffset);
+}
+
 export function springPointsFor(object: CanvasObject): Point[] {
   const basis = connectorBasis(object);
   const lead = Math.min(18, basis.length * .14); const activeLength = Math.max(0, basis.length - lead * 2);
