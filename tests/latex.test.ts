@@ -100,6 +100,28 @@ test("adds French ideal voltage and current generators with exact source geometr
   assert.deepEqual(objectsFromLatex(edited, [voltage]).objects[0].annotations, { main: "E_1" });
 });
 
+test("adds a four-terminal European transformer with shared exact geometry", () => {
+  const transformer: CanvasObject = { id: "transformer", kind: "transformer", x: 20, y: 30, width: 140, height: 160, annotations: { primary: "N_1", secondary: "N_2" } };
+  const output = objectToLatex(transformer);
+  assert.deepEqual(defaultAnnotations("transformer"), { primary: "N_1", secondary: "N_2" });
+  assert.deepEqual(stampSize("transformer"), { width: 140, height: 160 });
+  assert.ok(toolboxGroups.find((group) => group.title === "Électricité & signaux")?.kinds.includes("transformer"));
+  assert.deepEqual(portsFor(transformer), [
+    { name: "primary-top", x: 20, y: 70 },
+    { name: "primary-bottom", x: 20, y: 150 },
+    { name: "secondary-top", x: 160, y: 70 },
+    { name: "secondary-bottom", x: 160, y: 150 },
+  ]);
+  assert.equal((output.match(/\.\. controls/g) ?? []).length, 8);
+  assert.match(output, /\\draw \(1\.49,-1\.40\) \.\. controls \(1\.65,-1\.49\) and \(1\.65,-1\.71\) \.\. \(1\.49,-1\.80\);/);
+  assert.match(output, /\\draw \(2\.11,-1\.40\) \.\. controls \(1\.95,-1\.49\) and \(1\.95,-1\.71\) \.\. \(2\.11,-1\.80\);/);
+  assert.match(output, /\\draw\[line width=1\.36pt\] \(1\.72,-1\.24\) -- \(1\.72,-3\.16\);/);
+  assert.match(output, /\\draw\[line width=1\.36pt\] \(1\.88,-1\.24\) -- \(1\.88,-3\.16\);/);
+  assert.match(output, /\{\$N_\{1\}\$\}/);
+  assert.match(output, /\{\$N_\{2\}\$\}/);
+  assert.deepEqual(roundTripReport(documentFor([transformer]), [transformer]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("uses canvas baselines for prose and graph labels", () => {
   const prose = objectToLatex({ id: "txt", kind: "text", x: 50, y: 70, text: "Légende" });
   const graph = objectToLatex({ id: "axes-labels", kind: "axes", x: 0, y: 0, width: 200, height: 120, graph: { expression: "x", xMin: -1, xMax: 1, yMin: -1, yMax: 1, xLabel: "t", yLabel: "u_C" } });
@@ -343,6 +365,28 @@ test("provides French Thévenin and Norton equivalents with exact circuit semant
   assert.deepEqual(junctionPointsFor(norton.objects), [{ x: 450, y: 180 }, { x: 450, y: 360 }]);
   assert.deepEqual(roundTripReport(theveninLatex, thevenin.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
   assert.deepEqual(roundTripReport(nortonLatex, norton.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("provides a classroom-ready ideal transformer model with remapped terminal bindings", () => {
+  const template = diagramTemplates.find((candidate) => candidate.id === "ideal-transformer");
+  assert.ok(template);
+  const transformer = template.objects.find((object) => object.kind === "transformer");
+  assert.ok(transformer);
+  assert.equal(transformer.annotations?.primary, "N_1");
+  assert.equal(transformer.annotations?.secondary, "N_2");
+  assert.equal(template.objects.filter((object) => object.kind === "wire").length, 4);
+  assert.deepEqual(junctionPointsFor(template.objects), []);
+  const output = documentFor(template.objects);
+  assert.match(output, /\{\$N_\{1\}\$\}/);
+  assert.match(output, /\{\$N_\{2\}\$\}/);
+  assert.match(output, /\{\$i_\{1\}\$\}/);
+  assert.match(output, /\{\$i_\{2\}\$\}/);
+  assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+
+  const cloned = cloneTemplateObjects(template);
+  const clonedTransformer = cloned.find((object) => object.kind === "transformer");
+  assert.ok(clonedTransformer);
+  assert.ok(cloned.filter((object) => object.kind === "wire").every((wire) => !wire.bindings?.startId || wire.bindings.startId === clonedTransformer.id) && cloned.filter((object) => object.kind === "wire").every((wire) => !wire.bindings?.endId || wire.bindings.endId === clonedTransformer.id));
 });
 
 test("imports richer ordinary TikZ and protects unsupported commands", () => {

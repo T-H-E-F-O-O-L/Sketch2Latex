@@ -17,7 +17,7 @@ export type ScientificPrimitive =
 export const sharedScientificKinds: ObjectKind[] = [
   "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
-  "ground", "gbf", "oscilloscope", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
+  "ground", "transformer", "gbf", "oscilloscope", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
 ];
 
 export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] | undefined {
@@ -270,6 +270,26 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     { type: "line", x1: x + 11, y1: y + height * .53, x2: x + width - 11, y2: y + height * .53 },
     { type: "line", x1: x + 17, y1: y + height * .71, x2: x + width - 17, y2: y + height * .71 },
   ];
+  if (object.kind === "transformer") {
+    const top = y + height * .25; const bottom = y + height * .75; const turns = 4; const step = (bottom - top) / turns;
+    const leftCoilX = x + width * .39; const rightCoilX = x + width * .61; const bulge = width * .055;
+    const winding = (coilX: number, direction: -1 | 1): ScientificPrimitive[] => Array.from({ length: turns }, (_, index) => {
+      const startY = top + index * step; const endY = startY + step;
+      return { type: "bezier", start: { x: coilX, y: startY }, control1: { x: coilX + direction * bulge, y: startY + step * .22 }, control2: { x: coilX + direction * bulge, y: endY - step * .22 }, end: { x: coilX, y: endY } };
+    });
+    return [
+      { type: "line", x1: x, y1: top, x2: leftCoilX, y2: top },
+      ...winding(leftCoilX, 1),
+      { type: "line", x1: leftCoilX, y1: bottom, x2: x, y2: bottom },
+      { type: "line", x1: x + width, y1: top, x2: rightCoilX, y2: top },
+      ...winding(rightCoilX, -1),
+      { type: "line", x1: rightCoilX, y1: bottom, x2: x + width, y2: bottom },
+      { type: "line", x1: x + width * .47, y1: y + height * .2, x2: x + width * .47, y2: y + height * .8, strokeWidth: 2.4 },
+      { type: "line", x1: x + width * .53, y1: y + height * .2, x2: x + width * .53, y2: y + height * .8, strokeWidth: 2.4 },
+      { type: "text", x: x + width * .25, y: y + height * .91, value: label("primary", "N_1"), anchor: "middle", fontSize: 13 },
+      { type: "text", x: x + width * .75, y: y + height * .91, value: label("secondary", "N_2"), anchor: "middle", fontSize: 13 },
+    ];
+  }
   if (object.kind === "gbf" || object.kind === "oscilloscope") {
     const left = x + width * .22; const right = x + width * .78; const amplitude = height * .14; const wave: ScientificPrimitive[] = Array.from({ length: 3 }, (_, index): ScientificPrimitive => {
       const startX = left + ((right - left) / 3) * index; const endX = left + ((right - left) / 3) * (index + 1); const direction = index % 2 === 0 ? -1 : 1;

@@ -6,9 +6,11 @@ export const JUNCTION_RADIUS = 3;
 
 export const electricalTerminalKinds: ObjectKind[] = [
   "wire", "resistor", "capacitor", "inductor", "battery", "voltage-source", "current-source", "switch", "voltmeter", "ammeter",
+  "transformer",
 ];
 
 function centerFor(object: CanvasObject): Point {
+  if (object.kind === "transformer") return { x: object.x + (object.width ?? 0) / 2, y: object.y + (object.height ?? 0) / 2 };
   if (electricalTerminalKinds.includes(object.kind)) return { x: (object.x + (object.x2 ?? object.x)) / 2, y: (object.y + (object.y2 ?? object.y)) / 2 };
   return { x: object.x + (object.width ?? 0) / 2, y: object.y + (object.height ?? 0) / 2 };
 }
@@ -21,6 +23,15 @@ function transformPoint(object: CanvasObject, point: Point): Point {
 }
 
 function localPorts(object: CanvasObject): ConnectionPort[] {
+  if (object.kind === "transformer") {
+    const width = object.width ?? 0; const height = object.height ?? 0;
+    return [
+      { name: "primary-top", x: object.x, y: object.y + height * .25 },
+      { name: "primary-bottom", x: object.x, y: object.y + height * .75 },
+      { name: "secondary-top", x: object.x + width, y: object.y + height * .25 },
+      { name: "secondary-bottom", x: object.x + width, y: object.y + height * .75 },
+    ];
+  }
   if (electricalTerminalKinds.includes(object.kind)) return [
     { name: "start", x: object.x, y: object.y },
     { name: "end", x: object.x2 ?? object.x, y: object.y2 ?? object.y },
