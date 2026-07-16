@@ -1,6 +1,6 @@
 export type ObjectKind =
   | "freehand" | "line" | "dashed-line" | "curve" | "arrow" | "double-arrow" | "dimension" | "point" | "rect" | "circle" | "ellipse" | "text" | "equation" | "raw-tikz" | "axes"
-  | "wire" | "resistor" | "capacitor" | "inductor" | "battery" | "switch" | "ground"
+  | "wire" | "resistor" | "capacitor" | "inductor" | "battery" | "voltage-source" | "current-source" | "switch" | "ground"
   | "op-amp" | "op-amp-comparator" | "op-amp-inverting" | "op-amp-non-inverting" | "op-amp-summing" | "op-amp-integrator" | "op-amp-differentiator" | "op-amp-schmitt"
   | "voltmeter" | "ammeter" | "gbf" | "oscilloscope"
   | "spring" | "force" | "mass" | "pulley" | "pendulum" | "reference-frame" | "circular-trajectory" | "gravity-field"
@@ -62,7 +62,7 @@ export const defaultDocumentSettings: DocumentSettings = {
 
 const annotationDefaults: Partial<Record<ObjectKind, Record<string, string>>> = {
   arrow: { main: "" }, force: { main: "F" },
-  voltmeter: { main: "V" }, ammeter: { main: "A" }, gbf: { main: "GBF" }, oscilloscope: { main: "oscillo" }, mass: { main: "m" },
+  "voltage-source": { main: "E" }, "current-source": { main: "I" }, voltmeter: { main: "V" }, ammeter: { main: "A" }, gbf: { main: "GBF" }, oscilloscope: { main: "oscillo" }, mass: { main: "m" },
   "reference-frame": { x: "x", y: "y", origin: "O" }, "circular-trajectory": { origin: "O" }, "gravity-field": { main: "g" },
   "electric-field": { main: "E" }, "bar-magnet": { north: "N", south: "S" }, "laplace-rails": { velocity: "v" }, "charged-particle": { main: "q" },
   dimension: { main: "d" }, "heat-arrow": { main: "Q" }, "work-arrow": { main: "W" }, dipole: { main: "μ" }, "piston-cylinder": { main: "P, V, T" }, "thermal-reservoir": { main: "T" },
@@ -78,7 +78,7 @@ export function defaultAnnotations(kind: ObjectKind) {
 export const annotation = (object: CanvasObject, key: string, fallback: string) => object.annotations?.[key] ?? fallback;
 
 export const connectorKinds: ObjectKind[] = [
-  "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
+  "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "wire", "resistor", "capacitor", "inductor", "battery", "voltage-source", "current-source", "switch", "voltmeter", "ammeter",
   "lens", "diverging-lens",
   "spring", "force", "light-ray", "wave", "heat-arrow", "work-arrow", "bond-single", "bond-double", "bond-triple",
   "reaction-arrow", "equilibrium-arrow", "hydrogen-bond", "dipole",
@@ -94,7 +94,7 @@ export const stampKinds: ObjectKind[] = [
 
 export const labels: Record<ObjectKind, string> = {
   freehand: "Main levée", line: "Segment", "dashed-line": "Trait pointillé", curve: "Courbe de Bézier", arrow: "Flèche", "double-arrow": "Double flèche", dimension: "Cote / mesure", point: "Point", rect: "Rectangle", circle: "Cercle", ellipse: "Ellipse", text: "Texte", axes: "Repère / graphe",
-  wire: "Fil", resistor: "Résistance R", capacitor: "Condensateur C", inductor: "Bobine L", battery: "Générateur", switch: "Interrupteur", ground: "Masse / terre", voltmeter: "Voltmètre", ammeter: "Ampèremètre", gbf: "GBF", oscilloscope: "Oscilloscope",
+  wire: "Fil", resistor: "Résistance R", capacitor: "Condensateur C", inductor: "Bobine L", battery: "Pile / batterie", "voltage-source": "Générateur idéal de tension", "current-source": "Générateur idéal de courant", switch: "Interrupteur", ground: "Masse / terre", voltmeter: "Voltmètre", ammeter: "Ampèremètre", gbf: "GBF", oscilloscope: "Oscilloscope",
   spring: "Ressort", force: "Vecteur force", mass: "Masse m", pulley: "Poulie", pendulum: "Pendule", "reference-frame": "Repère (O,x,y)", "circular-trajectory": "Trajectoire circulaire", "gravity-field": "Champ de pesanteur",
   lens: "Lentille convergente", "diverging-lens": "Lentille divergente", "plane-mirror": "Miroir plan", screen: "Écran", prism: "Prisme", fiber: "Fibre optique", "light-ray": "Rayon lumineux", wave: "Onde progressive",
   "electric-field": "Champ électrique", "magnetic-field-in": "Champ B entrant", "magnetic-field-out": "Champ B sortant", "bar-magnet": "Aimant droit", coil: "Spire", solenoid: "Bobine longue", "laplace-rails": "Rails de Laplace", "charged-particle": "Particule chargée",
@@ -108,7 +108,7 @@ export type ToolboxGroup = { title: string; kinds: Array<ObjectKind | "select"> 
 
 export const toolboxGroups: ToolboxGroup[] = [
   { title: "Outils", kinds: ["select", "line", "dashed-line", "curve", "arrow", "double-arrow", "dimension", "point", "rect", "circle", "ellipse", "freehand", "text", "equation", "axes"] },
-  { title: "Électricité & signaux", kinds: ["wire", "resistor", "capacitor", "inductor", "battery", "switch", "ground", "voltmeter", "ammeter", "gbf", "oscilloscope"] },
+  { title: "Électricité & signaux", kinds: ["wire", "resistor", "capacitor", "inductor", "battery", "voltage-source", "current-source", "switch", "ground", "voltmeter", "ammeter", "gbf", "oscilloscope"] },
   { title: "Optique & ondes", kinds: ["lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "light-ray", "wave"] },
   { title: "Mécanique", kinds: ["force", "spring", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field"] },
   { title: "Champs & induction", kinds: ["electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle"] },

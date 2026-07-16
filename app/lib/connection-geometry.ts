@@ -5,7 +5,7 @@ export type ConnectionPort = Point & { name: ConnectionPortName };
 export const JUNCTION_RADIUS = 3;
 
 export const electricalTerminalKinds: ObjectKind[] = [
-  "wire", "resistor", "capacitor", "inductor", "battery", "switch", "voltmeter", "ammeter",
+  "wire", "resistor", "capacitor", "inductor", "battery", "voltage-source", "current-source", "switch", "voltmeter", "ammeter",
 ];
 
 function centerFor(object: CanvasObject): Point {

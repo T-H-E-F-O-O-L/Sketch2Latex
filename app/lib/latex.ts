@@ -100,6 +100,15 @@ function meterConnector(object: CanvasObject) {
   return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw[fill=white] (0,0) circle (${n(g.radius)});\n\\node[${labelNodeOptions()}] at (0,-${n(g.labelBaseline)}) {${componentLabel(annotation(object, "main", fallback))}};`);
 }
 
+function idealSourceConnector(object: CanvasObject) {
+  const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2); const g = circuitGeometry.source;
+  const voltage = object.kind === "voltage-source"; const fallback = voltage ? "E" : "I";
+  const sourceGlyph = voltage
+    ? `\\node[${labelNodeOptions("center", 17)}] at (-${n(g.glyphHalfLength)},0) {$-$};\n\\node[${labelNodeOptions("center", 17)}] at (${n(g.glyphHalfLength)},0) {$+$};`
+    : `\\draw[-{Latex}] (-${n(g.glyphHalfLength)},0) -- (${n(g.glyphHalfLength)},0);`;
+  return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw[fill=white] (0,0) circle (${n(g.radius)});\n\\node[${labelNodeOptions()}] at (0,${n(g.labelOffset)}) {${componentLabel(annotation(object, "main", fallback))}};\n${sourceGlyph}`);
+}
+
 function labelledArrowConnector(object: CanvasObject, label: string, vector = false, dipoleTick = false) {
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2); const tick = n(5);
   const annotationNode = label ? `\n\\node[${labelNodeOptions()}] at (0,${n(CONCOURS_CONNECTOR_LABEL_OFFSET)}) {${vector ? vectorComponentLabel(label) : componentLabel(label)}};` : "";
@@ -207,6 +216,7 @@ function objectToLatexBase(object: CanvasObject): string {
     case "point": return `\\fill ${point(object.x + (object.width ?? 18) / 2, object.y + (object.height ?? 18) / 2)} circle (0.06);`;
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
+    case "voltage-source": case "current-source": return idealSourceConnector(object);
     case "lens": case "diverging-lens": return lensConnector(object);
     case "voltmeter": case "ammeter": return meterConnector(object);
     case "spring": return `\\draw ${springPointsFor(object).map((value) => point(value.x, value.y)).join(" -- ")};`;
@@ -357,18 +367,45 @@ function textFromLatex(value: string) {
   return value.trim().replace(/\\textbackslash\{\}\s?/g, "\\").replace(/\\([#%&_{}])/g, "$1");
 }
 
+function nodeContentsFromLatex(block: string): string[] {
+  const starts = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^;{]+)?\s*\{/g)];
+  return starts.flatMap((match) => {
+    const opening = (match.index ?? 0) + match[0].length - 1; let depth = 0;
+    for (let index = opening; index < block.length; index += 1) {
+      if (block[index] === "{" && block[index - 1] !== "\\") depth += 1;
+      if (block[index] === "}" && block[index - 1] !== "\\") depth -= 1;
+      if (depth === 0) return [block.slice(opening + 1, index)];
+    }
+    return [];
+  });
+}
+
+function canvasLabelFromLatex(value: string) {
+  let label = value.trim();
+  const math = label.match(/^\$([\s\S]*)\$$/); if (math) label = math[1];
+  const prose = label.match(/^\\text\{([\s\S]*)\}$/); if (prose) return textFromLatex(prose[1]);
+  label = label.replace(/^\\(?:vec|overrightarrow)\{([^{}]+)\}/, "$1");
+  return textFromLatex(label).replace(/_\{([^{}]+)\}/g, "_$1").replace(/\^\{([^{}]+)\}/g, "^$1");
+}
+
 function annotationsFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
   const defaults = original.annotations ?? defaultAnnotations(original.kind); const keys = Object.keys(defaults ?? {});
   if (!keys.length) return original;
-  const rawValues = [...block.matchAll(/(?:\\node|\bnode)(?:\[[^\]]*\])?(?:\s+at\s+[^{};]+)?\s*\{([^{}]*)\}/g)].map((match) => textFromLatex(match[1]));
-  const values = rawValues.map((text) => {
-    const math = text.match(/^\$([\s\S]*)\$$/)?.[1] ?? text;
-    return math.match(/^\\vec\{([^{}]+)\}$/)?.[1] ?? math;
+  const rawValues = nodeContentsFromLatex(block).map(textFromLatex);
+  const expectedValues = nodeContentsFromLatex(objectToLatexBase(original)).map(textFromLatex);
+  if (rawValues.length === expectedValues.length && rawValues.every((value, index) => value === expectedValues[index])) return original;
+  if (!rawValues.length) return original;
+  const nodeIndexByKey = new Map<string, number>();
+  keys.forEach((key, keyIndex) => {
+    const sentinel = `SENTINEL${keyIndex}Z`; const variant = { ...original, annotations: { ...defaults, [key]: sentinel } };
+    const variantValues = nodeContentsFromLatex(objectToLatexBase(variant)).map(textFromLatex);
+    const nodeIndex = variantValues.findIndex((value, index) => value !== expectedValues[index]);
+    if (nodeIndex >= 0) nodeIndexByKey.set(key, nodeIndex);
   });
-  if (values.length < keys.length) return original;
   const annotations = { ...defaults }; let changed = false;
   keys.forEach((key, index) => {
-    const next = rawValues[index] === componentLabel(annotations[key]) ? annotations[key] : values[index];
+    const nodeIndex = nodeIndexByKey.get(key) ?? index; const raw = rawValues[nodeIndex];
+    const next = raw === undefined || raw === expectedValues[nodeIndex] ? annotations[key] : canvasLabelFromLatex(raw);
     if (annotations[key] !== next) { annotations[key] = next; changed = true; }
   });
   return changed ? { ...original, annotations } : original;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { connectorKinds, defaultDocumentSettings, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
+import { connectorKinds, defaultAnnotations, defaultDocumentSettings, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
 import { makeAopCircuit, type AopConfiguration } from "../app/lib/aop-circuits";
 import { graphPathFor, graphPointSetsFor } from "../app/lib/graph";
 import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from "../app/lib/latex";
@@ -76,6 +76,28 @@ test("matches exact French meter and connector label geometry", () => {
   assert.match(meter, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,-0\.10\) \{\$V_\{s\}\$\}/);
   assert.match(heat, /shift=\{\(1\.00,-1\.50\)\}, rotate=90/);
   assert.match(heat, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.18\) \{\$Q_\{h\}\$\}/);
+});
+
+test("adds French ideal voltage and current generators with exact source geometry", () => {
+  const voltage: CanvasObject = { id: "source-e", kind: "voltage-source", x: 0, y: 0, x2: 120, y2: 0, annotations: { main: "E_0" } };
+  const current: CanvasObject = { id: "source-i", kind: "current-source", x: 50, y: 150, x2: 50, y2: 0, annotations: { main: "I" } };
+  const voltageTikz = objectToLatex(voltage); const currentTikz = objectToLatex(current);
+  assert.deepEqual(defaultAnnotations("voltage-source"), { main: "E" });
+  assert.deepEqual(defaultAnnotations("current-source"), { main: "I" });
+  assert.match(voltageTikz, /shift=\{\(1\.20,0\.00\)\}, rotate=0/);
+  assert.match(voltageTikz, /\\draw\[fill=white\] \(0,0\) circle \(0\.32\)/);
+  assert.match(voltageTikz, /at \(-0\.16,0\) \{\$-\$\}/);
+  assert.match(voltageTikz, /at \(0\.16,0\) \{\$\+\$\}/);
+  assert.match(voltageTikz, /at \(0,0\.56\) \{\$E_\{0\}\$\}/);
+  assert.match(currentTikz, /shift=\{\(1\.00,-1\.50\)\}, rotate=90/);
+  assert.match(currentTikz, /\\draw\[-\{Latex\}\] \(-0\.16,0\) -- \(0\.16,0\)/);
+  assert.deepEqual(portsFor(voltage).map((port) => port.name), ["start", "end"]);
+  assert.deepEqual(portsFor(current).map((port) => port.name), ["start", "end"]);
+  assert.ok(toolboxGroups.find((group) => group.title === "Électricité & signaux")?.kinds.includes("voltage-source"));
+  assert.ok(toolboxGroups.find((group) => group.title === "Électricité & signaux")?.kinds.includes("current-source"));
+  assert.deepEqual(roundTripReport(documentFor([voltage, current]), [voltage, current]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+  const edited = documentFor([voltage]).replace("{$E_{0}$}", "{$E_{1}$}");
+  assert.deepEqual(objectsFromLatex(edited, [voltage]).objects[0].annotations, { main: "E_1" });
 });
 
 test("uses canvas baselines for prose and graph labels", () => {
