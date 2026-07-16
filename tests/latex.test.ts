@@ -10,7 +10,7 @@ import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
 import { scientificSceneFor, scientificSceneToTikz } from "../app/lib/scientific-scene";
-import { parseScientificLabel } from "../app/lib/scientific-label";
+import { parseScientificLabel, scientificLabelToLatex } from "../app/lib/scientific-label";
 
 test("parses concours scientific labels without changing prose", () => {
 assert.deepEqual(parseScientificLabel("R_1"), { parts: [{ text: "R" }, { text: "1", script: "sub" }], vector: false });
@@ -21,6 +21,19 @@ assert.deepEqual(parseScientificLabel("\\mu"), { parts: [{ text: "μ" }], vector
 assert.deepEqual(parseScientificLabel("Q_h"), { parts: [{ text: "Q" }, { text: "h", script: "sub" }], vector: false });
 assert.deepEqual(parseScientificLabel("V_s"), { parts: [{ text: "V" }, { text: "s", script: "sub" }], vector: false });
 assert.deepEqual(parseScientificLabel("solution à doser"), { parts: [{ text: "solution à doser" }], vector: false });
+assert.equal(scientificLabelToLatex("u_C(t)"), "$u_{C}(t)$");
+assert.equal(scientificLabelToLatex("x^2"), "$x^{2}$");
+assert.equal(scientificLabelToLatex("F₁", true), "$\\vec{F}_{1}$");
+assert.equal(scientificLabelToLatex("$F_1$", true), "$\\vec{F}_{1}$");
+});
+
+test("uses the shared label grammar in component and scientific-scene TikZ", () => {
+const resistor = objectToLatex({ id: "r-scientific", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "u_C(t)" } });
+const voltmeter = objectToLatex({ id: "v-scientific", kind: "voltmeter", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "V_s" } });
+const mass = { id: "m-scientific", kind: "mass" as const, x: 0, y: 0, width: 80, height: 60, annotations: { main: "m_1" } };
+assert.match(resistor, /\$u_\{C\}\(t\)\$/);
+assert.match(voltmeter, /\$V_\{s\}\$/);
+assert.match(scientificSceneToTikz(scientificSceneFor(mass) ?? []), /\$m_\{1\}\$/);
 });
 
 test("exports circuit connectors with the exact canvas geometry", () => {

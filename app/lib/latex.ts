@@ -2,6 +2,7 @@ import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObje
 import { circuitGeometry } from "./circuit-geometry";
 import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
+import { scientificLabelToLatex } from "./scientific-label";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
 import { GRAPH_TIKZ_STYLES, graphPointSetsFor } from "./graph";
 
@@ -21,19 +22,11 @@ function safeText(value = "") {
 }
 
 function componentLabel(value: string) {
-  if (value.includes("$")) return value;
-  const unicodeSubscripts: Record<string, string> = { "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9", "₊": "+", "₋": "-" };
-  const unicode = value.match(/^(.*?)([₀-₉₊₋]+)$/u);
-  if (unicode) return `$${safeText(unicode[1])}_{${[...unicode[2]].map((character) => unicodeSubscripts[character]).join("")}}$`;
-  const underscore = value.match(/^(.*?)_([^_]+)$/);
-  return underscore ? `$${safeText(underscore[1])}_{${safeText(underscore[2])}}$` : `$${safeText(value)}$`;
+  return scientificLabelToLatex(value);
 }
 
 function vectorComponentLabel(value: string) {
-  const label = componentLabel(value); const math = label.match(/^\$([\s\S]*)\$$/)?.[1] ?? safeText(value);
-  if (/^\\(?:vec|overrightarrow)\{/.test(math)) return `$${math}$`;
-  const subscript = math.match(/^(.*?)(_\{[^{}]+\}|_.+)$/);
-  return subscript ? `$\\vec{${subscript[1]}}${subscript[2]}$` : `$\\vec{${math}}$`;
+  return scientificLabelToLatex(value, true);
 }
 
 function simplify(points: Point[], tolerance = 1.5): Point[] {
@@ -205,8 +198,8 @@ function objectToLatexBase(object: CanvasObject): string {
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
     case "lens": case "diverging-lens": return lensConnector(object);
-    case "voltmeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "V"))}};`;
-    case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${safeText(annotation(object, "main", "A"))}};`;
+    case "voltmeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${componentLabel(annotation(object, "main", "V"))}};`;
+    case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${componentLabel(annotation(object, "main", "A"))}};`;
     case "spring": return `\\draw[decorate, decoration={coil, aspect=0.3}] ${origin} -- ${end(object)};`;
     case "wave": return `\\draw[decorate, decoration={snake, amplitude=0.08cm, segment length=0.25cm}] ${origin} -- ${end(object)};`;
     case "heat-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${componentLabel(annotation(object, "main", "Q"))}};`;

@@ -152,3 +152,24 @@ export function parseScientificLabel(value: string): ParsedScientificLabel {
   flushNormal();
   return { parts, vector: unwrapped.vector };
 }
+
+const UNICODE_SUBSCRIPTS: Record<string, string> = { "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9", "₊": "+", "₋": "-" };
+
+const normalizeUnicodeSubscript = (value: string) => {
+  const match = value.match(/^(.*?)([₀-₉₊₋]+)$/u);
+  return match ? `${match[1]}_{${[...match[2]].map((character) => UNICODE_SUBSCRIPTS[character]).join("")}}` : value;
+};
+
+const escapeLatexLabel = (value: string) => value.replace(/\\/g, "\\textbackslash{} ").replace(/([#%&_{}])/g, "\\$1");
+
+export function scientificLabelToLatex(value: string, forceVector = false): string {
+  if (value.includes("$") && !forceVector) return value;
+  const parsed = parseScientificLabel(normalizeUnicodeSubscript(value));
+  const pieces = parsed.parts.map((part) => {
+    const content = escapeLatexLabel(part.text);
+    return part.script === "sub" ? `_{${content}}` : part.script === "super" ? `^{${content}}` : content;
+  });
+  const vectorIndex = parsed.parts.findIndex((part) => !part.script);
+  if ((forceVector || parsed.vector) && vectorIndex >= 0) pieces[vectorIndex] = `\\vec{${pieces[vectorIndex]}}`;
+  return `$${pieces.join("")}$`;
+}

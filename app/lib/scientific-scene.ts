@@ -1,5 +1,6 @@
 import { annotation, type CanvasObject, type ObjectKind, type Point } from "./canvas-types";
 import { CANVAS_UNITS_PER_CM, tikzStrokeWidth } from "./concours-style";
+import { scientificLabelToLatex } from "./scientific-label";
 
 type FillRole = "none" | "paper" | "ink" | "light";
 
@@ -331,8 +332,7 @@ const labelLatex = (primitive: Extract<ScientificPrimitive, { type: "text" }>) =
   if (primitive.latex) return `$${primitive.latex}$`;
   if (primitive.math === "raw") return escapeLatex(primitive.value);
   if (primitive.math === false) return `\\text{${escapeLatex(primitive.value)}}`;
-  if (primitive.value.includes("$")) return primitive.value;
-  return primitive.vector ? `$\\vec{${escapeLatex(primitive.value)}}$` : `$${escapeLatex(primitive.value)}$`;
+  return scientificLabelToLatex(primitive.value, primitive.vector);
 };
 const widthOption = (strokeWidth?: number) => strokeWidth === undefined ? "" : `line width=${tikzStrokeWidth(strokeWidth).toFixed(2)}pt`;
 const drawOptions = (...options: Array<string | undefined>) => { const kept = options.filter(Boolean); return kept.length ? `[${kept.join(",")}]` : ""; };
