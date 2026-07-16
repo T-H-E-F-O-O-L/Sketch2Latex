@@ -1,5 +1,5 @@
 import { annotation, type CanvasObject, type ObjectKind, type Point } from "./canvas-types";
-import { CANVAS_UNITS_PER_CM, tikzStrokeWidth } from "./concours-style";
+import { CANVAS_UNITS_PER_CM, canvasUnitsToPoints, tikzStrokeWidth } from "./concours-style";
 import { scientificLabelToLatex } from "./scientific-label";
 
 type FillRole = "none" | "paper" | "ink" | "light";
@@ -334,6 +334,15 @@ const labelLatex = (primitive: Extract<ScientificPrimitive, { type: "text" }>) =
   if (primitive.math === false) return `\\text{${escapeLatex(primitive.value)}}`;
   return scientificLabelToLatex(primitive.value, primitive.vector);
 };
+const labelNodeOptions = (primitive: Extract<ScientificPrimitive, { type: "text" }>) => {
+  const anchor = primitive.anchor === "start" ? "base west" : primitive.anchor === "end" ? "base east" : "base";
+  const options = [`anchor=${anchor}`];
+  if (primitive.fontSize !== undefined && primitive.fontSize !== 14) {
+    const size = canvasUnitsToPoints(primitive.fontSize); const leading = size * 1.2;
+    options.push(`font=\\fontsize{${size.toFixed(2)}pt}{${leading.toFixed(2)}pt}\\selectfont`);
+  }
+  return options.join(",");
+};
 const widthOption = (strokeWidth?: number) => strokeWidth === undefined ? "" : `line width=${tikzStrokeWidth(strokeWidth).toFixed(2)}pt`;
 const drawOptions = (...options: Array<string | undefined>) => { const kept = options.filter(Boolean); return kept.length ? `[${kept.join(",")}]` : ""; };
 
@@ -361,6 +370,6 @@ export function scientificSceneToTikz(scene: ScientificPrimitive[]): string {
       const startX = primitive.cx + Math.cos((primitive.start * Math.PI) / 180) * primitive.r; const startY = primitive.cy + Math.sin((primitive.start * Math.PI) / 180) * primitive.r;
       return `\\draw${drawOptions(primitive.arrowEnd ? "-{Latex}" : undefined, widthOption(primitive.strokeWidth))} ${point(startX, startY)} arc[start angle=${-primitive.start},end angle=${-primitive.end},radius=${value(primitive.r)}cm];`;
     }
-    return `\\node at ${point(primitive.x, primitive.y)} {${labelLatex(primitive)}};`;
+    return `\\node[${labelNodeOptions(primitive)}] at ${point(primitive.x, primitive.y)} {${labelLatex(primitive)}};`;
   }).join("\n");
 }

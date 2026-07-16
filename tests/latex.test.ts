@@ -392,7 +392,7 @@ test("uses one scientific scene for concours mechanics geometry", () => {
   const tikz = scientificSceneToTikz(scene);
   assert.match(tikz, /\\draw\[-\{Latex\}\] \(2\.80,-3\.47\) -- \(5\.36,-3\.47\);/);
   assert.match(tikz, /\\fill \(2\.80,-3\.47\) circle \(0\.04\);/);
-  assert.match(objectToLatex(frame), /\\node at \(2\.60,-3\.81\) \{\$O\$\};/);
+  assert.match(objectToLatex(frame), /\\node\[anchor=base,font=\\fontsize\{7\.37pt\}\{8\.84pt\}\\selectfont\] at \(2\.60,-3\.81\) \{\$O\$\};/);
 });
 
 test("keeps shared mechanics geometry faithful to independent width and height", () => {
@@ -476,6 +476,7 @@ test("shares thermodynamic apparatus and uses correct quantity notation", () => 
   assert.match(engineOutput, /\{\\text\{machine\}\}/);
   assert.match(engineOutput, /\{\$Q_h\$\}/);
   assert.match(engineOutput, /\{\$Q_c\$\}/);
+  assert.match(engineOutput, /\\node\[anchor=base,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$Q_h\$\}/);
   assert.equal((engineOutput.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 3);
   assert.deepEqual(roundTripReport(documentFor([piston, engine]), [piston, engine]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
@@ -491,5 +492,13 @@ test("shares French instruments, ground and every AOP stamp across renderers", (
   assert.match(inverting, /\{\\text\{Inverseur\}\}/);
   assert.doesNotMatch(inverting, /zigzag|to\[R\]/);
   assert.match(comparator, /\{\$V_s\$\}/);
+  assert.match(comparator, /\\node\[anchor=base east,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$V_s\$\}/);
   assert.match(comparator, /\{\\text\{Comparateur\}\}/);
+});
+
+test("preserves concours magnetic glyph scale in TikZ", () => {
+  const field = objectToLatex({ id: "field", kind: "magnetic-field-in", x: 0, y: 0, width: 120, height: 90 });
+  assert.equal((field.match(/font=\\fontsize\{11\.34pt\}\{13\.61pt\}\\selectfont/g) ?? []).length, 6);
+  assert.equal((field.match(/\{\$\\otimes\$\}/g) ?? []).length, 6);
+  assert.match(field, /anchor=base,font=\\fontsize\{7\.37pt\}\{8\.84pt\}\\selectfont.*\{\$\\vec\{B\}\$\}/);
 });
