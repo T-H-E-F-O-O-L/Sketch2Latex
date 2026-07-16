@@ -16,6 +16,7 @@ import { JUNCTION_RADIUS, junctionPointsFor, pointOnWireAt, portFor, portsFor } 
 import { parseScientificLabel } from "./lib/scientific-label";
 import { scientificSceneFor, type ScientificPrimitive } from "./lib/scientific-scene";
 import { GRAPH_CANVAS_DASHES, graphPathFor, graphPathsFor } from "./lib/graph";
+import { simplifyFreehandPoints } from "./lib/freehand-path";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
@@ -408,7 +409,7 @@ function preview(object: CanvasObject, selected: boolean) {
   if (object.kind === "rect") return <rect {...common} x={object.x} y={object.y} width={object.width} height={object.height} />;
   if (object.kind === "circle") return <circle {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} r={Math.abs(object.width ?? 0) / 2} />;
   if (object.kind === "ellipse") return <ellipse {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} rx={Math.abs(object.width ?? 0) / 2} ry={Math.abs(object.height ?? 0) / 2} />;
-  if (object.kind === "freehand") return <polyline {...common} points={(object.points ?? []).map((p) => `${p.x},${p.y}`).join(" ")} />;
+  if (object.kind === "freehand") return <polyline {...common} points={simplifyFreehandPoints(object.points ?? []).map((point) => `${point.x},${point.y}`).join(" ")} />;
   if (object.kind === "text") return <text x={object.x} y={object.y} fill={color} fontSize="17" pointerEvents="all">{object.text}</text>;
   if (object.kind === "axes") return concoursGraphPreview(object, selected);
   return stampPreview(object, selected);

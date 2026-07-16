@@ -5,6 +5,7 @@ import { CANVAS_UNITS_PER_CM, CONCOURS_CONNECTOR_LABEL_OFFSET, TIKZ_ARROW_TIP, T
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificLabelToLatex } from "./scientific-label";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
+import { simplifyFreehandPoints } from "./freehand-path";
 import { GRAPH_TIKZ_STYLES, graphPointSetsFor } from "./graph";
 
 const SCALE = CANVAS_UNITS_PER_CM;
@@ -37,20 +38,6 @@ function labelNodeOptions(anchor = "base", fontSize = 14) {
     options.push(`font=\\fontsize{${size.toFixed(2)}pt}{${leading.toFixed(2)}pt}\\selectfont`);
   }
   return options.join(",");
-}
-
-function simplify(points: Point[], tolerance = 1.5): Point[] {
-  if (points.length < 3) return points;
-  const first = points[0]; const last = points[points.length - 1];
-  const dx = last.x - first.x; const dy = last.y - first.y; const lengthSquared = dx * dx + dy * dy;
-  let index = -1; let maximum = 0;
-  for (let i = 1; i < points.length - 1; i += 1) {
-    const p = points[i];
-    const distance = lengthSquared === 0 ? Math.hypot(p.x - first.x, p.y - first.y) : Math.abs(dy * p.x - dx * p.y + last.x * first.y - last.y * first.x) / Math.sqrt(lengthSquared);
-    if (distance > maximum) { maximum = distance; index = i; }
-  }
-  if (maximum <= tolerance || index < 0) return [first, last];
-  return [...simplify(points.slice(0, index + 1), tolerance), ...simplify(points.slice(index), tolerance).slice(1)];
 }
 
 function bondLines(object: CanvasObject, count: number) {
@@ -244,7 +231,7 @@ function objectToLatexBase(object: CanvasObject): string {
     case "text": return `\\node[${labelNodeOptions("base west", 17)}] at ${origin} {${safeText(object.text)}};`;
     case "equation": { const formula = latexFormula((object.text ?? "").trim().replace(/^\$|\$$/g, "")); return `\\node at ${point(object.x + (object.width ?? 220) / 2, object.y + (object.height ?? 70) / 2)} {$${formula}$};`; }
     case "raw-tikz": return object.rawTikz?.trim() ?? "";
-    case "freehand": { const points = simplify(object.points ?? []); return points.length > 1 ? `\\draw[smooth, tension=0.7] plot coordinates {${points.map((p) => point(p.x, p.y)).join(" ")}};` : ""; }
+    case "freehand": { const points = simplifyFreehandPoints(object.points ?? []); return points.length > 1 ? `\\draw ${points.map((value) => point(value.x, value.y)).join(" -- ")};` : ""; }
     case "axes": {
       const width = object.width ?? 250; const height = object.height ?? 180; const graph = object.graph; const xMin = graph?.xMin ?? -5; const xMax = graph?.xMax ?? 5; const yMin = graph?.yMin ?? -5; const yMax = graph?.yMax ?? 5;
       const clampRatio = (ratio: number) => Math.max(0, Math.min(1, ratio)); const verticalAxis = object.x + clampRatio((0 - xMin) / Math.max(.0001, xMax - xMin)) * width; const horizontalAxis = object.y + clampRatio((yMax - 0) / Math.max(.0001, yMax - yMin)) * height;
@@ -405,6 +392,11 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
     const start = points[0]; const control1 = points[1]; const finish = points[3];
     const control = { x: start.x + 1.5 * (control1.x - start.x), y: start.y + 1.5 * (control1.y - start.y) };
     return { ...withAnnotations, x: start.x, y: start.y, control, x2: finish.x, y2: finish.y };
+  }
+  if (original.kind === "freehand" && points.length >= 2) {
+    const expected = simplifyFreehandPoints(original.points ?? []);
+    const unchanged = points.length === expected.length && points.every((value, index) => Math.abs(value.x - expected[index].x) <= .26 && Math.abs(value.y - expected[index].y) <= .26);
+    return unchanged ? withAnnotations : { ...withAnnotations, x: points[0].x, y: points[0].y, points };
   }
   if (connectorKinds.includes(original.kind) && points.length >= 2) {
     const finish = original.kind === "spring" || original.kind === "wave" ? points.at(-1)! : points[1];

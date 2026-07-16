@@ -10,6 +10,7 @@ import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
 import { springPointsFor, wavePointsFor } from "../app/lib/connector-paths";
+import { simplifyFreehandPoints } from "../app/lib/freehand-path";
 import { scientificSceneFor, scientificSceneToTikz } from "../app/lib/scientific-scene";
 import { parseScientificLabel, scientificLabelToLatex } from "../app/lib/scientific-label";
 
@@ -100,6 +101,20 @@ test("shares exact spring and progressive-wave paths across renderers", () => {
   assert.equal((waveTikz.match(/\(-?\d+\.\d+,-?\d+\.\d+\)/g) ?? []).length, wavePoints.length);
   assert.doesNotMatch(`${springTikz}\n${waveTikz}`, /decorate|decoration=\{(?:coil|snake)/);
   assert.deepEqual(roundTripReport(documentFor([spring, wave]), [spring, wave]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("shares sub-millimetre freehand simplification without smoothing drift", () => {
+  const freehand: CanvasObject = { id: "stroke", kind: "freehand", x: 0, y: 0, points: [{ x: 0, y: 0 }, { x: 10, y: .2 }, { x: 25, y: -.3 }, { x: 50, y: 20 }, { x: 75, y: .4 }, { x: 90, y: -.2 }, { x: 100, y: 0 }] };
+  const simplified = simplifyFreehandPoints(freehand.points ?? []); const tikz = objectToLatex(freehand);
+  assert.ok(simplified.length < (freehand.points?.length ?? 0));
+  assert.deepEqual(simplified[0], { x: 0, y: 0 });
+  assert.deepEqual(simplified.at(-1), { x: 100, y: 0 });
+  assert.ok(simplified.some((point) => point.x === 50 && point.y === 20));
+  assert.equal((tikz.match(/\(-?\d+\.\d+,-?\d+\.\d+\)/g) ?? []).length, simplified.length);
+  assert.doesNotMatch(tikz, /smooth|tension|plot coordinates/);
+  assert.deepEqual(roundTripReport(documentFor([freehand]), [freehand]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+  const edited = documentFor([freehand]).replace("(1.00,-0.40)", "(1.00,-0.80)");
+  assert.ok(objectsFromLatex(edited, [freehand]).objects[0].points?.some((point) => point.x === 50 && point.y === 40));
 });
 
 test("flips canvas y coordinates and clips shared graph geometry", () => {
