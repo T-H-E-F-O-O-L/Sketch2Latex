@@ -12,6 +12,7 @@ export type DiagramTemplate = {
 };
 
 const o = (id: string, object: Omit<CanvasObject, "id">): CanvasObject => ({ id, ...object });
+const concours = (strokeWidth = 2) => ({ stroke: "#111111", strokeWidth });
 
 export const diagramTemplates: DiagramTemplate[] = [
   {
@@ -30,7 +31,7 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("rlc-right", { kind: "wire", x: 590, y: 160, x2: 590, y2: 390 }),
       o("rlc-c", { kind: "capacitor", x: 590, y: 390, x2: 430, y2: 390, annotations: { main: "C" } }),
       o("rlc-bottom", { kind: "wire", x: 430, y: 390, x2: 120, y2: 390 }),
-      o("rlc-i", { kind: "arrow", x: 190, y: 130, x2: 340, y2: 130, annotations: { main: "i(t)" }, style: { stroke: "#1769aa", strokeWidth: 2 } }),
+      o("rlc-i", { kind: "arrow", x: 190, y: 130, x2: 340, y2: 130, annotations: { main: "i(t)" }, style: concours() }),
       o("rlc-title", { kind: "text", x: 355, y: 90, text: "Circuit RLC série" }),
     ],
   },
@@ -46,8 +47,8 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("pen-support", { kind: "line", x: 250, y: 95, x2: 470, y2: 95 }),
       o("pen-rope", { kind: "line", x: 360, y: 95, x2: 485, y2: 330 }),
       o("pen-mass", { kind: "mass", x: 445, y: 315, width: 80, height: 60, annotations: { main: "m" } }),
-      o("pen-weight", { kind: "force", x: 485, y: 345, x2: 485, y2: 475, annotations: { main: "P" }, style: { stroke: "#c62828", strokeWidth: 3 } }),
-      o("pen-tension", { kind: "force", x: 480, y: 330, x2: 405, y2: 190, annotations: { main: "T" }, style: { stroke: "#1769aa", strokeWidth: 3 } }),
+      o("pen-weight", { kind: "force", x: 485, y: 345, x2: 485, y2: 475, annotations: { main: "P" }, style: concours(3) }),
+      o("pen-tension", { kind: "force", x: 480, y: 330, x2: 405, y2: 190, annotations: { main: "T" }, style: concours(3) }),
       o("pen-vertical", { kind: "dashed-line", x: 360, y: 95, x2: 360, y2: 390 }),
       o("pen-angle", { kind: "curve", x: 360, y: 175, x2: 398, y2: 166, control: { x: 377, y: 165 }, annotations: { main: "θ" } }),
       o("pen-label", { kind: "text", x: 395, y: 195, text: "θ" }),
@@ -63,12 +64,16 @@ export const diagramTemplates: DiagramTemplate[] = [
     license: "Adapté sous CC BY-SA 4.0",
     objects: [
       o("prism", { kind: "prism", x: 370, y: 190, width: 150, height: 140 }),
-      o("incident", { kind: "light-ray", x: 100, y: 260, x2: 415, y2: 260, style: { stroke: "#111111", strokeWidth: 3 } }),
-      o("red", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 205, style: { stroke: "#c62828", strokeWidth: 3 } }),
-      o("orange", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 240, style: { stroke: "#ef6c00", strokeWidth: 3 } }),
-      o("blue", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 300, style: { stroke: "#1769aa", strokeWidth: 3 } }),
-      o("violet", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 335, style: { stroke: "#6a1b9a", strokeWidth: 3 } }),
+      o("incident", { kind: "light-ray", x: 100, y: 260, x2: 415, y2: 260, style: concours(3) }),
+      o("red", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 205, style: concours(3) }),
+      o("orange", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 240, style: concours(3) }),
+      o("blue", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 300, style: concours(3) }),
+      o("violet", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 335, style: concours(3) }),
       o("white-light", { kind: "text", x: 190, y: 235, text: "lumière blanche" }),
+      o("red-label", { kind: "text", x: 780, y: 208, text: "rouge" }),
+      o("orange-label", { kind: "text", x: 780, y: 243, text: "orange" }),
+      o("blue-label", { kind: "text", x: 780, y: 303, text: "bleu" }),
+      o("violet-label", { kind: "text", x: 780, y: 338, text: "violet" }),
     ],
   },
   {
@@ -82,11 +87,11 @@ export const diagramTemplates: DiagramTemplate[] = [
     objects: [
       o("lens-axis", { kind: "line", x: 80, y: 300, x2: 820, y2: 300 }),
       o("lens", { kind: "lens", x: 450, y: 170, x2: 450, y2: 430 }),
-      o("object", { kind: "arrow", x: 230, y: 300, x2: 230, y2: 175, style: { stroke: "#111111", strokeWidth: 3 } }),
-      o("parallel", { kind: "light-ray", x: 230, y: 175, x2: 450, y2: 175, style: { stroke: "#1769aa", strokeWidth: 2 } }),
-      o("refracted", { kind: "light-ray", x: 450, y: 175, x2: 700, y2: 385, style: { stroke: "#1769aa", strokeWidth: 2 } }),
-      o("central", { kind: "light-ray", x: 230, y: 175, x2: 700, y2: 385, style: { stroke: "#c62828", strokeWidth: 2 } }),
-      o("image", { kind: "arrow", x: 700, y: 300, x2: 700, y2: 385, style: { stroke: "#111111", strokeWidth: 3 } }),
+      o("object", { kind: "arrow", x: 230, y: 300, x2: 230, y2: 175, style: concours(3) }),
+      o("parallel", { kind: "light-ray", x: 230, y: 175, x2: 450, y2: 175, style: concours() }),
+      o("refracted", { kind: "light-ray", x: 450, y: 175, x2: 700, y2: 385, style: concours() }),
+      o("central", { kind: "light-ray", x: 230, y: 175, x2: 700, y2: 385, style: concours() }),
+      o("image", { kind: "arrow", x: 700, y: 300, x2: 700, y2: 385, style: concours(3) }),
       o("f-left", { kind: "point", x: 325, y: 291, width: 18, height: 18 }),
       o("f-left-label", { kind: "text", x: 334, y: 330, text: "F" }),
       o("f-right", { kind: "point", x: 565, y: 291, width: 18, height: 18 }),
@@ -105,9 +110,9 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("hot", { kind: "thermal-reservoir", x: 390, y: 70, width: 120, height: 90, annotations: { main: "Tₕ" } }),
       o("engine", { kind: "heat-engine", x: 375, y: 235, width: 150, height: 120, annotations: { main: "machine", hot: "Qₕ", cold: "Q𝚌", work: "W" } }),
       o("cold", { kind: "thermal-reservoir", x: 390, y: 420, width: 120, height: 90, annotations: { main: "T𝚌" } }),
-      o("qh", { kind: "heat-arrow", x: 450, y: 160, x2: 450, y2: 235, annotations: { main: "Qₕ" }, style: { stroke: "#c62828", strokeWidth: 3 } }),
-      o("qc", { kind: "heat-arrow", x: 450, y: 355, x2: 450, y2: 420, annotations: { main: "Q𝚌" }, style: { stroke: "#1769aa", strokeWidth: 3 } }),
-      o("work", { kind: "work-arrow", x: 525, y: 295, x2: 700, y2: 295, annotations: { main: "W" }, style: { stroke: "#2e7d32", strokeWidth: 3 } }),
+      o("qh", { kind: "heat-arrow", x: 450, y: 160, x2: 450, y2: 235, annotations: { main: "Qₕ" }, style: concours(3) }),
+      o("qc", { kind: "heat-arrow", x: 450, y: 355, x2: 450, y2: 420, annotations: { main: "Q𝚌" }, style: concours(3) }),
+      o("work", { kind: "work-arrow", x: 525, y: 295, x2: 700, y2: 295, annotations: { main: "W" }, style: concours(3) }),
     ],
   },
   {
@@ -123,7 +128,7 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("burette", { kind: "burette", x: 360, y: 85, width: 50, height: 270 }),
       o("beaker", { kind: "beaker", x: 360, y: 365, width: 135, height: 140 }),
       o("stirrer", { kind: "magnetic-stirrer", x: 340, y: 455, width: 175, height: 90 }),
-      o("drop", { kind: "dashed-line", x: 385, y: 355, x2: 410, y2: 390, style: { stroke: "#1769aa", strokeWidth: 2 } }),
+      o("drop", { kind: "dashed-line", x: 385, y: 355, x2: 410, y2: 390, style: concours() }),
       o("titrant", { kind: "text", x: 470, y: 180, text: "solution titrante" }),
       o("analyte", { kind: "text", x: 565, y: 430, text: "solution à doser" }),
     ],
@@ -141,7 +146,7 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("wire-left", { kind: "wire", x: 340, y: 225, x2: 340, y2: 100 }),
       o("wire-top", { kind: "wire", x: 340, y: 100, x2: 560, y2: 100 }),
       o("wire-right", { kind: "wire", x: 560, y: 100, x2: 560, y2: 225 }),
-      o("current", { kind: "arrow", x: 390, y: 75, x2: 510, y2: 75, style: { stroke: "#c62828", strokeWidth: 2 } }),
+      o("current", { kind: "arrow", x: 390, y: 75, x2: 510, y2: 75, style: concours() }),
       o("current-label", { kind: "text", x: 450, y: 55, text: "e⁻" }),
     ],
   },

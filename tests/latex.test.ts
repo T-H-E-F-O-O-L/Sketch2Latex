@@ -189,6 +189,19 @@ test("keeps document settings and structured template projects portable", () => 
   assert.match(documentFor([], true, project.settings), /scale=10/);
 });
 
+test("keeps every built-in concours template print-safe and self-explanatory", () => {
+  const styled = diagramTemplates.flatMap((template) => template.objects.filter((object) => object.style?.stroke));
+  assert.ok(styled.length > 10);
+  assert.ok(styled.every((object) => object.style?.stroke === "#111111"));
+  for (const template of diagramTemplates) assert.doesNotMatch(documentFor(template.objects), /color=\{rgb/);
+  const prism = diagramTemplates.find((template) => template.id === "prism-dispersion");
+  assert.ok(prism);
+  assert.deepEqual(prism.objects.filter((object) => object.id.endsWith("-label")).map((object) => object.text), ["rouge", "orange", "bleu", "violet"]);
+  const pendulum = documentFor(diagramTemplates.find((template) => template.id === "pendulum-forces")!.objects);
+  assert.match(pendulum, /\$\\vec\{P\}\$/);
+  assert.match(pendulum, /\$\\vec\{T\}\$/);
+});
+
 test("imports richer ordinary TikZ and protects unsupported commands", () => {
   const source = String.raw`\begin{tikzpicture}
 \draw (0,0) circle (1);
