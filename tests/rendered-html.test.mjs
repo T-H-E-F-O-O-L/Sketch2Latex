@@ -28,7 +28,7 @@ test("server-renders the Sketch2LaTeX editor", async () => {
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
-  const [page, css, templates, project, latex, concoursStyle, connectionGeometry, scientificScene, mathKeyboard, mathCalculator, packageJson] = await Promise.all([
+  const [page, css, templates, project, latex, concoursStyle, connectionGeometry, scientificScene, scientificLabel, mathKeyboard, mathCalculator, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/templates.ts", import.meta.url), "utf8"),
@@ -37,6 +37,7 @@ test("ships editor, persistence, template and vector-export workflows", async ()
     readFile(new URL("../app/lib/concours-style.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/connection-geometry.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/scientific-scene.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/scientific-label.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/math-keyboard.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/math-calculator.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -85,6 +86,8 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(connectionGeometry, /junctionPointsFor/);
   assert.match(scientificScene, /sharedScientificKinds/);
   assert.match(scientificScene, /scientificSceneToTikz/);
+  assert.match(scientificLabel, /parseScientificLabel/);
+  assert.match(page, /scientificLabelSpans/);
   assert.match(mathKeyboard, /mathKeyboardLayouts/);
   assert.match(mathKeyboard, /label: "123"/);
   assert.match(mathKeyboard, /label: "f\(x\)"/);

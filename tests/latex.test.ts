@@ -10,6 +10,18 @@ import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
 import { scientificSceneFor, scientificSceneToTikz } from "../app/lib/scientific-scene";
+import { parseScientificLabel } from "../app/lib/scientific-label";
+
+test("parses concours scientific labels without changing prose", () => {
+assert.deepEqual(parseScientificLabel("R_1"), { parts: [{ text: "R" }, { text: "1", script: "sub" }], vector: false });
+assert.deepEqual(parseScientificLabel("u_C(t)"), { parts: [{ text: "u" }, { text: "C", script: "sub" }, { text: "(t)" }], vector: false });
+assert.deepEqual(parseScientificLabel("$\\vec{F}_{1}$"), { parts: [{ text: "F" }, { text: "1", script: "sub" }], vector: true });
+assert.deepEqual(parseScientificLabel("x^2"), { parts: [{ text: "x" }, { text: "2", script: "super" }], vector: false });
+assert.deepEqual(parseScientificLabel("\\mu"), { parts: [{ text: "μ" }], vector: false });
+assert.deepEqual(parseScientificLabel("Q_h"), { parts: [{ text: "Q" }, { text: "h", script: "sub" }], vector: false });
+assert.deepEqual(parseScientificLabel("V_s"), { parts: [{ text: "V" }, { text: "s", script: "sub" }], vector: false });
+assert.deepEqual(parseScientificLabel("solution à doser"), { parts: [{ text: "solution à doser" }], vector: false });
+});
 
 test("exports circuit connectors with the exact canvas geometry", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
