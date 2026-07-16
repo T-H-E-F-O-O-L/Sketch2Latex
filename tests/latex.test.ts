@@ -326,6 +326,25 @@ test("keeps every built-in concours template print-safe and self-explanatory", (
   assert.match(pendulum, /\$\\vec\{T\}\$/);
 });
 
+test("provides French Thévenin and Norton equivalents with exact circuit semantics", () => {
+  const thevenin = diagramTemplates.find((template) => template.id === "thevenin-equivalent");
+  const norton = diagramTemplates.find((template) => template.id === "norton-equivalent");
+  assert.ok(thevenin);
+  assert.ok(norton);
+  assert.ok(thevenin.objects.some((object) => object.kind === "voltage-source"));
+  assert.ok(norton.objects.some((object) => object.kind === "current-source"));
+
+  const theveninLatex = documentFor(thevenin.objects);
+  const nortonLatex = documentFor(norton.objects);
+  assert.match(theveninLatex, /\{\$E_\{Th\}\$\}/);
+  assert.match(theveninLatex, /\{\$R_\{Th\}\$\}/);
+  assert.match(nortonLatex, /\{\$I_\{N\}\$\}/);
+  assert.match(nortonLatex, /\{\$R_\{N\}\$\}/);
+  assert.deepEqual(junctionPointsFor(norton.objects), [{ x: 450, y: 180 }, { x: 450, y: 360 }]);
+  assert.deepEqual(roundTripReport(theveninLatex, thevenin.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+  assert.deepEqual(roundTripReport(nortonLatex, norton.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("imports richer ordinary TikZ and protects unsupported commands", () => {
   const source = String.raw`\begin{tikzpicture}
 \draw (0,0) circle (1);
