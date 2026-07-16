@@ -22,6 +22,8 @@ test("server-renders the Sketch2LaTeX editor", async () => {
   assert.match(html, /Canevas scientifique interactif/);
   assert.match(html, /Ajouter un graphe/);
   assert.match(html, /SVG vectoriel/);
+  assert.match(html, /Type de trait/);
+  assert.match(html, /Mixte tiret-point/);
   assert.doesNotMatch(html, /Compiler le LaTeX/);
 });
 
@@ -59,6 +61,7 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /EXPORTED_SVG_STYLE/);
   assert.match(page, /editor-locked/);
   assert.match(page, /scientificScenePreview/);
+  assert.match(page, /strokePattern/);
   assert.doesNotMatch(page, /\/api\/compile/);
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);

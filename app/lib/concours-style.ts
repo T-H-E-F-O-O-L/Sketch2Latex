@@ -1,3 +1,5 @@
+import type { StrokePattern } from "./canvas-types";
+
 /** Shared print geometry for the canvas, SVG/PDF export and generated TikZ. */
 export const CANVAS_UNITS_PER_CM = 50;
 export const POINTS_PER_CM = 72 / 2.54;
@@ -16,6 +18,18 @@ const pt = (value: number) => `${value.toFixed(2)}pt`;
 
 export const TIKZ_NORMAL_STROKE = pt(tikzStrokeWidth(DEFAULT_CANVAS_STROKE));
 export const TIKZ_DASH_PATTERN = `on ${pt(canvasUnitsToPoints(CONCOURS_DASH.on))} off ${pt(canvasUnitsToPoints(CONCOURS_DASH.off))}`;
+export const SVG_STROKE_PATTERNS: Record<StrokePattern, string | undefined> = {
+  solid: undefined,
+  dashed: `${CONCOURS_DASH.on} ${CONCOURS_DASH.off}`,
+  dotted: "1 4",
+  "dash-dot": `${CONCOURS_DASH.on} 3 1 3`,
+};
+export const TIKZ_STROKE_PATTERNS: Record<StrokePattern, string | undefined> = {
+  solid: undefined,
+  dashed: `dash pattern=${TIKZ_DASH_PATTERN}`,
+  dotted: "densely dotted",
+  "dash-dot": "dash dot",
+};
 export const TIKZ_ARROW_TIP = `Latex[length=${pt(canvasUnitsToPoints(CONCOURS_ARROW.length))},width=${pt(canvasUnitsToPoints(CONCOURS_ARROW.width))}]`;
 export const TIKZ_LABEL_SIZE = pt(canvasUnitsToPoints(CONCOURS_LABEL_SIZE));
 

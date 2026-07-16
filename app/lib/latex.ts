@@ -1,6 +1,6 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
-import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, tikzStrokeWidth } from "./concours-style";
+import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
 import { GRAPH_TIKZ_STYLES, graphPointSetsFor } from "./graph";
@@ -113,6 +113,8 @@ function tikzStyle(object: CanvasObject) {
   }
   const strokeWidth = object.style?.strokeWidth;
   if (strokeWidth !== undefined && strokeWidth !== 2) options.push(`line width=${tikzStrokeWidth(strokeWidth).toFixed(2)}pt`);
+  const strokePattern = TIKZ_STROKE_PATTERNS[object.style?.strokePattern ?? "solid"];
+  if (strokePattern) options.push(strokePattern);
   return options.join(",");
 }
 

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { connectorKinds, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
+import { connectorKinds, defaultDocumentSettings, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ObjectKind } from "../app/lib/canvas-types";
 import { makeAopCircuit, type AopConfiguration } from "../app/lib/aop-circuits";
 import { graphPathFor, graphPointSetsFor } from "../app/lib/graph";
 import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from "../app/lib/latex";
-import { parseProject } from "../app/lib/project";
+import { makeProject, parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
@@ -67,12 +67,29 @@ test("keeps independent selected-object width and height in the exported LaTeX",
 });
 
 test("exports editable drawing color and line width", () => {
-  const objects: CanvasObject[] = [{ id: "colored-line", kind: "line", x: 0, y: 0, x2: 100, y2: 0, style: { stroke: "#c62828", strokeWidth: 4 } }];
+  const objects: CanvasObject[] = [{ id: "colored-line", kind: "line", x: 0, y: 0, x2: 100, y2: 0, style: { stroke: "#c62828", strokeWidth: 4, strokePattern: "dash-dot" } }];
   const output = documentFor(objects);
   assert.match(output, /color=\{rgb,255:red,198;green,40;blue,40\}/);
   assert.match(output, /line width=2\.27pt/);
+  assert.match(output, /dash dot/);
   const edited = output.replace('"stroke":"#c62828"', '"stroke":"#1769aa"');
-  assert.deepEqual(objectsFromLatex(edited, objects).objects[0].style, { stroke: "#1769aa", strokeWidth: 4 });
+  assert.deepEqual(objectsFromLatex(edited, objects).objects[0].style, { stroke: "#1769aa", strokeWidth: 4, strokePattern: "dash-dot" });
+});
+
+test("exports and persists every French engineering stroke pattern", () => {
+  const objects: CanvasObject[] = [
+    { id: "solid", kind: "line", x: 0, y: 0, x2: 80, y2: 0, style: { strokePattern: "solid" } },
+    { id: "dash", kind: "force", x: 0, y: 30, x2: 80, y2: 30, annotations: { main: "F" }, style: { strokePattern: "dashed" } },
+    { id: "dot", kind: "circle", x: 0, y: 50, width: 60, height: 60, style: { strokePattern: "dotted" } },
+    { id: "mixed", kind: "mass", x: 100, y: 50, width: 80, height: 60, style: { strokePattern: "dash-dot" } },
+  ];
+  assert.doesNotMatch(objectToLatex(objects[0]), /dash pattern|dotted|dash dot/);
+  assert.match(objectToLatex(objects[1]), /dash pattern=on 3\.97pt off 2\.83pt/);
+  assert.match(objectToLatex(objects[2]), /densely dotted/);
+  assert.match(objectToLatex(objects[3]), /dash dot/);
+  const project = parseProject(makeProject("Traits normalisés", objects, defaultDocumentSettings));
+  assert.deepEqual(project.objects.map((object) => object.style?.strokePattern), ["solid", "dashed", "dotted", "dash-dot"]);
+  assert.deepEqual(roundTripReport(documentFor(objects), objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("applies editable generated LaTeX coordinates back to the canvas", () => {
@@ -197,6 +214,7 @@ test("keeps every built-in concours template print-safe and self-explanatory", (
   const prism = diagramTemplates.find((template) => template.id === "prism-dispersion");
   assert.ok(prism);
   assert.deepEqual(prism.objects.filter((object) => object.id.endsWith("-label")).map((object) => object.text), ["rouge", "orange", "bleu", "violet"]);
+  assert.deepEqual(prism.objects.filter((object) => ["red", "orange", "blue", "violet"].includes(object.id)).map((object) => object.style?.strokePattern), ["solid", "dashed", "dotted", "dash-dot"]);
   const pendulum = documentFor(diagramTemplates.find((template) => template.id === "pendulum-forces")!.objects);
   assert.match(pendulum, /\$\\vec\{P\}\$/);
   assert.match(pendulum, /\$\\vec\{T\}\$/);

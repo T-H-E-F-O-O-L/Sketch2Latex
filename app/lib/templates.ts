@@ -1,4 +1,4 @@
-import type { CanvasObject } from "./canvas-types";
+import type { CanvasObject, StrokePattern } from "./canvas-types";
 
 export type DiagramTemplate = {
   id: string;
@@ -12,7 +12,7 @@ export type DiagramTemplate = {
 };
 
 const o = (id: string, object: Omit<CanvasObject, "id">): CanvasObject => ({ id, ...object });
-const concours = (strokeWidth = 2) => ({ stroke: "#111111", strokeWidth });
+const concours = (strokeWidth = 2, strokePattern: StrokePattern = "solid") => ({ stroke: "#111111", strokeWidth, strokePattern });
 
 export const diagramTemplates: DiagramTemplate[] = [
   {
@@ -66,9 +66,9 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("prism", { kind: "prism", x: 370, y: 190, width: 150, height: 140 }),
       o("incident", { kind: "light-ray", x: 100, y: 260, x2: 415, y2: 260, style: concours(3) }),
       o("red", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 205, style: concours(3) }),
-      o("orange", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 240, style: concours(3) }),
-      o("blue", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 300, style: concours(3) }),
-      o("violet", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 335, style: concours(3) }),
+      o("orange", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 240, style: concours(3, "dashed") }),
+      o("blue", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 300, style: concours(3, "dotted") }),
+      o("violet", { kind: "light-ray", x: 470, y: 260, x2: 760, y2: 335, style: concours(3, "dash-dot") }),
       o("white-light", { kind: "text", x: 190, y: 235, text: "lumière blanche" }),
       o("red-label", { kind: "text", x: 780, y: 208, text: "rouge" }),
       o("orange-label", { kind: "text", x: 780, y: 243, text: "orange" }),

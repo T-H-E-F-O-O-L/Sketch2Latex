@@ -12,6 +12,7 @@ export type ObjectKind =
 
 export type Point = { x: number; y: number };
 export type ConnectionPortName = "start" | "end" | "segment" | "ground" | "inverting" | "non-inverting" | "output";
+export type StrokePattern = "solid" | "dashed" | "dotted" | "dash-dot";
 
 export type CanvasObject = {
   id: string;
@@ -31,7 +32,7 @@ export type CanvasObject = {
   text?: string;
   rawTikz?: string;
   annotations?: Record<string, string>;
-  style?: { stroke?: string; strokeWidth?: number; fill?: string };
+  style?: { stroke?: string; strokeWidth?: number; strokePattern?: StrokePattern; fill?: string };
   graph?: { expression: string; expressions?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
   bindings?: { startId?: string; endId?: string; startPort?: ConnectionPortName; endPort?: ConnectionPortName; startRatio?: number; endRatio?: number };
   groupId?: string;
