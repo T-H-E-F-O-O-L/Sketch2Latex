@@ -4,7 +4,7 @@ export type ObjectKind =
   | "op-amp" | "op-amp-comparator" | "op-amp-inverting" | "op-amp-non-inverting" | "op-amp-summing" | "op-amp-integrator" | "op-amp-differentiator" | "op-amp-schmitt"
   | "signal-arrow" | "transfer-block" | "summing-junction" | "takeoff-point"
   | "voltmeter" | "ammeter" | "gbf" | "oscilloscope"
-  | "spring" | "force" | "mass" | "pulley" | "pendulum" | "reference-frame" | "circular-trajectory" | "gravity-field" | "joint-pivot" | "joint-slider" | "joint-ball"
+  | "spring" | "force" | "mass" | "pulley" | "pendulum" | "reference-frame" | "circular-trajectory" | "gravity-field" | "joint-pivot" | "joint-slider" | "joint-ball" | "joint-cylindrical" | "joint-helical" | "joint-planar" | "joint-line-contact" | "joint-annular" | "joint-point-contact"
   | "lens" | "diverging-lens" | "plane-mirror" | "screen" | "prism" | "fiber" | "light-ray" | "wave"
   | "electric-field" | "magnetic-field-in" | "magnetic-field-out" | "bar-magnet" | "coil" | "solenoid" | "laplace-rails" | "charged-particle"
   | "heat-arrow" | "work-arrow" | "piston-cylinder" | "thermal-reservoir" | "heat-engine"
@@ -87,7 +87,7 @@ export const connectorKinds: ObjectKind[] = [
 ];
 
 export const stampKinds: ObjectKind[] = [
-  "point", "equation", "ground", "transformer", "gbf", "oscilloscope", "transfer-block", "summing-junction", "takeoff-point", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "joint-pivot", "joint-slider", "joint-ball",
+  "point", "equation", "ground", "transformer", "gbf", "oscilloscope", "transfer-block", "summing-junction", "takeoff-point", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "joint-pivot", "joint-slider", "joint-ball", "joint-cylindrical", "joint-helical", "joint-planar", "joint-line-contact", "joint-annular", "joint-point-contact",
   "plane-mirror", "screen", "prism", "fiber", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle",
   "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
@@ -99,6 +99,7 @@ export const labels: Record<ObjectKind, string> = {
   wire: "Fil", resistor: "Résistance R", capacitor: "Condensateur C", inductor: "Bobine L", battery: "Pile / batterie", "voltage-source": "Générateur idéal de tension", "current-source": "Générateur idéal de courant", switch: "Interrupteur", transformer: "Transformateur à noyau", ground: "Masse / terre", voltmeter: "Voltmètre", ammeter: "Ampèremètre", gbf: "GBF", oscilloscope: "Oscilloscope",
   spring: "Ressort", force: "Vecteur force", mass: "Masse m", pulley: "Poulie", pendulum: "Pendule", "reference-frame": "Repère (O,x,y)", "circular-trajectory": "Trajectoire circulaire", "gravity-field": "Champ de pesanteur",
   "joint-pivot": "Liaison pivot (vue de face)", "joint-slider": "Liaison glissière (vue de côté)", "joint-ball": "Liaison sphérique / rotule",
+  "joint-cylindrical": "Liaison pivot glissant", "joint-helical": "Liaison hélicoïdale", "joint-planar": "Liaison appui plan", "joint-line-contact": "Liaison linéaire rectiligne", "joint-annular": "Liaison linéaire annulaire", "joint-point-contact": "Liaison sphère-plan / ponctuelle",
   lens: "Lentille convergente", "diverging-lens": "Lentille divergente", "plane-mirror": "Miroir plan", screen: "Écran", prism: "Prisme", fiber: "Fibre optique", "light-ray": "Rayon lumineux", wave: "Onde progressive",
   "electric-field": "Champ électrique", "magnetic-field-in": "Champ B entrant", "magnetic-field-out": "Champ B sortant", "bar-magnet": "Aimant droit", coil: "Spire", solenoid: "Bobine longue", "laplace-rails": "Rails de Laplace", "charged-particle": "Particule chargée",
   "heat-arrow": "Transfert thermique Q", "work-arrow": "Travail W", "piston-cylinder": "Piston-cylindre", "thermal-reservoir": "Réservoir thermique", "heat-engine": "Machine thermique",
@@ -115,7 +116,7 @@ export const toolboxGroups: ToolboxGroup[] = [
   { title: "Électricité & signaux", kinds: ["wire", "resistor", "capacitor", "inductor", "battery", "voltage-source", "current-source", "switch", "transformer", "ground", "voltmeter", "ammeter", "gbf", "oscilloscope"] },
   { title: "Optique & ondes", kinds: ["lens", "diverging-lens", "plane-mirror", "screen", "prism", "fiber", "light-ray", "wave"] },
   { title: "Mécanique", kinds: ["force", "spring", "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field"] },
-  { title: "Liaisons mécaniques normalisées", kinds: ["joint-pivot", "joint-slider", "joint-ball"] },
+  { title: "Liaisons mécaniques normalisées", kinds: ["joint-pivot", "joint-slider", "joint-cylindrical", "joint-helical", "joint-ball", "joint-planar", "joint-line-contact", "joint-annular", "joint-point-contact"] },
   { title: "Champs & induction", kinds: ["electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle"] },
   { title: "Thermodynamique", kinds: ["heat-arrow", "work-arrow", "piston-cylinder", "thermal-reservoir", "heat-engine"] },
   { title: "Chimie", kinds: ["bond-single", "bond-double", "bond-triple", "reaction-arrow", "equilibrium-arrow", "hydrogen-bond", "dipole", "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell"] },
@@ -128,6 +129,7 @@ const sizes: Partial<Record<ObjectKind, { width: number; height: number }>> = {
   point: { width: 18, height: 18 }, equation: { width: 220, height: 70 }, "raw-tikz": { width: 180, height: 70 },
   ground: { width: 44, height: 42 }, transformer: { width: 140, height: 160 }, gbf: { width: 70, height: 70 }, oscilloscope: { width: 100, height: 70 }, mass: { width: 70, height: 55 }, pulley: { width: 85, height: 85 }, pendulum: { width: 80, height: 110 }, "reference-frame": { width: 100, height: 80 }, "circular-trajectory": { width: 90, height: 90 }, "gravity-field": { width: 95, height: 85 },
   "joint-pivot": { width: 90, height: 50 }, "joint-slider": { width: 110, height: 70 }, "joint-ball": { width: 100, height: 70 },
+  "joint-cylindrical": { width: 110, height: 70 }, "joint-helical": { width: 110, height: 70 }, "joint-planar": { width: 90, height: 80 }, "joint-line-contact": { width: 90, height: 90 }, "joint-annular": { width: 90, height: 90 }, "joint-point-contact": { width: 90, height: 90 },
   "transfer-block": { width: 120, height: 70 }, "summing-junction": { width: 70, height: 70 }, "takeoff-point": { width: 18, height: 18 },
   lens: { width: 60, height: 120 }, "diverging-lens": { width: 60, height: 120 }, "plane-mirror": { width: 34, height: 120 }, screen: { width: 34, height: 120 }, prism: { width: 90, height: 80 }, fiber: { width: 140, height: 65 }, "electric-field": { width: 100, height: 75 }, "magnetic-field-in": { width: 90, height: 75 }, "magnetic-field-out": { width: 90, height: 75 }, "bar-magnet": { width: 110, height: 48 }, coil: { width: 100, height: 70 }, solenoid: { width: 130, height: 80 }, "laplace-rails": { width: 140, height: 90 }, "charged-particle": { width: 50, height: 50 },
   "piston-cylinder": { width: 100, height: 105 }, "thermal-reservoir": { width: 78, height: 78 }, "heat-engine": { width: 120, height: 100 },

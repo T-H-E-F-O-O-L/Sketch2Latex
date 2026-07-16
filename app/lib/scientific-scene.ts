@@ -15,7 +15,7 @@ export type ScientificPrimitive =
   | { type: "text"; x: number; y: number; value: string; latex?: string; anchor?: "start" | "middle" | "end"; fontSize?: number; vector?: boolean; math?: boolean | "raw" };
 
 export const sharedScientificKinds: ObjectKind[] = [
-  "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "joint-pivot", "joint-slider", "joint-ball", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
+  "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "joint-pivot", "joint-slider", "joint-ball", "joint-cylindrical", "joint-helical", "joint-planar", "joint-line-contact", "joint-annular", "joint-point-contact", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
   "ground", "transformer", "gbf", "oscilloscope", "transfer-block", "summing-junction", "takeoff-point", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
 ];
@@ -70,6 +70,58 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
       { type: "line", x1: x, y1: cy, x2: cx - cupRadius, y2: cy },
       { type: "arc", cx, cy, r: cupRadius, start: 45, end: 315 },
       { type: "circle", cx, cy, r: radius, fill: "paper" },
+    ];
+  }
+  if (object.kind === "joint-cylindrical" || object.kind === "joint-helical") {
+    const axisY = y + height * .4; const bodyWidth = width * .5; const bodyHeight = height * .35; const left = cx - bodyWidth / 2; const right = cx + bodyWidth / 2;
+    const male: ScientificPrimitive[] = object.kind === "joint-cylindrical" ? [
+      { type: "line", x1: x, y1: axisY, x2: x + width, y2: axisY },
+    ] : [
+      { type: "line", x1: x, y1: axisY, x2: left, y2: axisY },
+      { type: "polyline", points: Array.from({ length: 33 }, (_, index) => ({ x: left + (bodyWidth * index) / 32, y: axisY + Math.sin((index / 32) * Math.PI * 6) * bodyHeight * .16 })) },
+      { type: "line", x1: right, y1: axisY, x2: x + width, y2: axisY },
+    ];
+    return [
+      { type: "rect", x: left, y: axisY - bodyHeight / 2, width: bodyWidth, height: bodyHeight, fill: "paper" },
+      ...male,
+      { type: "rect", x: left, y: axisY - bodyHeight / 2, width: bodyWidth, height: bodyHeight },
+      { type: "line", x1: cx, y1: axisY + bodyHeight / 2, x2: cx, y2: y + height },
+    ];
+  }
+  if (object.kind === "joint-planar") {
+    const half = width * .42; const upperY = cy - height * .1; const lowerY = cy + height * .1;
+    return [
+      { type: "line", x1: cx - half, y1: upperY, x2: cx + half, y2: upperY },
+      { type: "line", x1: cx, y1: y, x2: cx, y2: upperY },
+      { type: "line", x1: cx - half, y1: lowerY, x2: cx + half, y2: lowerY },
+      { type: "line", x1: cx, y1: lowerY, x2: cx, y2: y + height },
+    ];
+  }
+  if (object.kind === "joint-line-contact") {
+    const contactY = cy; const top = y + height * .42; const half = width * .42;
+    return [
+      { type: "polyline", points: [{ x: cx - half * .78, y: top }, { x: cx + half * .78, y: top }, { x: cx + half, y: contactY - 3 }, { x: cx - half, y: contactY - 3 }], closed: true, fill: "paper" },
+      { type: "line", x1: cx, y1: y, x2: cx, y2: top },
+      { type: "line", x1: cx - half, y1: contactY + 3, x2: cx + half, y2: contactY + 3 },
+      { type: "line", x1: cx, y1: contactY + 3, x2: cx, y2: y + height },
+    ];
+  }
+  if (object.kind === "joint-annular") {
+    const radius = Math.min(width, height) * .14; const grooveTop = cy; const grooveHeight = height * .22;
+    return [
+      { type: "rect", x: x + width * .18, y: grooveTop, width: width * .64, height: grooveHeight, fill: "paper" },
+      { type: "line", x1: cx, y1: grooveTop + grooveHeight, x2: cx, y2: y + height },
+      { type: "circle", cx, cy: grooveTop, r: radius, fill: "paper" },
+      { type: "line", x1: cx, y1: y, x2: cx, y2: grooveTop - radius },
+    ];
+  }
+  if (object.kind === "joint-point-contact") {
+    const planeY = cy + height * .08; const radius = Math.min(width, height) * .12; const ballY = planeY - radius;
+    return [
+      { type: "circle", cx, cy: ballY, r: radius, fill: "paper" },
+      { type: "line", x1: cx + radius * .7, y1: ballY - radius * .7, x2: x + width * .83, y2: y },
+      { type: "line", x1: x + width * .08, y1: planeY, x2: x + width * .92, y2: planeY },
+      { type: "line", x1: cx, y1: planeY, x2: cx, y2: y + height },
     ];
   }
   if (object.kind === "mass") return [

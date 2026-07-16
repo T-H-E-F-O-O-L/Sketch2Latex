@@ -160,7 +160,8 @@ test("adds normalized French mechanical joints with exact shared geometry", () =
   assert.deepEqual(stampSize("joint-slider"), { width: 110, height: 70 });
   assert.deepEqual(stampSize("joint-ball"), { width: 100, height: 70 });
   const group = toolboxGroups.find((candidate) => candidate.title === "Liaisons mécaniques normalisées");
-  assert.deepEqual(group?.kinds, ["joint-pivot", "joint-slider", "joint-ball"]);
+  assert.deepEqual(group?.kinds.slice(0, 3), ["joint-pivot", "joint-slider", "joint-cylindrical"]);
+  assert.ok(group?.kinds.includes("joint-ball"));
   assert.deepEqual(portsFor(pivot), [{ name: "solid-1", x: 100, y: 45 }, { name: "solid-2", x: 10, y: 45 }]);
   assert.deepEqual(portsFor(slider), [{ name: "solid-1", x: 200, y: 68 }, { name: "solid-2", x: 255, y: 110 }]);
   assert.deepEqual(portsFor(ball), [{ name: "solid-1", x: 450, y: 95 }, { name: "solid-2", x: 350, y: 95 }]);
@@ -181,6 +182,33 @@ test("adds normalized French mechanical joints with exact shared geometry", () =
   assert.match(scientificSceneToTikz(sliderScene), /\\draw\[fill=white\] \(4\.55,-1\.11\) rectangle \(5\.65,-1\.60\);/);
   assert.match(scientificSceneToTikz(ballScene), /arc\[start angle=-45,end angle=-315,radius=0\.37cm\]/);
   assert.deepEqual(roundTripReport(documentFor([pivot, slider, ball]), [pivot, slider, ball]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
+test("completes the French normalized mechanical-joint family", () => {
+  const cylindrical: CanvasObject = { id: "cylindrical", kind: "joint-cylindrical", x: 0, y: 0, width: 110, height: 70 };
+  const helical: CanvasObject = { id: "helical", kind: "joint-helical", x: 120, y: 0, width: 110, height: 70 };
+  const planar: CanvasObject = { id: "planar", kind: "joint-planar", x: 240, y: 0, width: 90, height: 80 };
+  const lineContact: CanvasObject = { id: "line-contact", kind: "joint-line-contact", x: 340, y: 0, width: 90, height: 90 };
+  const annular: CanvasObject = { id: "annular", kind: "joint-annular", x: 440, y: 0, width: 90, height: 90 };
+  const pointContact: CanvasObject = { id: "point-contact", kind: "joint-point-contact", x: 540, y: 0, width: 90, height: 90 };
+  const objects = [cylindrical, helical, planar, lineContact, annular, pointContact];
+  assert.deepEqual(stampSize("joint-cylindrical"), { width: 110, height: 70 });
+  assert.deepEqual(stampSize("joint-helical"), { width: 110, height: 70 });
+  assert.deepEqual(stampSize("joint-planar"), { width: 90, height: 80 });
+  assert.deepEqual(portsFor(cylindrical), [{ name: "solid-1", x: 0, y: 28 }, { name: "solid-2", x: 55, y: 70 }]);
+  assert.deepEqual(portsFor(planar), [{ name: "solid-1", x: 285, y: 0 }, { name: "solid-2", x: 285, y: 80 }]);
+  assert.deepEqual(portsFor(pointContact), [{ name: "solid-1", x: 614.7, y: 0 }, { name: "solid-2", x: 585, y: 90 }]);
+  const cylindricalScene = scientificSceneFor(cylindrical) ?? []; const helicalScene = scientificSceneFor(helical) ?? [];
+  assert.deepEqual(cylindricalScene.map((primitive) => primitive.type), ["rect", "line", "rect", "line"]);
+  assert.deepEqual(helicalScene.map((primitive) => primitive.type), ["rect", "line", "polyline", "line", "rect", "line"]);
+  const helix = helicalScene.find((primitive) => primitive.type === "polyline");
+  assert.equal(helix?.type === "polyline" ? helix.points.length : 0, 33);
+  assert.deepEqual((scientificSceneFor(planar) ?? []).map((primitive) => primitive.type), ["line", "line", "line", "line"]);
+  assert.deepEqual((scientificSceneFor(lineContact) ?? []).map((primitive) => primitive.type), ["polyline", "line", "line", "line"]);
+  assert.deepEqual((scientificSceneFor(annular) ?? []).map((primitive) => primitive.type), ["rect", "line", "circle", "line"]);
+  assert.deepEqual((scientificSceneFor(pointContact) ?? []).map((primitive) => primitive.type), ["circle", "line", "line", "line"]);
+  assert.match(scientificSceneToTikz(helicalScene), / -- /);
+  assert.deepEqual(roundTripReport(documentFor(objects), objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("uses canvas baselines for prose and graph labels", () => {
@@ -480,6 +508,18 @@ test("provides a French concours slider-crank kinematic model with semantic soli
   const cloned = cloneTemplateObjects(template); const clonedIds = new Set(cloned.map((object) => object.id));
   assert.ok(cloned.every((object) => !object.bindings?.startId || clonedIds.has(object.bindings.startId)));
   assert.ok(cloned.every((object) => !object.bindings?.endId || clonedIds.has(object.bindings.endId)));
+});
+
+test("provides a complete French normalized-joint reference model", () => {
+  const template = diagramTemplates.find((candidate) => candidate.id === "normalized-kinematic-joints");
+  assert.ok(template);
+  const jointKinds = template.objects.filter((object) => object.kind.startsWith("joint-")).map((object) => object.kind);
+  assert.deepEqual(jointKinds, ["joint-pivot", "joint-slider", "joint-cylindrical", "joint-helical", "joint-ball", "joint-planar", "joint-line-contact", "joint-annular", "joint-point-contact"]);
+  assert.match(template.sourceName, /Éduscol/);
+  assert.ok(template.objects.some((object) => object.kind === "text" && object.text?.startsWith("Encastrement :")));
+  const output = documentFor(template.objects);
+  for (const label of ["Pivot", "Glissière", "Pivot glissant", "Hélicoïdale", "Sphérique", "Appui plan", "Linéaire rectiligne", "Linéaire annulaire", "Sphère-plan"]) assert.match(output, new RegExp(label));
+  assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("provides a French concours negative-feedback block-diagram model", () => {
