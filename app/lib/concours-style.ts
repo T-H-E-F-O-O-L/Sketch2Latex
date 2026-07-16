@@ -9,6 +9,7 @@ export const CONCOURS_LIGHT_FILL = "#e6e6e6";
 export const CONCOURS_DASH = { on: 7, off: 5 } as const;
 export const CONCOURS_ARROW = { length: 8, width: 5.3 } as const;
 export const CONCOURS_LABEL_SIZE = 14;
+export const CONCOURS_CONNECTOR_LABEL_OFFSET = 9;
 
 export const canvasUnitsToCentimeters = (value: number) => value / CANVAS_UNITS_PER_CM;
 export const canvasUnitsToPoints = (value: number) => canvasUnitsToCentimeters(value) * POINTS_PER_CM;

@@ -1,6 +1,6 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
-import { CANVAS_UNITS_PER_CM, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, tikzStrokeWidth } from "./concours-style";
+import { CANVAS_UNITS_PER_CM, CONCOURS_CONNECTOR_LABEL_OFFSET, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, canvasUnitsToPoints, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificLabelToLatex } from "./scientific-label";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
@@ -27,6 +27,15 @@ function componentLabel(value: string) {
 
 function vectorComponentLabel(value: string) {
   return scientificLabelToLatex(value, true);
+}
+
+function labelNodeOptions(anchor = "base", fontSize = 14) {
+  const options = [`anchor=${anchor}`, "inner sep=0pt", "outer sep=0pt"];
+  if (fontSize !== 14) {
+    const size = canvasUnitsToPoints(fontSize); const leading = size * 1.2;
+    options.push(`font=\\fontsize{${size.toFixed(2)}pt}{${leading.toFixed(2)}pt}\\selectfont`);
+  }
+  return options.join(",");
 }
 
 function simplify(points: Point[], tolerance = 1.5): Point[] {
@@ -59,7 +68,7 @@ function connectorScope(object: CanvasObject, body: string) {
 
 function dimensionConnector(object: CanvasObject) {
   const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2); const tick = n(5); const labelOffset = n(10);
-  return connectorScope(object, `\\draw[<->] (-${halfLength},0) -- (${halfLength},0);\n\\draw (-${halfLength},-${tick}) -- (-${halfLength},${tick});\n\\draw (${halfLength},-${tick}) -- (${halfLength},${tick});\n\\node[fill=white,inner sep=1pt] at (0,${labelOffset}) {${componentLabel(annotation(object, "main", "d"))}};`);
+  return connectorScope(object, `\\draw[<->] (-${halfLength},0) -- (${halfLength},0);\n\\draw (-${halfLength},-${tick}) -- (-${halfLength},${tick});\n\\draw (${halfLength},-${tick}) -- (${halfLength},${tick});\n\\node[anchor=base,fill=white,inner sep=1pt,outer sep=0pt] at (0,${labelOffset}) {${componentLabel(annotation(object, "main", "d"))}};`);
 }
 
 function lensConnector(object: CanvasObject) {
@@ -77,17 +86,17 @@ function electricalConnector(object: CanvasObject) {
   const halfLength = n(length / 2); const label = (fallback: string) => componentLabel(annotation(object, "main", fallback));
   if (object.kind === "resistor") {
     const g = circuitGeometry.resistor;
-    return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw[fill=white,rounded corners=${n(1.5)}] (-${n(g.halfBody)},-${n(g.halfHeight)}) rectangle (${n(g.halfBody)},${n(g.halfHeight)});\n\\node at (0,${n(g.labelOffset)}) {${label("R")}};`);
+    return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw[fill=white,rounded corners=${n(1.5)}] (-${n(g.halfBody)},-${n(g.halfHeight)}) rectangle (${n(g.halfBody)},${n(g.halfHeight)});\n\\node[${labelNodeOptions()}] at (0,${n(g.labelOffset)}) {${label("R")}};`);
   }
   if (object.kind === "inductor") {
     const g = circuitGeometry.inductor; const turnWidth = (g.halfBody * 2) / g.turns;
     const turns = Array.from({ length: g.turns }, (_, index) => { const start = -g.halfBody + index * turnWidth; const end = start + turnWidth; return `.. controls (${n(start + turnWidth / 3)},${n((g.halfHeight * 2) / 3)}) and (${n(end - turnWidth / 3)},${n((g.halfHeight * 2) / 3)}) .. (${n(end)},0)`; }).join(" ");
-    return connectorScope(object, `\\draw (-${halfLength},0) -- (-${n(g.halfBody)},0);\n\\draw (-${n(g.halfBody)},0) ${turns};\n\\draw (${n(g.halfBody)},0) -- (${halfLength},0);\n\\node at (0,${n(g.labelOffset)}) {${label("L")}};`);
+    return connectorScope(object, `\\draw (-${halfLength},0) -- (-${n(g.halfBody)},0);\n\\draw (-${n(g.halfBody)},0) ${turns};\n\\draw (${n(g.halfBody)},0) -- (${halfLength},0);\n\\node[${labelNodeOptions()}] at (0,${n(g.labelOffset)}) {${label("L")}};`);
   }
   if (object.kind === "capacitor" || object.kind === "battery") {
     const g = object.kind === "battery" ? circuitGeometry.battery : circuitGeometry.capacitor;
     const negativeHalfPlate = "negativeHalfPlate" in g ? g.negativeHalfPlate : g.halfPlate; const positiveHalfPlate = "positiveHalfPlate" in g ? g.positiveHalfPlate : g.halfPlate;
-    const capacitorLabel = object.kind === "capacitor" ? `\n\\node at (0,-${n(g.labelOffset)}) {${label("C")}};` : "";
+    const capacitorLabel = object.kind === "capacitor" ? `\n\\node[${labelNodeOptions()}] at (0,-${n(g.labelOffset)}) {${label("C")}};` : "";
     return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw (-${n(g.negativePlateOffset)},-${n(negativeHalfPlate)}) -- (-${n(g.negativePlateOffset)},${n(negativeHalfPlate)});\n\\draw (${n(g.positivePlateOffset)},-${n(positiveHalfPlate)}) -- (${n(g.positivePlateOffset)},${n(positiveHalfPlate)});${capacitorLabel}`);
   }
   if (object.kind === "switch") {
@@ -95,6 +104,19 @@ function electricalConnector(object: CanvasObject) {
     return connectorScope(object, `\\draw (-${halfLength},0) -- (-${n(g.leftGap)},0);\n\\draw (${n(g.rightGap)},0) -- (${halfLength},0);\n\\fill (-${n(g.leftGap)},0) circle (${n(3)});\n\\draw (-${n(g.leftGap)},0) -- (${n(g.bladeLength)},${n(g.bladeLift)});`);
   }
   return "";
+}
+
+function meterConnector(object: CanvasObject) {
+  const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2); const g = circuitGeometry.meter;
+  const fallback = object.kind === "voltmeter" ? "V" : "A";
+  return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw[fill=white] (0,0) circle (${n(g.radius)});\n\\node[${labelNodeOptions()}] at (0,-${n(g.labelBaseline)}) {${componentLabel(annotation(object, "main", fallback))}};`);
+}
+
+function labelledArrowConnector(object: CanvasObject, label: string, vector = false, dipoleTick = false) {
+  const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2); const tick = n(5);
+  const annotationNode = label ? `\n\\node[${labelNodeOptions()}] at (0,${n(CONCOURS_CONNECTOR_LABEL_OFFSET)}) {${vector ? vectorComponentLabel(label) : componentLabel(label)}};` : "";
+  const startTick = dipoleTick ? `\n\\draw (-${halfLength},-${tick}) -- (-${halfLength},${tick});` : "";
+  return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0) -- (${halfLength},0);${startTick}${annotationNode}`);
 }
 
 function tikzStyle(object: CanvasObject) {
@@ -190,7 +212,7 @@ function objectToLatexBase(object: CanvasObject): string {
     }
     case "arrow": case "force": case "light-ray": {
       const label = annotation(object, "main", object.kind === "force" ? "F" : "").trim();
-      return `\\draw[-{Latex}] ${origin} -- ${end(object)}${label ? ` node[midway,above] {${object.kind === "force" ? vectorComponentLabel(label) : componentLabel(label)}}` : ""};`;
+      return labelledArrowConnector(object, label, object.kind === "force");
     }
     case "double-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
     case "dimension": return dimensionConnector(object);
@@ -198,12 +220,11 @@ function objectToLatexBase(object: CanvasObject): string {
     case "wire": return `\\draw ${origin} -- ${end(object)};`;
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
     case "lens": case "diverging-lens": return lensConnector(object);
-    case "voltmeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${componentLabel(annotation(object, "main", "V"))}};`;
-    case "ammeter": return `\\draw ${origin} -- ${end(object)}; \\node[draw,circle,fill=white,inner sep=1pt] at ($${origin}!0.5!${end(object)}$) {${componentLabel(annotation(object, "main", "A"))}};`;
+    case "voltmeter": case "ammeter": return meterConnector(object);
     case "spring": return `\\draw[decorate, decoration={coil, aspect=0.3}] ${origin} -- ${end(object)};`;
     case "wave": return `\\draw[decorate, decoration={snake, amplitude=0.08cm, segment length=0.25cm}] ${origin} -- ${end(object)};`;
-    case "heat-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${componentLabel(annotation(object, "main", "Q"))}};`;
-    case "work-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)} node[midway,above] {${componentLabel(annotation(object, "main", "W"))}};`;
+    case "heat-arrow": return labelledArrowConnector(object, annotation(object, "main", "Q"));
+    case "work-arrow": return labelledArrowConnector(object, annotation(object, "main", "W"));
     case "reaction-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)};`;
     case "equilibrium-arrow": {
       const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2);
@@ -211,8 +232,7 @@ function objectToLatexBase(object: CanvasObject): string {
     }
     case "hydrogen-bond": return `\\draw[dashed] ${origin} -- ${end(object)};`;
     case "dipole": {
-      const x2 = object.x2 ?? object.x; const y2 = object.y2 ?? object.y; const halfLength = n(Math.hypot(x2 - object.x, y2 - object.y) / 2);
-      return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0) -- (${halfLength},0) node[midway,above] {${vectorComponentLabel(annotation(object, "main", "μ"))}};\n\\draw (-${halfLength},-0.10) -- (-${halfLength},0.10);`);
+      return labelledArrowConnector(object, annotation(object, "main", "μ"), true, true);
     }
     case "bond-single": return bondLines(object, 1);
     case "bond-double": return bondLines(object, 2);
@@ -220,7 +240,7 @@ function objectToLatexBase(object: CanvasObject): string {
     case "rect": return `\\draw ${origin} rectangle ${point(object.x + (object.width ?? 0), object.y + (object.height ?? 0))};`;
     case "circle": return `\\draw ${point(object.x + (object.width ?? 0) / 2, object.y + (object.height ?? 0) / 2)} circle (${n(Math.abs(object.width ?? 0) / 2)});`;
     case "ellipse": return `\\draw ${point(object.x + (object.width ?? 0) / 2, object.y + (object.height ?? 0) / 2)} ellipse (${n(Math.abs(object.width ?? 0) / 2)} and ${n(Math.abs(object.height ?? 0) / 2)});`;
-    case "text": return `\\node at ${origin} {${safeText(object.text)}};`;
+    case "text": return `\\node[${labelNodeOptions("base west", 17)}] at ${origin} {${safeText(object.text)}};`;
     case "equation": { const formula = latexFormula((object.text ?? "").trim().replace(/^\$|\$$/g, "")); return `\\node at ${point(object.x + (object.width ?? 220) / 2, object.y + (object.height ?? 70) / 2)} {$${formula}$};`; }
     case "raw-tikz": return object.rawTikz?.trim() ?? "";
     case "freehand": { const points = simplify(object.points ?? []); return points.length > 1 ? `\\draw[smooth, tension=0.7] plot coordinates {${points.map((p) => point(p.x, p.y)).join(" ")}};` : ""; }
@@ -232,7 +252,7 @@ function objectToLatexBase(object: CanvasObject): string {
         return `\\draw[gray!30] ${point(gridX, object.y)} -- ${point(gridX, object.y + height)};\n\\draw[gray!30] ${point(object.x, gridY)} -- ${point(object.x + width, gridY)};`;
       }).join("\n") : "";
       const plots = graphPointSetsFor(object).flatMap((segments, index) => segments.map((segment) => `\\draw[${GRAPH_TIKZ_STYLES[index % GRAPH_TIKZ_STYLES.length]}] plot coordinates {${segment.map((coordinate) => point(coordinate.x, coordinate.y)).join(" ")}};`)).join("\n");
-      return `\\begin{scope}\n\\clip ${point(object.x, object.y)} rectangle ${point(object.x + width, object.y + height)};\n${grid}\n${plots}\n\\end{scope}\n\\draw[-{Latex}] ${point(object.x, horizontalAxis)} -- ${point(object.x + width, horizontalAxis)};\n\\draw[-{Latex}] ${point(verticalAxis, object.y + height)} -- ${point(verticalAxis, object.y)};\n\\node[anchor=south east] at ${point(object.x + width - 4, horizontalAxis - 8)} {${componentLabel(graph?.xLabel ?? "x")}};\n\\node[anchor=west] at ${point(verticalAxis + 9, object.y + 15)} {${componentLabel(graph?.yLabel ?? "y")}};`;
+      return `\\begin{scope}\n\\clip ${point(object.x, object.y)} rectangle ${point(object.x + width, object.y + height)};\n${grid}\n${plots}\n\\end{scope}\n\\draw[-{Latex}] ${point(object.x, horizontalAxis)} -- ${point(object.x + width, horizontalAxis)};\n\\draw[-{Latex}] ${point(verticalAxis, object.y + height)} -- ${point(verticalAxis, object.y)};\n\\node[${labelNodeOptions("base east")}] at ${point(object.x + width - 4, horizontalAxis - 8)} {${componentLabel(graph?.xLabel ?? "x")}};\n\\node[${labelNodeOptions("base west")}] at ${point(verticalAxis + 9, object.y + 15)} {${componentLabel(graph?.yLabel ?? "y")}};`;
     }
     default: return stamp(object);
   }
@@ -396,7 +416,7 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
     if (radii) { const rx = Number(radii[1]) * SCALE; const ry = Number(radii[2]) * SCALE; return { ...original, x: points[0].x - rx, y: points[0].y - ry, width: rx * 2, height: ry * 2 }; }
   }
   if (original.kind === "text") {
-    const node = block.match(/\\node\s+at\s+\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([\s\S]*?)\};/);
+    const node = block.match(/\\node(?:\[[^\]]*\])?\s+at\s+\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*\{([\s\S]*?)\};/);
     if (node) return { ...original, x: Number(node[1]) * SCALE, y: -Number(node[2]) * SCALE, text: textFromLatex(node[3]) };
   }
   if (original.kind === "equation") {

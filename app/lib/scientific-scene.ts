@@ -336,7 +336,7 @@ const labelLatex = (primitive: Extract<ScientificPrimitive, { type: "text" }>) =
 };
 const labelNodeOptions = (primitive: Extract<ScientificPrimitive, { type: "text" }>) => {
   const anchor = primitive.anchor === "start" ? "base west" : primitive.anchor === "end" ? "base east" : "base";
-  const options = [`anchor=${anchor}`];
+  const options = [`anchor=${anchor}`, "inner sep=0pt", "outer sep=0pt"];
   if (primitive.fontSize !== undefined && primitive.fontSize !== 14) {
     const size = canvasUnitsToPoints(primitive.fontSize); const leading = size * 1.2;
     options.push(`font=\\fontsize{${size.toFixed(2)}pt}{${leading.toFixed(2)}pt}\\selectfont`);

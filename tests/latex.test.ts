@@ -40,7 +40,7 @@ test("exports circuit connectors with the exact canvas geometry", () => {
   const output = objectToLatex({ id: "r1", kind: "resistor", x: 0, y: 0, x2: 100, y2: 0 });
   assert.match(output, /shift=\{\(1\.00,0\.00\)\}, rotate=0/);
   assert.match(output, /\(-0\.36,-0\.16\) rectangle \(0\.36,0\.16\)/);
-  assert.match(output, /\\node at \(0,0\.26\) \{\$R\$\}/);
+  assert.match(output, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.26\) \{\$R\$\}/);
   assert.doesNotMatch(output, /to\[R\]/);
 });
 
@@ -51,7 +51,7 @@ test("keeps resistor and inductor proportions and labels in every direction", ()
   assert.match(resistor, /\{\$R_\{1\}\$\}/);
   assert.match(inductor, /rotate=90/);
   assert.match(inductor, /\(-0\.40,0\).*\(0\.40,0\)/s);
-  assert.match(inductor, /\\node at \(0,0\.38\) \{\$L\$\}/);
+  assert.match(inductor, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.38\) \{\$L\$\}/);
   assert.doesNotMatch(inductor, /to\[L\]/);
 });
 
@@ -59,11 +59,29 @@ test("exports the other electrical symbols without Circuitikz substitutions", ()
   const capacitor = objectToLatex({ id: "c", kind: "capacitor", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "C₁" } });
   const battery = objectToLatex({ id: "b", kind: "battery", x: 0, y: 0, x2: 100, y2: 0 });
   const circuitSwitch = objectToLatex({ id: "s", kind: "switch", x: 0, y: 0, x2: 100, y2: 0 });
-  assert.match(capacitor, /\\node at \(0,-0\.42\) \{\$C_\{1\}\$\}/);
+  assert.match(capacitor, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,-0\.42\) \{\$C_\{1\}\$\}/);
   assert.match(battery, /\(0\.12,-0\.30\) -- \(0\.12,0\.30\)/);
   assert.match(battery, /\(-0\.10,-0\.18\) -- \(-0\.10,0\.18\)/);
   assert.match(circuitSwitch, /\(-0\.24,0\) -- \(0\.24,0\.24\)/);
   for (const output of [capacitor, battery, circuitSwitch]) assert.doesNotMatch(output, /to\[/);
+});
+
+test("matches exact French meter and connector label geometry", () => {
+  const meter = objectToLatex({ id: "v", kind: "voltmeter", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "V_s" } });
+  const heat = objectToLatex({ id: "q", kind: "heat-arrow", x: 50, y: 150, x2: 50, y2: 0, annotations: { main: "Q_h" } });
+  assert.match(meter, /shift=\{\(1\.00,0\.00\)\}, rotate=0/);
+  assert.match(meter, /\\draw\[fill=white\] \(0,0\) circle \(0\.30\)/);
+  assert.match(meter, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,-0\.10\) \{\$V_\{s\}\$\}/);
+  assert.match(heat, /shift=\{\(1\.00,-1\.50\)\}, rotate=90/);
+  assert.match(heat, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.18\) \{\$Q_\{h\}\$\}/);
+});
+
+test("uses canvas baselines for prose and graph labels", () => {
+  const prose = objectToLatex({ id: "txt", kind: "text", x: 50, y: 70, text: "Légende" });
+  const graph = objectToLatex({ id: "axes-labels", kind: "axes", x: 0, y: 0, width: 200, height: 120, graph: { expression: "x", xMin: -1, xMax: 1, yMin: -1, yMax: 1, xLabel: "t", yLabel: "u_C" } });
+  assert.match(prose, /\\node\[anchor=base west,inner sep=0pt,outer sep=0pt,font=\\fontsize\{9\.64pt\}\{11\.57pt\}\\selectfont\] at \(1\.00,-1\.40\) \{Légende\}/);
+  assert.match(graph, /\\node\[anchor=base east,inner sep=0pt,outer sep=0pt\].*\{\$t\$\}/);
+  assert.match(graph, /\\node\[anchor=base west,inner sep=0pt,outer sep=0pt\].*\{\$u_\{C\}\$\}/);
 });
 
 test("flips canvas y coordinates and clips shared graph geometry", () => {
@@ -327,10 +345,11 @@ test("exports semantic French scientific arrows", () => {
   const indexedForce = objectToLatex({ id: "f1", kind: "force", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "F₁" } });
   const equilibrium = objectToLatex({ id: "eq", kind: "equilibrium-arrow", x: 0, y: 0, x2: 100, y2: 0 });
   const dipole = objectToLatex({ id: "mu", kind: "dipole", x: 0, y: 0, x2: 100, y2: 0 });
-  assert.match(force, /node\[midway,above\] \{\$\\vec\{F\}\$\}/);
-  assert.match(indexedForce, /node\[midway,above\] \{\$\\vec\{F\}_\{1\}\$\}/);
+  assert.match(force, /shift=\{\(1\.00,0\.00\)\}, rotate=0/);
+  assert.match(force, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.18\) \{\$\\vec\{F\}\$\}/);
+  assert.match(indexedForce, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.18\) \{\$\\vec\{F\}_\{1\}\$\}/);
   assert.equal((equilibrium.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 2);
-  assert.match(dipole, /node\[midway,above\] \{\$\\vec\{μ\}\$\}/);
+  assert.match(dipole, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt\] at \(0,0\.18\) \{\$\\vec\{μ\}\$\}/);
   assert.match(dipole, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\)/);
 });
 
@@ -342,7 +361,7 @@ test("exports explicit French dimension lines with matching construction marks",
   assert.match(output, /\\draw\[<->\] \(-1\.00,0\) -- \(1\.00,0\);/);
   assert.match(output, /\\draw \(-1\.00,-0\.10\) -- \(-1\.00,0\.10\);/);
   assert.match(output, /\\draw \(1\.00,-0\.10\) -- \(1\.00,0\.10\);/);
-  assert.match(output, /\\node\[fill=white,inner sep=1pt\] at \(0,0\.20\) \{\$d_\{1\}\$\};/);
+  assert.match(output, /\\node\[anchor=base,fill=white,inner sep=1pt,outer sep=0pt\] at \(0,0\.20\) \{\$d_\{1\}\$\};/);
   assert.match(rotated, /shift=\{\(1\.00,-2\.50\)\}, rotate=-90/);
   assert.doesNotMatch(output, /\|<->\|/);
   assert.deepEqual(roundTripReport(documentFor([horizontal, vertical]), [horizontal, vertical]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
@@ -392,7 +411,7 @@ test("uses one scientific scene for concours mechanics geometry", () => {
   const tikz = scientificSceneToTikz(scene);
   assert.match(tikz, /\\draw\[-\{Latex\}\] \(2\.80,-3\.47\) -- \(5\.36,-3\.47\);/);
   assert.match(tikz, /\\fill \(2\.80,-3\.47\) circle \(0\.04\);/);
-  assert.match(objectToLatex(frame), /\\node\[anchor=base,font=\\fontsize\{7\.37pt\}\{8\.84pt\}\\selectfont\] at \(2\.60,-3\.81\) \{\$O\$\};/);
+  assert.match(objectToLatex(frame), /\\node\[anchor=base,inner sep=0pt,outer sep=0pt,font=\\fontsize\{7\.37pt\}\{8\.84pt\}\\selectfont\] at \(2\.60,-3\.81\) \{\$O\$\};/);
 });
 
 test("keeps shared mechanics geometry faithful to independent width and height", () => {
@@ -476,7 +495,7 @@ test("shares thermodynamic apparatus and uses correct quantity notation", () => 
   assert.match(engineOutput, /\{\\text\{machine\}\}/);
   assert.match(engineOutput, /\{\$Q_h\$\}/);
   assert.match(engineOutput, /\{\$Q_c\$\}/);
-  assert.match(engineOutput, /\\node\[anchor=base,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$Q_h\$\}/);
+  assert.match(engineOutput, /\\node\[anchor=base,inner sep=0pt,outer sep=0pt,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$Q_h\$\}/);
   assert.equal((engineOutput.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 3);
   assert.deepEqual(roundTripReport(documentFor([piston, engine]), [piston, engine]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
@@ -492,7 +511,7 @@ test("shares French instruments, ground and every AOP stamp across renderers", (
   assert.match(inverting, /\{\\text\{Inverseur\}\}/);
   assert.doesNotMatch(inverting, /zigzag|to\[R\]/);
   assert.match(comparator, /\{\$V_s\$\}/);
-  assert.match(comparator, /\\node\[anchor=base east,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$V_s\$\}/);
+  assert.match(comparator, /\\node\[anchor=base east,inner sep=0pt,outer sep=0pt,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$V_s\$\}/);
   assert.match(comparator, /\{\\text\{Comparateur\}\}/);
 });
 
@@ -500,5 +519,5 @@ test("preserves concours magnetic glyph scale in TikZ", () => {
   const field = objectToLatex({ id: "field", kind: "magnetic-field-in", x: 0, y: 0, width: 120, height: 90 });
   assert.equal((field.match(/font=\\fontsize\{11\.34pt\}\{13\.61pt\}\\selectfont/g) ?? []).length, 6);
   assert.equal((field.match(/\{\$\\otimes\$\}/g) ?? []).length, 6);
-  assert.match(field, /anchor=base,font=\\fontsize\{7\.37pt\}\{8\.84pt\}\\selectfont.*\{\$\\vec\{B\}\$\}/);
+  assert.match(field, /anchor=base,inner sep=0pt,outer sep=0pt,font=\\fontsize\{7\.37pt\}\{8\.84pt\}\\selectfont.*\{\$\\vec\{B\}\$\}/);
 });

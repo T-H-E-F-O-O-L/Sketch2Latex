@@ -10,7 +10,7 @@ import { MathCalculator } from "./components/math-calculator";
 import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ConnectionPortName, type DocumentSettings, type ObjectKind, type Point, type StrokePattern } from "./lib/canvas-types";
 import { isCompleteAopConfiguration, makeAopCircuit } from "./lib/aop-circuits";
 import { circuitGeometry } from "./lib/circuit-geometry";
-import { CONCOURS_ARROW, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, SVG_STROKE_PATTERNS, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
+import { CONCOURS_ARROW, CONCOURS_CONNECTOR_LABEL_OFFSET, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, SVG_STROKE_PATTERNS, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor, pointOnWireAt, portFor, portsFor } from "./lib/connection-geometry";
 import { parseScientificLabel } from "./lib/scientific-label";
 import { scientificSceneFor, type ScientificPrimitive } from "./lib/scientific-scene";
@@ -263,7 +263,7 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
     return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} />{triangle(startTip, startBase)}{triangle(endTip, endBase)}</g>;
   }
   if (object.kind === "switch") return <g><line {...common} x1={object.x} y1={object.y} x2={midX - 12 * ux} y2={midY - 12 * uy} /><line {...common} x1={midX + 14 * ux} y1={midY + 14 * uy} x2={x2} y2={y2} /><line {...common} x1={midX - 12 * ux} y1={midY - 12 * uy} x2={midX + 12 * ux - 12 * px} y2={midY + 12 * uy - 12 * py} /><circle cx={midX - 12 * ux} cy={midY - 12 * uy} r="3" fill={color} /></g>;
-  if (object.kind === "voltmeter" || object.kind === "ammeter") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r="15" fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text x={midX} y={midY + 5} textAnchor="middle" fontSize="14" fill={color}>{scientificLabelSpans(a("main", object.kind === "voltmeter" ? "V" : "A"))}</text></g>;
+  if (object.kind === "voltmeter" || object.kind === "ammeter") { const meter = circuitGeometry.meter; return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r={meter.radius} fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text x={midX} y={midY + meter.labelBaseline} textAnchor="middle" fontSize="14" fill={color}>{scientificLabelSpans(a("main", object.kind === "voltmeter" ? "V" : "A"))}</text></g>; }
   if (object.kind === "spring") return <polyline {...common} points={Array.from({ length: 11 }, (_, i) => `${object.x + dx * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * px)},${object.y + dy * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * py)}`).join(" ")} />;
   if (object.kind === "wave") return <polyline {...common} points={Array.from({ length: 17 }, (_, i) => `${object.x + dx * i / 16 + Math.sin(i * Math.PI / 2) * 7 * px},${object.y + dy * i / 16 + Math.sin(i * Math.PI / 2) * 7 * py}`).join(" ")} />;
   if (object.kind.startsWith("bond-")) {
@@ -273,14 +273,14 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
   if (object.kind === "force" || object.kind === "arrow") {
     const label = a("main", object.kind === "force" ? "F" : "").trim();
-    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX - 9 * px, midY - 9 * py) : <text className="diagram-label" x={midX - 9 * px} y={midY - 9 * py} textAnchor="middle" fill={color}>{scientificLabelSpans(label)}</text>)}</g>;
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py) : <text className="diagram-label" x={midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px} y={midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py} textAnchor="middle" fill={color}>{scientificLabelSpans(label)}</text>)}</g>;
   }
-  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX - 9 * px, midY - 9 * py)}</g>;
+  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py)}</g>;
   const markerEnd = ["arrow", "force", "light-ray", "heat-arrow", "work-arrow", "reaction-arrow", "dipole"].includes(object.kind) ? "url(#arrowhead)" : undefined;
   const markerStart = object.kind === "equilibrium-arrow" ? "url(#arrowhead)" : undefined;
   const dashed = object.kind === "hydrogen-bond" ? "5 4" : undefined;
   const label = object.kind === "heat-arrow" ? a("main", "Q") : object.kind === "work-arrow" ? a("main", "W") : object.kind === "dipole" ? a("main", "μ") : undefined;
-  return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd={markerEnd} markerStart={markerStart} strokeDasharray={dashed} />{label && <text x={midX - 8 * px} y={midY - 8 * py} fontSize="14">{scientificLabelSpans(label)}</text>}</g>;
+  return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd={markerEnd} markerStart={markerStart} strokeDasharray={dashed} />{label && <text x={midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px} y={midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py} textAnchor="middle" fontSize="14">{scientificLabelSpans(label)}</text>}</g>;
 }
 
 function scientificScenePreview(scene: ScientificPrimitive[], object: CanvasObject, selected: boolean) {
