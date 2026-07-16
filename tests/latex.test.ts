@@ -443,6 +443,16 @@ test("supports precise T-junctions on the middle of a wire", () => {
   assert.match(documentFor([main, branch]), /"startPort":"segment","startRatio":0\.5/);
 });
 
+test("removes hidden layers and their derived junctions from every export", () => {
+  const hiddenMain: CanvasObject = { id: "hidden-main", kind: "wire", x: 0, y: 0, x2: 200, y2: 0, hidden: true };
+  const branch: CanvasObject = { id: "visible-branch", kind: "wire", x: 100, y: 0, x2: 100, y2: 100, bindings: { startId: "hidden-main", startPort: "segment", startRatio: .5 } };
+  assert.deepEqual(junctionPointsFor([hiddenMain, branch]), []);
+  const source = documentFor([hiddenMain, branch]);
+  assert.doesNotMatch(source, /sketch2latex id=hidden-main/);
+  assert.match(source, /sketch2latex id=visible-branch/);
+  assert.doesNotMatch(source, /\\fill \(2\.00,0\.00\) circle/);
+});
+
 test("preserves named terminal bindings in generated metadata", () => {
   const objects: CanvasObject[] = [
     { id: "r", kind: "resistor", x: 100, y: 100, x2: 220, y2: 100 },

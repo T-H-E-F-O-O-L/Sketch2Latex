@@ -72,7 +72,7 @@ export function junctionPointsFor(objects: CanvasObject[], tolerance = .75): Poi
     for (const endpoint of ["start", "end"] as const) {
       const port = object.bindings[`${endpoint}Port`]; const id = object.bindings[`${endpoint}Id`]; const ratio = object.bindings[`${endpoint}Ratio`];
       if (port !== "segment" || id === undefined || ratio === undefined) continue;
-      const target = lookup.get(id); const point = target ? pointOnWireAt(target, ratio) : undefined;
+      const target = lookup.get(id); const point = target && !target.hidden ? pointOnWireAt(target, ratio) : undefined;
       if (point && !forced.some((value) => Math.hypot(value.x - point.x, value.y - point.y) <= tolerance)) forced.push(point);
     }
   }

@@ -274,11 +274,12 @@ export function objectToLatex(object: CanvasObject): string {
 }
 
 export function documentFor(objects: CanvasObject[], snippetOnly = false, settings?: DocumentSettings): string {
-  const objectBody = objects.flatMap((object) => {
+  const visibleObjects = objects.filter((object) => !object.hidden);
+  const objectBody = visibleObjects.flatMap((object) => {
     const rendered = objectToLatex(object);
     return rendered ? [`% sketch2latex id=${object.id}\n% @sketch2latex ${JSON.stringify(object)}\n  ${rendered}`] : [];
   }).join("\n\n  ");
-  const junctionBody = junctionPointsFor(objects).map((junction) => `\\fill ${point(junction.x, junction.y)} circle (${n(JUNCTION_RADIUS)});`).join("\n");
+  const junctionBody = junctionPointsFor(visibleObjects).map((junction) => `\\fill ${point(junction.x, junction.y)} circle (${n(JUNCTION_RADIUS)});`).join("\n");
   const body = [objectBody, junctionBody].filter(Boolean).join("\n\n  ");
   const unit = settings?.unit ?? "cm";
   const axisUnit = unit === "tikz" ? "cm" : unit;
