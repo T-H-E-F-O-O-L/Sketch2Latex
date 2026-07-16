@@ -1,4 +1,5 @@
 import type { CanvasObject, Point } from "./canvas-types";
+import { canvasUnitsToPoints } from "./concours-style";
 
 const functions = ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "sqrt", "abs", "exp"];
 const allowedNames = new Set(["x", "pi", "e", "deg", "ln", "log", ...functions]);
@@ -52,8 +53,9 @@ function segmentsForExpression(object: CanvasObject, expression: string): Point[
   return segments.length ? segments : undefined;
 }
 
-export const GRAPH_CANVAS_DASHES = [undefined, "8 4", "2 3", "10 3 2 3"] as const;
-export const GRAPH_TIKZ_STYLES = ["solid", "dash pattern=on 4pt off 2pt", "densely dotted", "dash dot"] as const;
+const GRAPH_PATTERN_SEGMENTS = [undefined, [8, 4], [2, 3], [10, 3, 2, 3]] as const;
+export const GRAPH_CANVAS_DASHES = GRAPH_PATTERN_SEGMENTS.map((pattern) => pattern?.join(" "));
+export const GRAPH_TIKZ_STYLES = GRAPH_PATTERN_SEGMENTS.map((pattern) => pattern ? `dash pattern=${pattern.map((length, index) => `${index % 2 ? "off" : "on"} ${canvasUnitsToPoints(length).toFixed(2)}pt`).join(" ")}` : "solid");
 
 export function graphPointSetsFor(object: CanvasObject): Point[][][] {
   const expressions = object.graph?.expressions?.length ? object.graph.expressions : object.graph?.expression ? [object.graph.expression] : [];

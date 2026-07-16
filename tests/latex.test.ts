@@ -7,7 +7,7 @@ import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from ".
 import { makeProject, parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
-import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
+import { CONCOURS_GRAPH_GRID_PERCENT, CONCOURS_LIGHT_FILL, canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
 import { connectorLabelPointFor, springPointsFor, wavePointsFor } from "../app/lib/connector-paths";
 import { simplifyFreehandPoints } from "../app/lib/freehand-path";
@@ -333,12 +333,20 @@ test("uses monochrome concours line styles and identical sampled graph points", 
   assert.equal(sets.length, 3);
   assert.ok(sets.every((segments) => segments.flat().length > 100));
   assert.match(output, /\\draw\[solid\] plot coordinates/);
-  assert.match(output, /\\draw\[dash pattern=on 4pt off 2pt\] plot coordinates/);
-  assert.match(output, /\\draw\[densely dotted\] plot coordinates/);
-  assert.equal((output.match(/\\draw\[gray!30\]/g) ?? []).length, 18);
+  assert.match(output, /\\draw\[dash pattern=on 4\.54pt off 2\.27pt\] plot coordinates/);
+  assert.match(output, /\\draw\[dash pattern=on 1\.13pt off 1\.70pt\] plot coordinates/);
+  assert.equal((output.match(/\\draw\[gray!14\]/g) ?? []).length, 18);
   assert.doesNotMatch(output, /color=blue|color=red|green!|orange|violet/);
   assert.match(output, /\{\$t\$\}/);
   assert.match(output, /\{\$u\$\}/);
+  assert.equal(CONCOURS_GRAPH_GRID_PERCENT, 14);
+  assert.equal(CONCOURS_LIGHT_FILL, "#e0e0e0");
+});
+
+test("accepts the French concours π glyph in graph expressions", () => {
+  const graph: CanvasObject = { id: "pi-graph", kind: "axes", x: 0, y: 0, width: 240, height: 160, graph: { expression: "sin(π*x)", xMin: -2, xMax: 2, yMin: -1.2, yMax: 1.2 } };
+  assert.match(graphPathFor(graph) ?? "", /^M/);
+  assert.ok(graphPointSetsFor(graph)[0].flat().length > 150);
 });
 
 test("keeps spaces when a plain-text formula is exported", () => {

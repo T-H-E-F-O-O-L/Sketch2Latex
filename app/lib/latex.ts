@@ -1,7 +1,7 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
 import { springPointsFor, wavePointsFor } from "./connector-paths";
-import { CANVAS_UNITS_PER_CM, CONCOURS_CONNECTOR_LABEL_OFFSET, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, canvasUnitsToPoints, tikzStrokeWidth } from "./concours-style";
+import { CANVAS_UNITS_PER_CM, CONCOURS_CONNECTOR_LABEL_OFFSET, CONCOURS_GRAPH_GRID_PERCENT, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, canvasUnitsToPoints, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificLabelToLatex } from "./scientific-label";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
@@ -237,7 +237,7 @@ function objectToLatexBase(object: CanvasObject): string {
       const clampRatio = (ratio: number) => Math.max(0, Math.min(1, ratio)); const verticalAxis = object.x + clampRatio((0 - xMin) / Math.max(.0001, xMax - xMin)) * width; const horizontalAxis = object.y + clampRatio((yMax - 0) / Math.max(.0001, yMax - yMin)) * height;
       const grid = graph?.showGrid === true ? Array.from({ length: 9 }, (_, index) => {
         const gridX = object.x + width * index / 8; const gridY = object.y + height * index / 8;
-        return `\\draw[gray!30] ${point(gridX, object.y)} -- ${point(gridX, object.y + height)};\n\\draw[gray!30] ${point(object.x, gridY)} -- ${point(object.x + width, gridY)};`;
+        return `\\draw[gray!${CONCOURS_GRAPH_GRID_PERCENT}] ${point(gridX, object.y)} -- ${point(gridX, object.y + height)};\n\\draw[gray!${CONCOURS_GRAPH_GRID_PERCENT}] ${point(object.x, gridY)} -- ${point(object.x + width, gridY)};`;
       }).join("\n") : "";
       const plots = graphPointSetsFor(object).flatMap((segments, index) => segments.map((segment) => `\\draw[${GRAPH_TIKZ_STYLES[index % GRAPH_TIKZ_STYLES.length]}] plot coordinates {${segment.map((coordinate) => point(coordinate.x, coordinate.y)).join(" ")}};`)).join("\n");
       return `\\begin{scope}\n\\clip ${point(object.x, object.y)} rectangle ${point(object.x + width, object.y + height)};\n${grid}\n${plots}\n\\end{scope}\n\\draw[-{Latex}] ${point(object.x, horizontalAxis)} -- ${point(object.x + width, horizontalAxis)};\n\\draw[-{Latex}] ${point(verticalAxis, object.y + height)} -- ${point(verticalAxis, object.y)};\n\\node[${labelNodeOptions("base east")}] at ${point(object.x + width - 4, horizontalAxis - 8)} {${componentLabel(graph?.xLabel ?? "x")}};\n\\node[${labelNodeOptions("base west")}] at ${point(verticalAxis + 9, object.y + 15)} {${componentLabel(graph?.yLabel ?? "y")}};`;
