@@ -15,7 +15,7 @@ export type ScientificPrimitive =
   | { type: "text"; x: number; y: number; value: string; latex?: string; anchor?: "start" | "middle" | "end"; fontSize?: number; vector?: boolean; math?: boolean | "raw" };
 
 export const sharedScientificKinds: ObjectKind[] = [
-  "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
+  "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "joint-pivot", "joint-slider", "joint-ball", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
   "ground", "transformer", "gbf", "oscilloscope", "transfer-block", "summing-junction", "takeoff-point", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
 ];
@@ -47,6 +47,31 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "takeoff-point") return [{ type: "circle", cx, cy, r: Math.min(width, height) * .22, fill: "ink" }];
+  if (object.kind === "joint-pivot") {
+    const radius = Math.min(width, height) * .24;
+    return [
+      { type: "line", x1: cx, y1: cy, x2: x + width, y2: cy },
+      { type: "line", x1: x, y1: cy, x2: cx - radius, y2: cy },
+      { type: "circle", cx, cy, r: radius, fill: "paper" },
+    ];
+  }
+  if (object.kind === "joint-slider") {
+    const axisY = y + height * .4; const bodyWidth = width * .5; const bodyHeight = height * .35;
+    return [
+      { type: "line", x1: x, y1: axisY, x2: x + width, y2: axisY },
+      { type: "rect", x: cx - bodyWidth / 2, y: axisY - bodyHeight / 2, width: bodyWidth, height: bodyHeight, fill: "paper" },
+      { type: "line", x1: cx, y1: axisY + bodyHeight / 2, x2: cx, y2: y + height },
+    ];
+  }
+  if (object.kind === "joint-ball") {
+    const radius = Math.min(width, height) * .18; const cupRadius = radius * 1.45;
+    return [
+      { type: "line", x1: cx + radius, y1: cy, x2: x + width, y2: cy },
+      { type: "line", x1: x, y1: cy, x2: cx - cupRadius, y2: cy },
+      { type: "arc", cx, cy, r: cupRadius, start: 45, end: 315 },
+      { type: "circle", cx, cy, r: radius, fill: "paper" },
+    ];
+  }
   if (object.kind === "mass") return [
     { type: "rect", x: x + 5, y: y + 8, width: width - 10, height: height - 16, fill: "paper" },
     { type: "text", x: cx, y: cy + 5, value: label("main", "m"), anchor: "middle", fontSize: 14 },

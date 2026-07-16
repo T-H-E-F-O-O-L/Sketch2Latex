@@ -152,6 +152,37 @@ test("adds semantic French control-system blocks with exact named ports", () => 
   assert.deepEqual(roundTripReport(documentFor([transfer, sum, takeoff, signal]), [transfer, sum, takeoff, signal]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
+test("adds normalized French mechanical joints with exact shared geometry", () => {
+  const pivot: CanvasObject = { id: "pivot-a", kind: "joint-pivot", x: 10, y: 20, width: 90, height: 50 };
+  const slider: CanvasObject = { id: "slider-a", kind: "joint-slider", x: 200, y: 40, width: 110, height: 70 };
+  const ball: CanvasObject = { id: "ball-a", kind: "joint-ball", x: 350, y: 60, width: 100, height: 70 };
+  assert.deepEqual(stampSize("joint-pivot"), { width: 90, height: 50 });
+  assert.deepEqual(stampSize("joint-slider"), { width: 110, height: 70 });
+  assert.deepEqual(stampSize("joint-ball"), { width: 100, height: 70 });
+  const group = toolboxGroups.find((candidate) => candidate.title === "Liaisons mécaniques normalisées");
+  assert.deepEqual(group?.kinds, ["joint-pivot", "joint-slider", "joint-ball"]);
+  assert.deepEqual(portsFor(pivot), [{ name: "solid-1", x: 100, y: 45 }, { name: "solid-2", x: 10, y: 45 }]);
+  assert.deepEqual(portsFor(slider), [{ name: "solid-1", x: 200, y: 68 }, { name: "solid-2", x: 255, y: 110 }]);
+  assert.deepEqual(portsFor(ball), [{ name: "solid-1", x: 450, y: 95 }, { name: "solid-2", x: 350, y: 95 }]);
+  assert.deepEqual(portsFor({ ...pivot, rotation: 90 }), [{ name: "solid-1", x: 55, y: 90 }, { name: "solid-2", x: 55, y: 0 }]);
+  const pivotScene = scientificSceneFor(pivot) ?? []; const sliderScene = scientificSceneFor(slider) ?? []; const ballScene = scientificSceneFor(ball) ?? [];
+  assert.deepEqual(pivotScene, [
+    { type: "line", x1: 55, y1: 45, x2: 100, y2: 45 },
+    { type: "line", x1: 10, y1: 45, x2: 43, y2: 45 },
+    { type: "circle", cx: 55, cy: 45, r: 12, fill: "paper" },
+  ]);
+  assert.deepEqual(sliderScene, [
+    { type: "line", x1: 200, y1: 68, x2: 310, y2: 68 },
+    { type: "rect", x: 227.5, y: 55.75, width: 55, height: 24.5, fill: "paper" },
+    { type: "line", x1: 255, y1: 80.25, x2: 255, y2: 110 },
+  ]);
+  assert.equal(ballScene[2]?.type, "arc");
+  assert.match(scientificSceneToTikz(pivotScene), /\\draw\[fill=white\] \(1\.10,-0\.90\) circle \(0\.24\);/);
+  assert.match(scientificSceneToTikz(sliderScene), /\\draw\[fill=white\] \(4\.55,-1\.11\) rectangle \(5\.65,-1\.60\);/);
+  assert.match(scientificSceneToTikz(ballScene), /arc\[start angle=-45,end angle=-315,radius=0\.37cm\]/);
+  assert.deepEqual(roundTripReport(documentFor([pivot, slider, ball]), [pivot, slider, ball]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("uses canvas baselines for prose and graph labels", () => {
   const prose = objectToLatex({ id: "txt", kind: "text", x: 50, y: 70, text: "Légende" });
   const graph = objectToLatex({ id: "axes-labels", kind: "axes", x: 0, y: 0, width: 200, height: 120, graph: { expression: "x", xMin: -1, xMax: 1, yMin: -1, yMax: 1, xLabel: "t", yLabel: "u_C" } });
@@ -428,6 +459,27 @@ test("provides a classroom-ready ideal transformer model with remapped terminal 
   const clonedTransformer = cloned.find((object) => object.kind === "transformer");
   assert.ok(clonedTransformer);
   assert.ok(cloned.filter((object) => object.kind === "wire").every((wire) => !wire.bindings?.startId || wire.bindings.startId === clonedTransformer.id) && cloned.filter((object) => object.kind === "wire").every((wire) => !wire.bindings?.endId || wire.bindings.endId === clonedTransformer.id));
+});
+
+test("provides a French concours slider-crank kinematic model with semantic solid bindings", () => {
+  const template = diagramTemplates.find((candidate) => candidate.id === "slider-crank-kinematic");
+  assert.ok(template);
+  assert.equal(template.category, "Mécanique");
+  assert.equal(template.objects.filter((object) => object.kind === "joint-pivot").length, 2);
+  assert.equal(template.objects.filter((object) => object.kind === "joint-slider").length, 1);
+  const crank = template.objects.find((object) => object.id === "sc-crank");
+  const rod = template.objects.find((object) => object.id === "sc-rod");
+  assert.deepEqual(crank?.bindings, { startId: "sc-pivot-a", startPort: "solid-1", endId: "sc-pivot-b", endPort: "solid-2" });
+  assert.deepEqual(rod?.bindings, { startId: "sc-pivot-b", startPort: "solid-1", endId: "sc-slider", endPort: "solid-1" });
+  const output = documentFor(template.objects);
+  assert.match(output, /Schéma cinématique plan/);
+  assert.match(output, /1 : manivelle/);
+  assert.match(output, /2 : bielle/);
+  assert.match(output, /3 : coulisseau/);
+  assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+  const cloned = cloneTemplateObjects(template); const clonedIds = new Set(cloned.map((object) => object.id));
+  assert.ok(cloned.every((object) => !object.bindings?.startId || clonedIds.has(object.bindings.startId)));
+  assert.ok(cloned.every((object) => !object.bindings?.endId || clonedIds.has(object.bindings.endId)));
 });
 
 test("provides a French concours negative-feedback block-diagram model", () => {

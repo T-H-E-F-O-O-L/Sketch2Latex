@@ -49,6 +49,27 @@ function localPorts(object: CanvasObject): ConnectionPort[] {
       { name: "secondary-bottom", x: object.x + width, y: object.y + height * .75 },
     ];
   }
+  if (object.kind === "joint-pivot") {
+    const width = object.width ?? 0; const height = object.height ?? 0;
+    return [
+      { name: "solid-1", x: object.x + width, y: object.y + height / 2 },
+      { name: "solid-2", x: object.x, y: object.y + height / 2 },
+    ];
+  }
+  if (object.kind === "joint-slider") {
+    const width = object.width ?? 0; const height = object.height ?? 0;
+    return [
+      { name: "solid-1", x: object.x, y: object.y + height * .4 },
+      { name: "solid-2", x: object.x + width / 2, y: object.y + height },
+    ];
+  }
+  if (object.kind === "joint-ball") {
+    const width = object.width ?? 0; const height = object.height ?? 0;
+    return [
+      { name: "solid-1", x: object.x + width, y: object.y + height / 2 },
+      { name: "solid-2", x: object.x, y: object.y + height / 2 },
+    ];
+  }
   if (electricalTerminalKinds.includes(object.kind)) return [
     { name: "start", x: object.x, y: object.y },
     { name: "end", x: object.x2 ?? object.x, y: object.y2 ?? object.y },
