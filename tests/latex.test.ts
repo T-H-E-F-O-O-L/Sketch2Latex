@@ -183,15 +183,26 @@ test("creates a visible canvas path for supported graph expressions", () => {
 });
 
 test("keeps selected-object rotation and size in the exported LaTeX", () => {
-  const output = objectToLatex({ id: "box", kind: "rect", x: 0, y: 0, width: 100, height: 50, scale: 1.5, rotation: 90 });
-  assert.match(output, /\\begin\{scope\}\[cm=\{/);
+  const object: CanvasObject = { id: "box", kind: "rect", x: 0, y: 0, width: 100, height: 50, scale: 1.5, rotation: 90 };
+  const output = objectToLatex(object);
+  assert.match(output, /\\begin\{scope\}\[transform canvas=\{cm=\{/);
   assert.match(output, /\\draw \(0\.00,0\.00\) rectangle \(2\.00,-1\.00\);/);
   assert.match(output, /\\end\{scope\}$/);
+  assert.deepEqual(roundTripReport(documentFor([object]), [object]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("keeps independent selected-object width and height in the exported LaTeX", () => {
   const output = objectToLatex({ id: "box", kind: "rect", x: 0, y: 0, width: 100, height: 50, scaleX: 2, scaleY: 0.5 });
-  assert.match(output, /cm=\{2,0,0,0\.5,/);
+  assert.match(output, /transform canvas=\{cm=\{2,0,0,0\.5,/);
+});
+
+test("transforms scientific labels with their resized and rotated stamp", () => {
+  const transformer: CanvasObject = { id: "scaled-transformer", kind: "transformer", x: 0, y: 0, width: 140, height: 160, scaleX: 1.25, scaleY: .75, rotation: 30, annotations: { primary: "N_1", secondary: "N_2" } };
+  const output = objectToLatex(transformer);
+  assert.match(output, /\\begin\{scope\}\[transform canvas=\{cm=\{1\.08253,-0\.625,0\.375,0\.64952,\(0\.48446,0\.31423\)\}\}\]/);
+  assert.match(output, /\{\$N_\{1\}\$\}/);
+  assert.match(output, /\{\$N_\{2\}\$\}/);
+  assert.deepEqual(roundTripReport(documentFor([transformer]), [transformer]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("exports editable drawing color and line width", () => {

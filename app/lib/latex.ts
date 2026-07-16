@@ -280,7 +280,9 @@ export function objectToLatex(object: CanvasObject): string {
   const angle = (-rotation * Math.PI) / 180;
   const a = scaleX * Math.cos(angle); const b = scaleX * Math.sin(angle); const c = -scaleY * Math.sin(angle); const d = scaleY * Math.cos(angle);
   const tx = cx - a * cx - c * cy; const ty = cy - b * cx - d * cy;
-  return `\\begin{scope}[cm={${matrixNumber(a)},${matrixNumber(b)},${matrixNumber(c)},${matrixNumber(d)},(${matrixNumber(tx)},${matrixNumber(ty)})}]\n${body}\n\\end{scope}`;
+  // A canvas transform mirrors the SVG group transform, including labels, arrowheads and stroke geometry.
+  // documentFor supplies an explicit page bound and clip, so TikZ does not need transformed-node bounds here.
+  return `\\begin{scope}[transform canvas={cm={${matrixNumber(a)},${matrixNumber(b)},${matrixNumber(c)},${matrixNumber(d)},(${matrixNumber(tx)},${matrixNumber(ty)})}}]\n${body}\n\\end{scope}`;
 }
 
 export function documentFor(objects: CanvasObject[], snippetOnly = false, settings?: DocumentSettings): string {
@@ -413,7 +415,7 @@ function annotationsFromLatexBlock(original: CanvasObject, block: string): Canva
 
 function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
   const withAnnotations = annotationsFromLatexBlock(original, block);
-  if (block.includes("\\begin{scope}[cm=")) return withAnnotations;
+  if (block.includes("\\begin{scope}[cm=") || block.includes("\\begin{scope}[transform canvas={cm=")) return withAnnotations;
   const connectorScopeMatch = connectorKinds.includes(original.kind) ? block.match(/\\begin\{scope\}\[shift=\{\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\},\s*rotate=\s*(-?\d+(?:\.\d+)?)/) : undefined;
   if (connectorScopeMatch) {
     const localSource = block.slice((connectorScopeMatch.index ?? 0) + connectorScopeMatch[0].length);
