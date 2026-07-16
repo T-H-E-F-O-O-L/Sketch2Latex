@@ -1,5 +1,6 @@
 import { annotation, connectorKinds, defaultAnnotations, labels, type CanvasObject, type DocumentSettings, type Point } from "./canvas-types";
 import { circuitGeometry } from "./circuit-geometry";
+import { springPointsFor, wavePointsFor } from "./connector-paths";
 import { CANVAS_UNITS_PER_CM, CONCOURS_CONNECTOR_LABEL_OFFSET, TIKZ_ARROW_TIP, TIKZ_DASH_PATTERN, TIKZ_LABEL_SIZE, TIKZ_NORMAL_STROKE, TIKZ_STROKE_PATTERNS, canvasUnitsToPoints, tikzStrokeWidth } from "./concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificLabelToLatex } from "./scientific-label";
@@ -221,8 +222,8 @@ function objectToLatexBase(object: CanvasObject): string {
     case "resistor": case "capacitor": case "inductor": case "battery": case "switch": return electricalConnector(object);
     case "lens": case "diverging-lens": return lensConnector(object);
     case "voltmeter": case "ammeter": return meterConnector(object);
-    case "spring": return `\\draw[decorate, decoration={coil, aspect=0.3}] ${origin} -- ${end(object)};`;
-    case "wave": return `\\draw[decorate, decoration={snake, amplitude=0.08cm, segment length=0.25cm}] ${origin} -- ${end(object)};`;
+    case "spring": return `\\draw ${springPointsFor(object).map((value) => point(value.x, value.y)).join(" -- ")};`;
+    case "wave": return `\\draw ${wavePointsFor(object).map((value) => point(value.x, value.y)).join(" -- ")};`;
     case "heat-arrow": return labelledArrowConnector(object, annotation(object, "main", "Q"));
     case "work-arrow": return labelledArrowConnector(object, annotation(object, "main", "W"));
     case "reaction-arrow": return `\\draw[-{Latex}] ${origin} -- ${end(object)};`;
@@ -405,7 +406,10 @@ function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObje
     const control = { x: start.x + 1.5 * (control1.x - start.x), y: start.y + 1.5 * (control1.y - start.y) };
     return { ...withAnnotations, x: start.x, y: start.y, control, x2: finish.x, y2: finish.y };
   }
-  if (connectorKinds.includes(original.kind) && points.length >= 2) return { ...withAnnotations, x: points[0].x, y: points[0].y, x2: points[1].x, y2: points[1].y };
+  if (connectorKinds.includes(original.kind) && points.length >= 2) {
+    const finish = original.kind === "spring" || original.kind === "wave" ? points.at(-1)! : points[1];
+    return { ...withAnnotations, x: points[0].x, y: points[0].y, x2: finish.x, y2: finish.y };
+  }
   if (original.kind === "rect" && points.length >= 2) return { ...original, x: points[0].x, y: points[0].y, width: points[1].x - points[0].x, height: points[1].y - points[0].y };
   if (original.kind === "circle" && points.length) {
     const radius = block.match(/circle\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)/);

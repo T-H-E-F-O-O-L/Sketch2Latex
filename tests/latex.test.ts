@@ -9,6 +9,7 @@ import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
 import { canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
+import { springPointsFor, wavePointsFor } from "../app/lib/connector-paths";
 import { scientificSceneFor, scientificSceneToTikz } from "../app/lib/scientific-scene";
 import { parseScientificLabel, scientificLabelToLatex } from "../app/lib/scientific-label";
 
@@ -82,6 +83,23 @@ test("uses canvas baselines for prose and graph labels", () => {
   assert.match(prose, /\\node\[anchor=base west,inner sep=0pt,outer sep=0pt,font=\\fontsize\{9\.64pt\}\{11\.57pt\}\\selectfont\] at \(1\.00,-1\.40\) \{Légende\}/);
   assert.match(graph, /\\node\[anchor=base east,inner sep=0pt,outer sep=0pt\].*\{\$t\$\}/);
   assert.match(graph, /\\node\[anchor=base west,inner sep=0pt,outer sep=0pt\].*\{\$u_\{C\}\$\}/);
+});
+
+test("shares exact spring and progressive-wave paths across renderers", () => {
+  const spring: CanvasObject = { id: "spring-path", kind: "spring", x: 0, y: 0, x2: 140, y2: 0 };
+  const wave: CanvasObject = { id: "wave-path", kind: "wave", x: 10, y: 20, x2: 130, y2: 100 };
+  const springPoints = springPointsFor(spring); const wavePoints = wavePointsFor(wave);
+  assert.deepEqual(springPoints[0], { x: 0, y: 0 });
+  assert.deepEqual(springPoints.at(-1), { x: 140, y: 0 });
+  assert.deepEqual(wavePoints[0], { x: 10, y: 20 });
+  assert.deepEqual(wavePoints.at(-1), { x: 130, y: 100 });
+  assert.ok(springPoints.some((point) => point.y > 0) && springPoints.some((point) => point.y < 0));
+  assert.ok(wavePoints.some((point) => Math.abs(point.y - (20 + (point.x - 10) * 2 / 3)) > 3));
+  const springTikz = objectToLatex(spring); const waveTikz = objectToLatex(wave);
+  assert.equal((springTikz.match(/\(-?\d+\.\d+,-?\d+\.\d+\)/g) ?? []).length, springPoints.length);
+  assert.equal((waveTikz.match(/\(-?\d+\.\d+,-?\d+\.\d+\)/g) ?? []).length, wavePoints.length);
+  assert.doesNotMatch(`${springTikz}\n${waveTikz}`, /decorate|decoration=\{(?:coil|snake)/);
+  assert.deepEqual(roundTripReport(documentFor([spring, wave]), [spring, wave]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("flips canvas y coordinates and clips shared graph geometry", () => {

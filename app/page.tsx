@@ -10,6 +10,7 @@ import { MathCalculator } from "./components/math-calculator";
 import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ConnectionPortName, type DocumentSettings, type ObjectKind, type Point, type StrokePattern } from "./lib/canvas-types";
 import { isCompleteAopConfiguration, makeAopCircuit } from "./lib/aop-circuits";
 import { circuitGeometry } from "./lib/circuit-geometry";
+import { springPointsFor, wavePointsFor } from "./lib/connector-paths";
 import { CONCOURS_ARROW, CONCOURS_CONNECTOR_LABEL_OFFSET, CONCOURS_DASH, CONCOURS_INK, EXPORTED_SVG_STYLE, SVG_STROKE_PATTERNS, canvasUnitsToCentimeters, canvasUnitsToPoints } from "./lib/concours-style";
 import { JUNCTION_RADIUS, junctionPointsFor, pointOnWireAt, portFor, portsFor } from "./lib/connection-geometry";
 import { parseScientificLabel } from "./lib/scientific-label";
@@ -264,7 +265,7 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   }
   if (object.kind === "switch") return <g><line {...common} x1={object.x} y1={object.y} x2={midX - 12 * ux} y2={midY - 12 * uy} /><line {...common} x1={midX + 14 * ux} y1={midY + 14 * uy} x2={x2} y2={y2} /><line {...common} x1={midX - 12 * ux} y1={midY - 12 * uy} x2={midX + 12 * ux - 12 * px} y2={midY + 12 * uy - 12 * py} /><circle cx={midX - 12 * ux} cy={midY - 12 * uy} r="3" fill={color} /></g>;
   if (object.kind === "voltmeter" || object.kind === "ammeter") { const meter = circuitGeometry.meter; return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r={meter.radius} fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text x={midX} y={midY + meter.labelBaseline} textAnchor="middle" fontSize="14" fill={color}>{scientificLabelSpans(a("main", object.kind === "voltmeter" ? "V" : "A"))}</text></g>; }
-  if (object.kind === "spring") return <polyline {...common} points={Array.from({ length: 11 }, (_, i) => `${object.x + dx * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * px)},${object.y + dy * i / 10 + (i === 0 || i === 10 ? 0 : (i % 2 ? 9 : -9) * py)}`).join(" ")} />;
+  if (object.kind === "spring" || object.kind === "wave") { const points = object.kind === "spring" ? springPointsFor(object) : wavePointsFor(object); return <polyline {...common} points={points.map((point) => `${point.x},${point.y}`).join(" ")} />; }
   if (object.kind === "wave") return <polyline {...common} points={Array.from({ length: 17 }, (_, i) => `${object.x + dx * i / 16 + Math.sin(i * Math.PI / 2) * 7 * px},${object.y + dy * i / 16 + Math.sin(i * Math.PI / 2) * 7 * py}`).join(" ")} />;
   if (object.kind.startsWith("bond-")) {
     const offsets = object.kind === "bond-single" ? [0] : object.kind === "bond-double" ? [-1, 1] : [-2, 0, 2];
