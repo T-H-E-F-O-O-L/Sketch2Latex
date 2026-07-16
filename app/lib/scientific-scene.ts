@@ -17,13 +17,36 @@ export type ScientificPrimitive =
 export const sharedScientificKinds: ObjectKind[] = [
   "mass", "pulley", "pendulum", "reference-frame", "circular-trajectory", "gravity-field", "electric-field", "magnetic-field-in", "magnetic-field-out", "bar-magnet", "coil", "solenoid", "laplace-rails", "charged-particle", "plane-mirror", "screen", "prism", "fiber", "piston-cylinder", "thermal-reservoir", "heat-engine",
   "ion", "lone-pair", "crystal-fcc", "precipitate", "electrochemical-cell", "beaker", "flask", "round-bottom-flask", "distillation-flask", "test-tube", "graduated-cylinder", "burette", "volumetric-flask", "separatory-funnel", "pipette", "filter-funnel", "wash-bottle", "liebig-condenser", "support-stand", "magnetic-stirrer", "thermometer", "bunsen-burner",
-  "ground", "transformer", "gbf", "oscilloscope", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
+  "ground", "transformer", "gbf", "oscilloscope", "transfer-block", "summing-junction", "takeoff-point", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
 ];
 
 export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] | undefined {
   if (!sharedScientificKinds.includes(object.kind)) return undefined;
   const x = object.x; const y = object.y; const width = object.width ?? 80; const height = object.height ?? 80; const cx = x + width / 2; const cy = y + height / 2;
   const label = (key: string, fallback: string) => annotation(object, key, fallback);
+  if (object.kind === "transfer-block") return [
+    { type: "rect", x, y, width, height, fill: "paper" },
+    { type: "text", x: cx, y: cy + 5, value: label("main", "H(p)"), anchor: "middle", fontSize: 15 },
+  ];
+  if (object.kind === "summing-junction") {
+    const radius = Math.min(width, height) * .32;
+    const sign = (key: string, fallback: string, signX: number, signY: number): ScientificPrimitive[] => {
+      const value = label(key, fallback).trim();
+      const latex = value === "−" ? "-" : value === "+" || value === "-" ? value : undefined;
+      return value ? [{ type: "text", x: signX, y: signY, value, ...(latex ? { latex } : {}), anchor: "middle", fontSize: 12 }] : [];
+    };
+    return [
+      { type: "line", x1: x, y1: cy, x2: cx - radius, y2: cy },
+      { type: "line", x1: cx + radius, y1: cy, x2: x + width, y2: cy },
+      { type: "line", x1: cx, y1: y, x2: cx, y2: cy - radius },
+      { type: "line", x1: cx, y1: cy + radius, x2: cx, y2: y + height },
+      { type: "circle", cx, cy, r: radius, fill: "paper" },
+      ...sign("left", "+", cx - radius * .45, cy + 4),
+      ...sign("top", "+", cx, cy - radius * .42 + 4),
+      ...sign("bottom", "−", cx, cy + radius * .5 + 4),
+    ];
+  }
+  if (object.kind === "takeoff-point") return [{ type: "circle", cx, cy, r: Math.min(width, height) * .22, fill: "ink" }];
   if (object.kind === "mass") return [
     { type: "rect", x: x + 5, y: y + 8, width: width - 10, height: height - 16, fill: "paper" },
     { type: "text", x: cx, y: cy + 5, value: label("main", "m"), anchor: "middle", fontSize: 14 },

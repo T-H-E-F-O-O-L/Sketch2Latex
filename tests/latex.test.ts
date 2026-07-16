@@ -122,6 +122,36 @@ test("adds a four-terminal European transformer with shared exact geometry", () 
   assert.deepEqual(roundTripReport(documentFor([transformer]), [transformer]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
+test("adds semantic French control-system blocks with exact named ports", () => {
+  const transfer: CanvasObject = { id: "transfer", kind: "transfer-block", x: 100, y: 80, width: 120, height: 70, annotations: { main: "C(p)" } };
+  const sum: CanvasObject = { id: "sum", kind: "summing-junction", x: 20, y: 30, width: 70, height: 70, annotations: { left: "+", top: "+", bottom: "−" } };
+  const takeoff: CanvasObject = { id: "takeoff", kind: "takeoff-point", x: 0, y: 0, width: 18, height: 18 };
+  const signal: CanvasObject = { id: "signal", kind: "signal-arrow", x: 0, y: 0, x2: 100, y2: 0, annotations: { main: "E(p)" } };
+  assert.deepEqual(defaultAnnotations("signal-arrow"), { main: "x(p)" });
+  assert.deepEqual(defaultAnnotations("transfer-block"), { main: "H(p)" });
+  assert.deepEqual(defaultAnnotations("summing-junction"), { left: "+", top: "+", bottom: "−" });
+  assert.deepEqual(stampSize("transfer-block"), { width: 120, height: 70 });
+  assert.ok(toolboxGroups.find((group) => group.title === "Automatique & schémas-blocs")?.kinds.includes("summing-junction"));
+  assert.deepEqual(portsFor(transfer), [{ name: "input", x: 100, y: 115 }, { name: "output", x: 220, y: 115 }]);
+  assert.deepEqual(portsFor(sum), [
+    { name: "input-left", x: 20, y: 65 },
+    { name: "input-top", x: 55, y: 30 },
+    { name: "input-bottom", x: 55, y: 100 },
+    { name: "output", x: 90, y: 65 },
+  ]);
+  assert.deepEqual(portsFor(takeoff), [{ name: "branch", x: 9, y: 9 }]);
+  const transferOutput = objectToLatex(transfer); const sumOutput = objectToLatex(sum); const takeoffOutput = objectToLatex(takeoff); const signalOutput = objectToLatex(signal);
+  assert.match(transferOutput, /\\draw\[fill=white\] \(2\.00,-1\.60\) rectangle \(4\.40,-3\.00\);/);
+  assert.match(transferOutput, /\{\$C\(p\)\$\}/);
+  assert.match(sumOutput, /circle \(0\.45\)/);
+  assert.equal((sumOutput.match(/\{\$\+\$\}/g) ?? []).length, 2);
+  assert.match(sumOutput, /\{\$-\$\}/);
+  assert.match(takeoffOutput, /\\fill \(0\.18,-0\.18\) circle \(0\.08\);/);
+  assert.match(signalOutput, /\\draw\[-\{Latex\}\] \(-1\.00,0\) -- \(1\.00,0\);/);
+  assert.match(signalOutput, /\{\$E\(p\)\$\}/);
+  assert.deepEqual(roundTripReport(documentFor([transfer, sum, takeoff, signal]), [transfer, sum, takeoff, signal]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+});
+
 test("uses canvas baselines for prose and graph labels", () => {
   const prose = objectToLatex({ id: "txt", kind: "text", x: 50, y: 70, text: "Légende" });
   const graph = objectToLatex({ id: "axes-labels", kind: "axes", x: 0, y: 0, width: 200, height: 120, graph: { expression: "x", xMin: -1, xMax: 1, yMin: -1, yMax: 1, xLabel: "t", yLabel: "u_C" } });
@@ -398,6 +428,25 @@ test("provides a classroom-ready ideal transformer model with remapped terminal 
   const clonedTransformer = cloned.find((object) => object.kind === "transformer");
   assert.ok(clonedTransformer);
   assert.ok(cloned.filter((object) => object.kind === "wire").every((wire) => !wire.bindings?.startId || wire.bindings.startId === clonedTransformer.id) && cloned.filter((object) => object.kind === "wire").every((wire) => !wire.bindings?.endId || wire.bindings.endId === clonedTransformer.id));
+});
+
+test("provides a French concours negative-feedback block-diagram model", () => {
+  const template = diagramTemplates.find((candidate) => candidate.id === "closed-loop-control");
+  assert.ok(template);
+  assert.equal(template.category, "Automatique");
+  assert.equal(template.objects.filter((object) => object.kind === "transfer-block").length, 3);
+  assert.equal(template.objects.filter((object) => object.kind === "summing-junction").length, 1);
+  assert.equal(template.objects.filter((object) => object.kind === "takeoff-point").length, 1);
+  assert.equal(template.objects.filter((object) => object.kind === "signal-arrow").length, 7);
+  assert.deepEqual(junctionPointsFor(template.objects), []);
+  const output = documentFor(template.objects);
+  for (const label of ["E\\(p\\)", "ε\\(p\\)", "C\\(p\\)", "U\\(p\\)", "H\\(p\\)", "S\\(p\\)", "H_\\{m\\}\\(p\\)"]) assert.match(output, new RegExp(`\\{\\$${label}\\$\\}`));
+  assert.match(output, /\{\$-\$\}/);
+  assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
+
+  const cloned = cloneTemplateObjects(template); const clonedIds = new Set(cloned.map((object) => object.id));
+  assert.ok(cloned.every((object) => !object.bindings?.startId || clonedIds.has(object.bindings.startId)));
+  assert.ok(cloned.every((object) => !object.bindings?.endId || clonedIds.has(object.bindings.endId)));
 });
 
 test("imports richer ordinary TikZ and protects unsupported commands", () => {

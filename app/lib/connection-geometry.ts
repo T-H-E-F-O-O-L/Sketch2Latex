@@ -23,6 +23,23 @@ function transformPoint(object: CanvasObject, point: Point): Point {
 }
 
 function localPorts(object: CanvasObject): ConnectionPort[] {
+  if (object.kind === "transfer-block") {
+    const width = object.width ?? 0; const height = object.height ?? 0;
+    return [
+      { name: "input", x: object.x, y: object.y + height / 2 },
+      { name: "output", x: object.x + width, y: object.y + height / 2 },
+    ];
+  }
+  if (object.kind === "summing-junction") {
+    const width = object.width ?? 0; const height = object.height ?? 0;
+    return [
+      { name: "input-left", x: object.x, y: object.y + height / 2 },
+      { name: "input-top", x: object.x + width / 2, y: object.y },
+      { name: "input-bottom", x: object.x + width / 2, y: object.y + height },
+      { name: "output", x: object.x + width, y: object.y + height / 2 },
+    ];
+  }
+  if (object.kind === "takeoff-point") return [{ name: "branch", x: object.x + (object.width ?? 0) / 2, y: object.y + (object.height ?? 0) / 2 }];
   if (object.kind === "transformer") {
     const width = object.width ?? 0; const height = object.height ?? 0;
     return [

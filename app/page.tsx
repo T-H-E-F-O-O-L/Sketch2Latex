@@ -277,8 +277,8 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
     return <g>{offsets.map((offset) => <line key={offset} {...common} x1={object.x + px * offset * 4} y1={object.y + py * offset * 4} x2={x2 + px * offset * 4} y2={y2 + py * offset * 4} />)}</g>;
   }
   if (object.kind === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
-  if (object.kind === "force" || object.kind === "arrow") {
-    const label = a("main", object.kind === "force" ? "F" : "").trim();
+  if (object.kind === "force" || object.kind === "arrow" || object.kind === "signal-arrow") {
+    const label = a("main", object.kind === "force" ? "F" : object.kind === "signal-arrow" ? "x(p)" : "").trim();
     return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py) : <text className="diagram-label" x={midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px} y={midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py} textAnchor="middle" fill={color}>{scientificLabelSpans(label)}</text>)}</g>;
   }
   if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py)}</g>;

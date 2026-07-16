@@ -207,8 +207,8 @@ function objectToLatexBase(object: CanvasObject): string {
       const control2 = { x: x2 + (2 / 3) * (control.x - x2), y: y2 + (2 / 3) * (control.y - y2) };
       return `\\draw ${origin} .. controls ${point(control1.x, control1.y)} and ${point(control2.x, control2.y)} .. ${end(object)};`;
     }
-    case "arrow": case "force": case "light-ray": {
-      const label = annotation(object, "main", object.kind === "force" ? "F" : "").trim();
+    case "arrow": case "signal-arrow": case "force": case "light-ray": {
+      const label = annotation(object, "main", object.kind === "force" ? "F" : object.kind === "signal-arrow" ? "x(p)" : "").trim();
       return labelledArrowConnector(object, label, object.kind === "force");
     }
     case "double-arrow": return `\\draw[<->] ${origin} -- ${end(object)};`;
