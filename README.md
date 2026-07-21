@@ -10,6 +10,8 @@ Turn visual STEM thinking into precise, editable TikZ diagrams.
 
 Built for OpenAI Build Week using Codex and GPT-5.6.
 
+> **Development note:** The idea and initial foundation were created with GPT-5.6 and Codex when GPT-5.6 launched. Most of Sketch2LaTeX—including advanced features such as **Draw on PDF**, the **graph workspace**, and later accuracy and usability refinements—was built during the hackathon week. The entire project was developed using GPT-5.6 and Codex.
+
 ## Inspiration
 
 STEM students often understand mathematical and scientific diagrams visually, yet turning those ideas into professional TikZ can be slow and difficult. Sketch2LaTeX makes technical drawing approachable without requiring users to master TikZ syntax first.
