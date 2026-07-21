@@ -819,19 +819,22 @@ export default function Home() {
   const roundTrip = useMemo(() => roundTripReport(latexSource, objects.filter((object) => !object.hidden)), [latexSource, objects]);
   const libraryGroups = useMemo(() => {
     const groups = new Map(toolboxGroups.map((group) => [group.title, group.kinds]));
-    const combine = (...titles: string[]) => titles.flatMap((title) => groups.get(title) ?? []);
-    return [
-      { title: "Outils", kinds: combine("Outils", "Dessin technique & GPS") },
-      { title: "Électricité & signaux", kinds: combine("Électricité & signaux", "Champs & induction", "Induction & conversion électromécanique", "Automatique & schémas-blocs", "Réponses temporelles & fréquentielles") },
-      { title: "Optique & ondes", kinds: combine("Optique & ondes", "Ondes, interférences & diffraction") },
-      { title: "Mécanique", kinds: combine("Mécanique", "Transmissions mécaniques", "Actionneurs & chaîne d’énergie") },
-      { title: "Liaisons mécaniques normalisées", kinds: combine("Liaisons mécaniques normalisées") },
-      { title: "Thermodynamique", kinds: combine("Thermodynamique", "Diagrammes thermodynamiques") },
-      { title: "Chimie", kinds: combine("Chimie") },
-      { title: "Structures moléculaires & mécanismes", kinds: combine("Structures moléculaires & mécanismes") },
-      { title: "Verrerie & matériel de TP", kinds: combine("Verrerie & matériel de TP") },
-      { title: "Amplificateurs opérationnels", kinds: combine("Amplificateurs opérationnels") },
-    ];
+    const permittedSections = [
+      "Outils",
+      "Électricité & signaux",
+      "Optique & ondes",
+      "Mécanique",
+      "Liaisons mécaniques normalisées",
+      "Thermodynamique",
+      "Chimie",
+      "Structures moléculaires & mécanismes",
+      "Verrerie & matériel de TP",
+      "Amplificateurs opérationnels",
+    ] as const;
+
+    // The library is deliberately a strict subset of the internal registry:
+    // it must contain only the families requested for the student-facing UI.
+    return permittedSections.map((title) => ({ title, kinds: groups.get(title) ?? [] }));
   }, []);
   const visibleLibraryKinds = useMemo(() => new Set(libraryGroups.flatMap((group) => group.kinds).filter((kind): kind is ObjectKind => kind !== "select")), [libraryGroups]);
   const filteredGroups = useMemo(() => libraryGroups.map((group) => ({ ...group, kinds: group.kinds.filter((kind) => kind === "select" || labels[kind].toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr"))) })).filter((group) => group.kinds.length), [libraryGroups, search]);
