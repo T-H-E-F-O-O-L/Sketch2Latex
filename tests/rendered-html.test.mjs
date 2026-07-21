@@ -21,11 +21,11 @@ test("server-renders the Sketch2LaTeX editor", async () => {
   assert.match(html, /Math &amp; Physics/);
   assert.match(html, /Blank Canvas/);
   assert.match(html, /Draw on PDF/);
-  assert.match(html, /Ajouter un graphe/);
-  assert.match(html, /SVG vectoriel/);
+  assert.match(html, /Add a graph/);
+  assert.match(html, /Vector SVG/);
   assert.match(html, /Stroke style/);
   assert.match(html, /Dash-dot/);
-  assert.doesNotMatch(html, /Compiler le LaTeX/);
+  assert.doesNotMatch(html, /Compile LaTeX/);
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
@@ -76,9 +76,9 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.doesNotMatch(css, /\.canvas-wrap svg/);
   assert.match(css, /\.pdf-background-canvas/);
   assert.match(css, /pointer-events: none/);
-  assert.match(templates, /Circuit RLC série/);
-  assert.match(templates, /Dispersion par un prisme/);
-  assert.match(templates, /Pile électrochimique/);
+  assert.match(templates, /Series RLC circuit/);
+  assert.match(templates, /Dispersion through a prism/);
+  assert.match(templates, /Electrochemical cell/);
   assert.match(project, /PROJECT_VERSION/);
   assert.match(latex, /tikz-rect-/);
   assert.match(latex, /raw-tikz/);

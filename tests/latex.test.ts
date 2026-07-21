@@ -93,8 +93,8 @@ test("adds French ideal voltage and current generators with exact source geometr
   assert.match(currentTikz, /\\draw\[-\{Latex\}\] \(-0\.16,0\) -- \(0\.16,0\)/);
   assert.deepEqual(portsFor(voltage).map((port) => port.name), ["start", "end"]);
   assert.deepEqual(portsFor(current).map((port) => port.name), ["start", "end"]);
-  assert.ok(toolboxGroups.find((group) => group.title === "Électricité & signaux")?.kinds.includes("voltage-source"));
-  assert.ok(toolboxGroups.find((group) => group.title === "Électricité & signaux")?.kinds.includes("current-source"));
+  assert.ok(toolboxGroups.find((group) => group.title === "Electricity & signals")?.kinds.includes("voltage-source"));
+  assert.ok(toolboxGroups.find((group) => group.title === "Electricity & signals")?.kinds.includes("current-source"));
   assert.deepEqual(roundTripReport(documentFor([voltage, current]), [voltage, current]), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
   const edited = documentFor([voltage]).replace("{$E_{0}$}", "{$E_{1}$}");
   assert.deepEqual(objectsFromLatex(edited, [voltage]).objects[0].annotations, { main: "E_1" });
@@ -105,7 +105,7 @@ test("adds a four-terminal European transformer with shared exact geometry", () 
   const output = objectToLatex(transformer);
   assert.deepEqual(defaultAnnotations("transformer"), { primary: "N_1", secondary: "N_2" });
   assert.deepEqual(stampSize("transformer"), { width: 140, height: 160 });
-  assert.ok(toolboxGroups.find((group) => group.title === "Électricité & signaux")?.kinds.includes("transformer"));
+  assert.ok(toolboxGroups.find((group) => group.title === "Electricity & signals")?.kinds.includes("transformer"));
   assert.deepEqual(portsFor(transformer), [
     { name: "primary-top", x: 20, y: 70 },
     { name: "primary-bottom", x: 20, y: 150 },
@@ -131,7 +131,7 @@ test("adds semantic French control-system blocks with exact named ports", () => 
   assert.deepEqual(defaultAnnotations("transfer-block"), { main: "H(p)" });
   assert.deepEqual(defaultAnnotations("summing-junction"), { left: "+", top: "+", bottom: "−" });
   assert.deepEqual(stampSize("transfer-block"), { width: 120, height: 70 });
-  assert.ok(toolboxGroups.find((group) => group.title === "Automatique & schémas-blocs")?.kinds.includes("summing-junction"));
+  assert.ok(toolboxGroups.find((group) => group.title === "Control systems & block diagrams")?.kinds.includes("summing-junction"));
   assert.deepEqual(portsFor(transfer), [{ name: "input", x: 100, y: 115 }, { name: "output", x: 220, y: 115 }]);
   assert.deepEqual(portsFor(sum), [
     { name: "input-left", x: 20, y: 65 },
@@ -159,7 +159,7 @@ test("adds normalized French mechanical joints with exact shared geometry", () =
   assert.deepEqual(stampSize("joint-pivot"), { width: 90, height: 50 });
   assert.deepEqual(stampSize("joint-slider"), { width: 110, height: 70 });
   assert.deepEqual(stampSize("joint-ball"), { width: 100, height: 70 });
-  const group = toolboxGroups.find((candidate) => candidate.title === "Liaisons mécaniques normalisées");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Standardized mechanical joints");
   assert.deepEqual(group?.kinds.slice(0, 3), ["joint-pivot", "joint-slider", "joint-cylindrical"]);
   assert.ok(group?.kinds.includes("joint-ball"));
   assert.deepEqual(portsFor(pivot), [{ name: "solid-1", x: 100, y: 45 }, { name: "solid-2", x: 10, y: 45 }]);
@@ -220,7 +220,7 @@ test("adds the core French CPGE mechanical-transmission components", () => {
   assert.deepEqual(defaultAnnotations("gear-pair"), { driver: "Z_1", driven: "Z_2" });
   assert.deepEqual(defaultAnnotations("rack-pinion"), { pinion: "Z", rack: "x" });
   assert.deepEqual(stampSize("belt-drive"), { width: 190, height: 120 });
-  assert.deepEqual(toolboxGroups.find((group) => group.title === "Transmissions mécaniques")?.kinds, ["gear-pair", "rack-pinion", "belt-drive", "screw-nut", "worm-gear", "planetary-gear", "cam-follower"]);
+  assert.deepEqual(toolboxGroups.find((group) => group.title === "Mechanical transmissions")?.kinds, ["gear-pair", "rack-pinion", "belt-drive", "screw-nut", "worm-gear", "planetary-gear", "cam-follower"]);
   assert.deepEqual(portsFor(gears).map((port) => port.name), ["input", "output"]);
   assert.deepEqual(portsFor(rack).map((port) => port.name), ["input", "output"]);
   assert.deepEqual(portsFor(belt), [{ name: "input", x: 447.5, y: 60 }, { name: "output", x: 542.5, y: 60 }]);
@@ -268,7 +268,7 @@ test("adds French electromechanical power-chain components with semantic ports",
   const clutch: CanvasObject = { id: "clutch", kind: "clutch", x: 320, y: 0, width: 130, height: 90, annotations: { main: "E" } };
   const brake: CanvasObject = { id: "brake", kind: "brake", x: 480, y: 0, width: 130, height: 110, annotations: { main: "F" } };
   const objects = [motor, reducer, clutch, brake];
-  assert.deepEqual(toolboxGroups.find((group) => group.title === "Actionneurs & chaîne d’énergie")?.kinds, ["electric-motor", "gear-reducer", "clutch", "brake"]);
+  assert.deepEqual(toolboxGroups.find((group) => group.title === "Actuators & power chain")?.kinds, ["electric-motor", "gear-reducer", "clutch", "brake"]);
   assert.deepEqual(defaultAnnotations("electric-motor"), { main: "M" });
   assert.deepEqual(defaultAnnotations("gear-reducer"), { main: "r" });
   assert.deepEqual(stampSize("brake"), { width: 130, height: 110 });
@@ -292,7 +292,7 @@ test("adds the core ISO 1219 hydraulic library with A/B/P/T ports", () => {
   const valve: CanvasObject = { id: "valve", kind: "hydraulic-valve-4-3", x: 430, y: 0, width: 200, height: 130, annotations: { main: "1V" } };
   const relief: CanvasObject = { id: "relief", kind: "pressure-relief-valve", x: 650, y: 0, width: 140, height: 110, annotations: { main: "p_0" } };
   const objects = [pump, reservoir, cylinder, valve, relief];
-  assert.deepEqual(toolboxGroups.find((group) => group.title === "Hydraulique ISO 1219")?.kinds, ["hydraulic-pump", "hydraulic-reservoir", "hydraulic-cylinder", "hydraulic-valve-4-3", "pressure-relief-valve"]);
+  assert.deepEqual(toolboxGroups.find((group) => group.title === "Hydraulics — ISO 1219")?.kinds, ["hydraulic-pump", "hydraulic-reservoir", "hydraulic-cylinder", "hydraulic-valve-4-3", "pressure-relief-valve"]);
   assert.deepEqual(defaultAnnotations("hydraulic-cylinder"), { main: "1A" });
   assert.deepEqual(stampSize("hydraulic-valve-4-3"), { width: 200, height: 130 });
   assert.deepEqual(portsFor(pump), [{ name: "P", x: 45, y: 0 }, { name: "T", x: 45, y: 110 }, { name: "shaft", x: 0, y: 55 }]);
@@ -321,7 +321,7 @@ test("adds a concours-ready ISO 1219 pneumatic library with numeric 5/2 ports", 
   const control: CanvasObject = { id: "control", kind: "one-way-flow-control", x: 0, y: 130, width: 140, height: 90, annotations: { main: "1V2" } };
   const exhaust: CanvasObject = { id: "exhaust", kind: "pneumatic-exhaust", x: 160, y: 130, width: 60, height: 60 };
   const objects = [source, service, frl, cylinder, valve, control, exhaust];
-  assert.deepEqual(toolboxGroups.find((group) => group.title === "Pneumatique ISO 1219")?.kinds, ["pneumatic-source", "pneumatic-service-unit", "pneumatic-frl", "pneumatic-cylinder", "pneumatic-valve-5-2", "one-way-flow-control", "pneumatic-exhaust"]);
+  assert.deepEqual(toolboxGroups.find((group) => group.title === "Pneumatics — ISO 1219")?.kinds, ["pneumatic-source", "pneumatic-service-unit", "pneumatic-frl", "pneumatic-cylinder", "pneumatic-valve-5-2", "one-way-flow-control", "pneumatic-exhaust"]);
   assert.deepEqual(defaultAnnotations("pneumatic-valve-5-2"), { main: "1V1", actuator: "1M1" });
   assert.deepEqual(stampSize("pneumatic-service-unit"), { width: 170, height: 90 });
   assert.deepEqual(portsFor(source), [{ name: "P", x: 45, y: 0 }, { name: "shaft", x: 0, y: 50 }]);
@@ -351,13 +351,13 @@ test("adds a concours-ready ISO 1219 pneumatic library with numeric 5/2 ports", 
 });
 
 test("adds French ISO technical-drawing lines, sections and semantic GPS callouts", () => {
-  const group = toolboxGroups.find((candidate) => candidate.title === "Dessin technique & GPS");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Technical drawing & GPS");
   assert.deepEqual(group?.kinds, ["hidden-edge", "centre-line", "cutting-plane", "section-hatch", "datum-feature", "feature-control-frame", "surface-texture"]);
   assert.deepEqual(stampSize("section-hatch"), { width: 160, height: 100 });
   assert.deepEqual(defaultAnnotations("cutting-plane"), { main: "A" });
   assert.deepEqual(defaultAnnotations("datum-feature"), { datum: "A" });
   assert.deepEqual(defaultAnnotations("feature-control-frame"), { characteristic: "position", tolerance: "0,02", diameter: "oui", modifier: "", datum1: "A", datum2: "B", datum3: "C" });
-  assert.deepEqual(defaultAnnotations("surface-texture"), { requirement: "enlèvement", parameter: "Ra", value: "3,2", process: "", lay: "", allAround: "non" });
+  assert.deepEqual(defaultAnnotations("surface-texture"), { requirement: "material removal", parameter: "Ra", value: "3.2", process: "", lay: "", allAround: "no" });
 
   const hidden: CanvasObject = { id: "hidden", kind: "hidden-edge", x: 0, y: 0, x2: 160, y2: 0 };
   const centre: CanvasObject = { id: "centre", kind: "centre-line", x: 0, y: 25, x2: 160, y2: 25 };
@@ -676,7 +676,7 @@ test("provides a classroom-ready ideal transformer model with remapped terminal 
 test("provides a French concours slider-crank kinematic model with semantic solid bindings", () => {
   const template = diagramTemplates.find((candidate) => candidate.id === "slider-crank-kinematic");
   assert.ok(template);
-  assert.equal(template.category, "Mécanique");
+  assert.equal(template.category, "Mechanics");
   assert.equal(template.objects.filter((object) => object.kind === "joint-pivot").length, 2);
   assert.equal(template.objects.filter((object) => object.kind === "joint-slider").length, 1);
   const crank = template.objects.find((object) => object.id === "sc-crank");
@@ -684,10 +684,10 @@ test("provides a French concours slider-crank kinematic model with semantic soli
   assert.deepEqual(crank?.bindings, { startId: "sc-pivot-a", startPort: "solid-1", endId: "sc-pivot-b", endPort: "solid-2" });
   assert.deepEqual(rod?.bindings, { startId: "sc-pivot-b", startPort: "solid-1", endId: "sc-slider", endPort: "solid-1" });
   const output = documentFor(template.objects);
-  assert.match(output, /Schéma cinématique plan/);
-  assert.match(output, /1 : manivelle/);
-  assert.match(output, /2 : bielle/);
-  assert.match(output, /3 : coulisseau/);
+  assert.match(output, /Planar slider-crank kinematic diagram/);
+  assert.match(output, /1: crank/);
+  assert.match(output, /2: connecting rod/);
+  assert.match(output, /3: slider/);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
   const cloned = cloneTemplateObjects(template); const clonedIds = new Set(cloned.map((object) => object.id));
   assert.ok(cloned.every((object) => !object.bindings?.startId || clonedIds.has(object.bindings.startId)));
@@ -700,9 +700,9 @@ test("provides a complete French normalized-joint reference model", () => {
   const jointKinds = template.objects.filter((object) => object.kind.startsWith("joint-")).map((object) => object.kind);
   assert.deepEqual(jointKinds, ["joint-pivot", "joint-slider", "joint-cylindrical", "joint-helical", "joint-ball", "joint-planar", "joint-line-contact", "joint-annular", "joint-point-contact"]);
   assert.match(template.sourceName, /Éduscol/);
-  assert.ok(template.objects.some((object) => object.kind === "text" && object.text?.startsWith("Encastrement :")));
+  assert.ok(template.objects.some((object) => object.kind === "text" && object.text?.startsWith("Fixed joint:")));
   const output = documentFor(template.objects);
-  for (const label of ["Pivot", "Glissière", "Pivot glissant", "Hélicoïdale", "Sphérique", "Appui plan", "Linéaire rectiligne", "Linéaire annulaire", "Sphère-plan"]) assert.match(output, new RegExp(label));
+  for (const label of ["Pivot", "Prismatic", "Cylindrical", "Helical", "Spherical", "Planar", "Linear contact", "Annular contact", "Sphere–plane"]) assert.match(output, new RegExp(label));
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
@@ -712,10 +712,10 @@ test("provides a French CPGE mechanical-transmission reference model", () => {
   assert.deepEqual(template.objects.filter((object) => ["gear-pair", "rack-pinion", "belt-drive", "screw-nut"].includes(object.kind)).map((object) => object.kind), ["gear-pair", "rack-pinion", "belt-drive", "screw-nut"]);
   assert.match(template.sourceName, /STEM mechanical/);
   const output = documentFor(template.objects);
-  assert.match(output, /Engrenage extérieur/);
-  assert.match(output, /Pignon-crémaillère/);
-  assert.match(output, /Poulies-courroie/);
-  assert.match(output, /Vis-écrou/);
+  assert.match(output, /External gear pair/);
+  assert.match(output, /Rack and pinion/);
+  assert.match(output, /Pulley and belt drive/);
+  assert.match(output, /Lead screw and nut/);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
@@ -725,9 +725,9 @@ test("provides an advanced French CPGE transmission reference model", () => {
   assert.deepEqual(template.objects.filter((object) => ["worm-gear", "planetary-gear", "cam-follower"].includes(object.kind)).map((object) => object.kind), ["worm-gear", "planetary-gear", "cam-follower"]);
   assert.match(template.sourceUrl, /eduscol\.education\.fr/);
   const output = documentFor(template.objects);
-  assert.match(output, /Roue et vis sans fin/);
-  assert.match(output, /Train épicycloïdal/);
-  assert.match(output, /Came et poussoir/);
+  assert.match(output, /Worm gear/);
+  assert.match(output, /Planetary gear train/);
+  assert.match(output, /Cam and follower/);
   assert.match(output, /rotation → translation/);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
@@ -742,8 +742,8 @@ test("provides a French concours electromechanical power-chain model", () => {
   assert.equal(brake?.rotation, 90);
   assert.deepEqual(brakeBranch?.bindings, { endId: "pc-brake", endPort: "shaft" });
   const output = documentFor(template.objects);
-  for (const label of ["Convertir", "Adapter", "Distribuer / accoupler", "Agir"]) assert.match(output, new RegExp(label));
-  assert.match(output, /Le frein est lié au bâti/);
+  for (const label of ["Convert", "Adapt", "Distribute / couple", "Act"]) assert.match(output, new RegExp(label));
+  assert.match(output, /The brake is attached to the frame/);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
@@ -759,8 +759,8 @@ test("provides a connected French ISO 1219 hydraulic reference circuit", () => {
   assert.deepEqual(workLineA?.bindings, { endId: "hc-cylinder", endPort: "A" });
   assert.equal(relief?.rotation, 90);
   const output = documentFor(template.objects);
-  assert.match(output, /Circuit hydraulique/);
-  assert.match(output, /A\/B : conduites de travail/);
+  assert.match(output, /Hydraulic circuit/);
+  assert.match(output, /A\/B: working lines/);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
@@ -783,15 +783,15 @@ test("provides a meter-out French electropneumatic 5/2 reference circuit", () =>
   assert.deepEqual(template.objects.find((object) => object.id === "pn-s-down")?.bindings, { startId: "pn-valve", startPort: "5" });
   assert.deepEqual(template.objects.find((object) => object.id === "pn-r-down")?.bindings, { startId: "pn-valve", startPort: "3" });
   const output = documentFor(template.objects);
-  assert.match(output, /Circuit électropneumatique/);
-  assert.match(output, /Réglage à l’échappement/);
+  assert.match(output, /Electropneumatic circuit/);
+  assert.match(output, /Meter-out control/);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
 
 test("provides a French concours technical-drawing and GPS reference sheet", () => {
   const template = diagramTemplates.find((candidate) => candidate.id === "gps-technical-drawing-reference");
   assert.ok(template);
-  assert.equal(template.category, "Dessin technique");
+  assert.equal(template.category, "Technical drawing");
   assert.match(template.sourceUrl, /eduscol\.education\.fr/);
   assert.deepEqual(template.objects.filter((object) => ["hidden-edge", "centre-line", "cutting-plane", "section-hatch", "datum-feature", "feature-control-frame", "surface-texture"].includes(object.kind)).map((object) => object.kind), ["cutting-plane", "hidden-edge", "hidden-edge", "centre-line", "section-hatch", "centre-line", "datum-feature", "feature-control-frame", "feature-control-frame", "feature-control-frame", "surface-texture"]);
   const datum = template.objects.find((object) => object.id === "gps-datum-a"); const flatness = template.objects.find((object) => object.id === "gps-flatness"); const position = template.objects.find((object) => object.id === "gps-position");
@@ -800,7 +800,7 @@ test("provides a French concours technical-drawing and GPS reference sheet", () 
   assert.equal(position?.annotations?.diameter, "oui");
   assert.deepEqual([position?.annotations?.datum1, position?.annotations?.datum2, position?.annotations?.datum3], ["A", "B", "C"]);
   const output = documentFor(template.objects);
-  assert.match(output, /COUPE A–A/);
+  assert.match(output, /SECTION A–A/);
   assert.match(output, /ISO 128.*ISO 1101.*ISO 5459.*ISO 21920/s);
   assert.deepEqual(roundTripReport(output, template.objects), { ok: true, mismatchedIds: [], message: "Aller-retour canevas ↔ TikZ vérifié sans perte." });
 });
@@ -808,7 +808,7 @@ test("provides a French concours technical-drawing and GPS reference sheet", () 
 test("provides a French concours negative-feedback block-diagram model", () => {
   const template = diagramTemplates.find((candidate) => candidate.id === "closed-loop-control");
   assert.ok(template);
-  assert.equal(template.category, "Automatique");
+  assert.equal(template.category, "Control systems");
   assert.equal(template.objects.filter((object) => object.kind === "transfer-block").length, 3);
   assert.equal(template.objects.filter((object) => object.kind === "summing-junction").length, 1);
   assert.equal(template.objects.filter((object) => object.kind === "takeoff-point").length, 1);
@@ -1087,11 +1087,11 @@ test("shares French instruments, ground and every AOP stamp across renderers", (
   const comparator = objectToLatex({ id: "cmp", kind: "op-amp-comparator", x: 0, y: 0, width: 150, height: 105 });
   assert.equal((ground.match(/\\draw /g) ?? []).length, 4);
   assert.match(inverting, /rectangle/);
-  assert.match(inverting, /\{\\text\{Inverseur\}\}/);
+  assert.match(inverting, /\{\\text\{Inverting\}\}/);
   assert.doesNotMatch(inverting, /zigzag|to\[R\]/);
   assert.match(comparator, /\{\$V_s\$\}/);
   assert.match(comparator, /\\node\[anchor=base east,inner sep=0pt,outer sep=0pt,font=\\fontsize\{6\.24pt\}\{7\.48pt\}\\selectfont\].*\{\$V_s\$\}/);
-  assert.match(comparator, /\{\\text\{Comparateur\}\}/);
+  assert.match(comparator, /\{\\text\{Comparator\}\}/);
 });
 
 test("preserves concours magnetic glyph scale in TikZ", () => {
@@ -1102,15 +1102,15 @@ test("preserves concours magnetic glyph scale in TikZ", () => {
 });
 
 test("exposes the current CPGE SysML and sequential-system toolset with semantic defaults", () => {
-  const group = toolboxGroups.find((candidate) => candidate.title === "Systèmes séquentiels & SysML");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Sequential systems & SysML");
   const kinds: ObjectKind[] = ["sysml-frame", "functional-block", "typed-flow", "state-node", "state-pseudostate", "state-transition", "choice-junction", "fork-join", "chronogram-lane"];
   assert.ok(group);
   assert.deepEqual(group.kinds, kinds);
   assert.ok(connectorKinds.includes("typed-flow") && connectorKinds.includes("state-transition"));
   assert.ok(kinds.filter((kind) => !connectorKinds.includes(kind)).every((kind) => stampKinds.includes(kind)));
-  assert.deepEqual(defaultAnnotations("sysml-frame"), { diagram: "stm", name: "Système" });
-  assert.deepEqual(defaultAnnotations("state-transition"), { event: "événement", guard: "", action: "" });
-  assert.deepEqual(defaultAnnotations("chronogram-lane"), { signal: "signal", waveform: "0,1,0,1", chronogram: "binaire", times: "t_0,t_1,t_2,t_3,t_4" });
+  assert.deepEqual(defaultAnnotations("sysml-frame"), { diagram: "stm", name: "System" });
+  assert.deepEqual(defaultAnnotations("state-transition"), { event: "event", guard: "", action: "" });
+  assert.deepEqual(defaultAnnotations("chronogram-lane"), { signal: "signal", waveform: "0,1,0,1", chronogram: "binary", times: "t_0,t_1,t_2,t_3,t_4" });
   assert.deepEqual(stampSize("state-node"), { width: 150, height: 90 });
   assert.deepEqual(stampSize("chronogram-lane"), { width: 320, height: 70 });
 });
@@ -1169,7 +1169,7 @@ test("adds precise pseudostates, junctions, parallel bars, chronograms and named
 test("provides a lossless concours motorized-gate functional-chain, stm and chronogram model", () => {
   const template = diagramTemplates.find((candidate) => candidate.id === "motorized-gate-systems");
   assert.ok(template);
-  assert.equal(template.category, "Systèmes & SysML");
+  assert.equal(template.category, "Systems & SysML");
   assert.match(template.sourceUrl, /eduscol\.education\.fr/);
   assert.equal(template.objects.filter((object) => object.kind === "sysml-frame").length, 2);
   assert.equal(template.objects.filter((object) => object.kind === "functional-block").length, 5);
@@ -1193,7 +1193,7 @@ test("provides a lossless concours motorized-gate functional-chain, stm and chro
 });
 
 test("exposes the French SysML requirements, BDD and IBD tool family with exact semantic defaults", () => {
-  const group = toolboxGroups.find((candidate) => candidate.title === "Exigences & architecture SysML");
+  const group = toolboxGroups.find((candidate) => candidate.title === "SysML requirements & architecture");
   const kinds: ObjectKind[] = ["sysml-requirement", "sysml-requirement-link", "sysml-block", "sysml-structural-link", "sysml-part", "sysml-port", "sysml-connector", "sysml-item-flow"];
   const connectors: ObjectKind[] = ["sysml-requirement-link", "sysml-structural-link", "sysml-connector", "sysml-item-flow"];
   const stamps: ObjectKind[] = ["sysml-requirement", "sysml-block", "sysml-part", "sysml-port"];
@@ -1201,14 +1201,14 @@ test("exposes the French SysML requirements, BDD and IBD tool family with exact 
   assert.deepEqual(group.kinds, kinds);
   assert.ok(connectors.every((kind) => connectorKinds.includes(kind)));
   assert.ok(stamps.every((kind) => stampKinds.includes(kind)));
-  assert.deepEqual(defaultAnnotations("sysml-requirement"), { name: "Exigence", reqId: "REQ-1", statement: "Le système doit satisfaire cette exigence." });
+  assert.deepEqual(defaultAnnotations("sysml-requirement"), { name: "Requirement", reqId: "REQ-1", statement: "The system must satisfy this requirement." });
   assert.deepEqual(defaultAnnotations("sysml-requirement-link"), { requirementRelation: "satisfy" });
-  assert.deepEqual(defaultAnnotations("sysml-block"), { name: "Bloc", values: "", parts: "", references: "", operations: "" });
-  assert.deepEqual(defaultAnnotations("sysml-structural-link"), { structuralRelation: "association", symbolEnd: "début", startRole: "", startMultiplicity: "1", endRole: "", endMultiplicity: "1" });
-  assert.deepEqual(defaultAnnotations("sysml-part"), { name: "partie", blockType: "Bloc" });
+  assert.deepEqual(defaultAnnotations("sysml-block"), { name: "Block", values: "", parts: "", references: "", operations: "" });
+  assert.deepEqual(defaultAnnotations("sysml-structural-link"), { structuralRelation: "association", symbolEnd: "start", startRole: "", startMultiplicity: "1", endRole: "", endMultiplicity: "1" });
+  assert.deepEqual(defaultAnnotations("sysml-part"), { name: "part", blockType: "Block" });
   assert.deepEqual(defaultAnnotations("sysml-port"), { name: "p", interfaceType: "Interface", portDirection: "inout" });
   assert.deepEqual(defaultAnnotations("sysml-connector"), { main: "" });
-  assert.deepEqual(defaultAnnotations("sysml-item-flow"), { name: "flux", itemType: "Information", flowDirection: "début vers fin" });
+  assert.deepEqual(defaultAnnotations("sysml-item-flow"), { name: "flow", itemType: "Information", flowDirection: "start to end" });
   assert.deepEqual(stampSize("sysml-requirement"), { width: 220, height: 125 });
   assert.deepEqual(stampSize("sysml-block"), { width: 220, height: 160 });
   assert.deepEqual(stampSize("sysml-part"), { width: 190, height: 75 });
@@ -1284,7 +1284,7 @@ test("draws SysML aggregation, composition, generalization and item-flow symbols
 test("provides a bound concours SysML req-BDD-IBD reference whose clone remaps every endpoint", () => {
   const template = diagramTemplates.find((candidate) => candidate.id === "sysml-requirements-architecture");
   assert.ok(template);
-  assert.equal(template.category, "Systèmes & SysML");
+  assert.equal(template.category, "Systems & SysML");
   assert.deepEqual(new Set(template.objects.filter((object) => object.kind === "sysml-frame").map((object) => object.annotations?.diagram)), new Set(["req", "bdd", "ibd"]));
   const requiredKinds: ObjectKind[] = ["sysml-requirement", "sysml-requirement-link", "sysml-block", "sysml-structural-link", "sysml-part", "sysml-port", "sysml-connector", "sysml-item-flow"];
   assert.ok(requiredKinds.every((kind) => template.objects.some((object) => object.kind === kind)), requiredKinds.filter((kind) => !template.objects.some((object) => object.kind === kind)).join(", "));
@@ -1316,19 +1316,19 @@ test("provides a bound concours SysML req-BDD-IBD reference whose clone remaps e
 
 test("exposes the exact French CPGE wave, interference and diffraction tool family", () => {
   const kinds: ObjectKind[] = ["wave-source", "wavefront", "aperture-array", "wave-path", "fringe-screen", "diffraction-cone", "standing-wave", "intensity-profile"];
-  const group = toolboxGroups.find((candidate) => candidate.title === "Ondes, interférences & diffraction");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Waves, interference & diffraction");
   assert.ok(group);
   assert.deepEqual(group.kinds, kinds);
   assert.deepEqual(kinds.filter((kind) => connectorKinds.includes(kind)), ["wave-path", "standing-wave"]);
   assert.deepEqual(kinds.filter((kind) => stampKinds.includes(kind)), ["wave-source", "wavefront", "aperture-array", "fringe-screen", "diffraction-cone", "intensity-profile"]);
-  assert.deepEqual(defaultAnnotations("wave-source"), { name: "S", sourceType: "ponctuelle", phase: "0" });
-  assert.deepEqual(defaultAnnotations("wavefront"), { wavefrontType: "circulaire", direction: "droite", main: "φ = constante" });
-  assert.deepEqual(defaultAnnotations("aperture-array"), { apertureType: "trous d’Young", count: "2", spacing: "a", opening: "b" });
-  assert.deepEqual(defaultAnnotations("wave-path"), { main: "δ(M)", medium: "n = 1", pathStyle: "réel" });
-  assert.deepEqual(defaultAnnotations("fringe-screen"), { screenName: "Écran", pointName: "M", fringeCount: "7", fringeSpacing: "i" });
+  assert.deepEqual(defaultAnnotations("wave-source"), { name: "S", sourceType: "point", phase: "0" });
+  assert.deepEqual(defaultAnnotations("wavefront"), { wavefrontType: "circular", direction: "right", main: "φ = constant" });
+  assert.deepEqual(defaultAnnotations("aperture-array"), { apertureType: "Young double slit", count: "2", spacing: "a", opening: "b" });
+  assert.deepEqual(defaultAnnotations("wave-path"), { main: "δ(M)", medium: "n = 1", pathStyle: "actual" });
+  assert.deepEqual(defaultAnnotations("fringe-screen"), { screenName: "Screen", pointName: "M", fringeCount: "7", fringeSpacing: "i" });
   assert.deepEqual(defaultAnnotations("diffraction-cone"), { opening: "a", angle: "θ", wavelength: "λ", distance: "D" });
-  assert.deepEqual(defaultAnnotations("standing-wave"), { main: "y(x,t)", mode: "3", showAntinodes: "oui" });
-  assert.deepEqual(defaultAnnotations("intensity-profile"), { profileType: "interférence", main: "I(x)", fringeCount: "7" });
+  assert.deepEqual(defaultAnnotations("standing-wave"), { main: "y(x,t)", mode: "3", showAntinodes: "yes" });
+  assert.deepEqual(defaultAnnotations("intensity-profile"), { profileType: "interference", main: "I(x)", fringeCount: "7" });
   assert.deepEqual(stampSize("wave-source"), { width: 70, height: 70 });
   assert.deepEqual(stampSize("wavefront"), { width: 180, height: 130 });
   assert.deepEqual(stampSize("aperture-array"), { width: 70, height: 160 });
@@ -1465,20 +1465,20 @@ test("provides three bound and lossless CPGE wave teaching templates whose clone
 
 test("exposes the exact semantic molecular-structure family and extended reaction annotations", () => {
   const newKinds: ObjectKind[] = ["chemical-atom", "bond-wedge-solid", "bond-wedge-hashed", "bond-wavy", "electron-pair-arrow", "single-electron-arrow", "mesomeric-arrow", "newman-projection", "skeletal-ring"];
-  const group = toolboxGroups.find((candidate) => candidate.title === "Structures moléculaires & mécanismes");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Molecular structures & mechanisms");
   assert.ok(group);
   assert.deepEqual(group.kinds, ["chemical-atom", "bond-wedge-solid", "bond-wedge-hashed", "bond-wavy", "electron-pair-arrow", "single-electron-arrow", "reaction-arrow", "mesomeric-arrow", "newman-projection", "skeletal-ring"]);
   assert.deepEqual(newKinds.filter((kind) => connectorKinds.includes(kind)), ["bond-wedge-solid", "bond-wedge-hashed", "bond-wavy", "electron-pair-arrow", "single-electron-arrow", "mesomeric-arrow"]);
   assert.deepEqual(newKinds.filter((kind) => stampKinds.includes(kind)), ["chemical-atom", "newman-projection", "skeletal-ring"]);
-  assert.deepEqual(defaultAnnotations("chemical-atom"), { element: "C", hydrogens: "0", charge: "", isotope: "", radical: "non", electronVacancy: "non", lonePairs: "0" });
-  assert.deepEqual(defaultAnnotations("bond-wedge-solid"), { wideEnd: "fin" });
-  assert.deepEqual(defaultAnnotations("bond-wedge-hashed"), { wideEnd: "fin" });
+  assert.deepEqual(defaultAnnotations("chemical-atom"), { element: "C", hydrogens: "0", charge: "", isotope: "", radical: "no", electronVacancy: "no", lonePairs: "0" });
+  assert.deepEqual(defaultAnnotations("bond-wedge-solid"), { wideEnd: "end" });
+  assert.deepEqual(defaultAnnotations("bond-wedge-hashed"), { wideEnd: "end" });
   assert.deepEqual(defaultAnnotations("bond-wavy"), { main: "" });
-  assert.deepEqual(defaultAnnotations("electron-pair-arrow"), { main: "", curvature: "gauche" });
-  assert.deepEqual(defaultAnnotations("single-electron-arrow"), { main: "", curvature: "gauche" });
+  assert.deepEqual(defaultAnnotations("electron-pair-arrow"), { main: "", curvature: "left" });
+  assert.deepEqual(defaultAnnotations("single-electron-arrow"), { main: "", curvature: "left" });
   assert.deepEqual(defaultAnnotations("mesomeric-arrow"), { main: "" });
-  assert.deepEqual(defaultAnnotations("newman-projection"), { conformation: "décalée", front1: "H", front2: "H", front3: "CH_3", rear1: "H", rear2: "H", rear3: "CH_3", rotation: "0" });
-  assert.deepEqual(defaultAnnotations("skeletal-ring"), { ringSize: "6", ringType: "aromatique", substituent1: "", substituent2: "" });
+  assert.deepEqual(defaultAnnotations("newman-projection"), { conformation: "staggered", front1: "H", front2: "H", front3: "CH_3", rear1: "H", rear2: "H", rear3: "CH_3", rotation: "0" });
+  assert.deepEqual(defaultAnnotations("skeletal-ring"), { ringSize: "6", ringType: "aromatic", substituent1: "", substituent2: "" });
   assert.deepEqual(defaultAnnotations("reaction-arrow"), { above: "", below: "", reagent: "", solvent: "", temperature: "", duration: "" });
   assert.deepEqual(stampSize("chemical-atom"), { width: 70, height: 60 });
   assert.deepEqual(stampSize("newman-projection"), { width: 190, height: 190 });
@@ -1542,9 +1542,9 @@ test("shares exact Lewis, Cram, mechanism, Newman and skeletal geometry with Tik
 
   assert.equal(scene(newman.id).filter((primitive) => primitive.type === "line").length, 6);
   assert.deepEqual(scene(newman.id).filter((primitive) => primitive.type === "circle").map((primitive) => primitive.type === "circle" ? primitive.fill : undefined), ["paper", "ink"]);
-  for (const value of ["H", "Cl", "CH_3", "Br", "décalée"]) assert.ok(texts(newman.id).includes(value), value);
+  for (const value of ["H", "Cl", "CH_3", "Br", "staggered"]) assert.ok(texts(newman.id).includes(value), value);
   const eclipsed = scientificSceneFor({ ...newman, id: "newman-eclipsed", annotations: { ...newman.annotations, conformation: "éclipsée" } }) ?? [];
-  assert.ok(eclipsed.some((primitive) => primitive.type === "text" && primitive.value === "éclipsée"));
+  assert.ok(eclipsed.some((primitive) => primitive.type === "text" && primitive.value === "eclipsed"));
   assert.notDeepEqual(scene(newman.id).filter((primitive) => primitive.type === "line"), eclipsed.filter((primitive) => primitive.type === "line"));
 
   const aromaticOutline = scene(aromatic.id).find((primitive) => primitive.type === "polyline");
@@ -1591,7 +1591,7 @@ test("provides three lossless chemistry references whose semantic bindings survi
   const coveredKinds = new Set(templates.flatMap((template) => template.objects.map((object) => object.kind)));
   for (const kind of ["chemical-atom", "bond-wedge-solid", "bond-wedge-hashed", "bond-wavy", "electron-pair-arrow", "single-electron-arrow", "mesomeric-arrow", "newman-projection", "skeletal-ring"] satisfies ObjectKind[]) assert.ok(coveredKinds.has(kind), kind);
   const newmanTemplate = templates[1];
-  assert.deepEqual(new Set(newmanTemplate.objects.filter((object) => object.kind === "newman-projection").map((object) => object.annotations?.conformation)), new Set(["décalée", "éclipsée"]));
+  assert.deepEqual(new Set(newmanTemplate.objects.filter((object) => object.kind === "newman-projection").map((object) => object.annotations?.conformation)), new Set(["staggered", "eclipsed"]));
   const mechanismTemplate = templates[2];
   assert.ok(mechanismTemplate.objects.some((object) => object.kind === "reaction-arrow" && ["above", "reagent", "below", "solvent", "temperature", "duration"].some((key) => object.annotations?.[key]?.trim())));
 
@@ -1662,23 +1662,23 @@ const hasDashedControlPrimitive = (scene: NonNullable<ReturnType<typeof scientif
 const controlCanvasPoint = (point: { x: number; y: number }) => `(${canvasUnitsToCentimeters(point.x).toFixed(2)},${(-canvasUnitsToCentimeters(point.y)).toFixed(2)})`;
 
 test("registers exactly ten French CPGE control-analysis tools with stable defaults and sizes", () => {
-  const group = toolboxGroups.find((candidate) => candidate.title === "Réponses temporelles & fréquentielles");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Time & frequency responses");
   assert.ok(group);
   assert.deepEqual(group.kinds, controlAnalysisKinds);
   assert.deepEqual(connectorKinds.filter((kind) => controlAnalysisKinds.includes(kind)), ["bode-break", "bode-slope", "performance-marker"]);
   assert.deepEqual(stampKinds.filter((kind) => controlAnalysisKinds.includes(kind)), [
     "bode-diagram", "bode-trace", "stability-margin", "time-response-diagram", "time-response-trace", "settling-band", "pole-zero-map",
   ]);
-  assert.deepEqual(defaultAnnotations("bode-diagram"), { title: "Diagramme de Bode", transferFunction: "H(p)", omegaMin: "0.1", omegaMax: "1000", gainMin: "-60", gainMax: "40", phaseMin: "-180", phaseMax: "0", frequencyUnit: "rad/s" });
-  assert.deepEqual(defaultAnnotations("bode-trace"), { channel: "module", traceType: "réel", model: "premier ordre", gain: "1", omega0: "10", damping: "0.7", main: "H" });
+  assert.deepEqual(defaultAnnotations("bode-diagram"), { title: "Bode diagram", transferFunction: "H(p)", omegaMin: "0.1", omegaMax: "1000", gainMin: "-60", gainMax: "40", phaseMin: "-180", phaseMax: "0", frequencyUnit: "rad/s" });
+  assert.deepEqual(defaultAnnotations("bode-trace"), { channel: "magnitude", traceType: "exact", model: "first order", gain: "1", omega0: "10", damping: "0.7", main: "H" });
   assert.deepEqual(defaultAnnotations("bode-break"), { main: "ω_0" });
-  assert.deepEqual(defaultAnnotations("bode-slope"), { main: "-20 dB/décade", slope: "-20" });
+  assert.deepEqual(defaultAnnotations("bode-slope"), { main: "-20 dB/decade", slope: "-20" });
   assert.deepEqual(defaultAnnotations("stability-margin"), { marginType: "phase", omegaC: "10", marginValue: "45", main: "M_φ" });
-  assert.deepEqual(defaultAnnotations("time-response-diagram"), { title: "Réponse temporelle", input: "échelon", signal: "y(t)", unit: "", timeMin: "0", timeMax: "10", yMin: "0", yMax: "1.5" });
-  assert.deepEqual(defaultAnnotations("time-response-trace"), { model: "premier ordre", input: "échelon", gain: "1", tau: "1", omega0: "1", damping: "0.5", main: "y(t)" });
+  assert.deepEqual(defaultAnnotations("time-response-diagram"), { title: "Time response", input: "step", signal: "y(t)", unit: "", timeMin: "0", timeMax: "10", yMin: "0", yMax: "1.5" });
+  assert.deepEqual(defaultAnnotations("time-response-trace"), { model: "first order", input: "step", gain: "1", tau: "1", omega0: "1", damping: "0.5", main: "y(t)" });
   assert.deepEqual(defaultAnnotations("settling-band"), { target: "1", tolerance: "5", main: "±5 %" });
   assert.deepEqual(defaultAnnotations("performance-marker"), { performanceType: "t5%", main: "t_5%" });
-  assert.deepEqual(defaultAnnotations("pole-zero-map"), { main: "Pôles et zéros", poles: "-1+2i;-1-2i", zeros: "", realMin: "-5", realMax: "1", imagMin: "-4", imagMax: "4" });
+  assert.deepEqual(defaultAnnotations("pole-zero-map"), { main: "Poles and zeros", poles: "-1+2i;-1-2i", zeros: "", realMin: "-5", realMax: "1", imagMin: "-4", imagMax: "4" });
   assert.deepEqual(Object.fromEntries(controlAnalysisKinds.map((kind) => [kind, stampSize(kind)])), {
     "bode-diagram": { width: 420, height: 300 }, "bode-trace": { width: 420, height: 300 }, "bode-break": { width: 70, height: 80 }, "bode-slope": { width: 70, height: 80 }, "stability-margin": { width: 420, height: 300 },
     "time-response-diagram": { width: 420, height: 240 }, "time-response-trace": { width: 420, height: 240 }, "settling-band": { width: 420, height: 240 }, "performance-marker": { width: 70, height: 80 }, "pole-zero-map": { width: 320, height: 260 },
@@ -1782,7 +1782,7 @@ test("shares aligned logarithmic Bode geometry and real/asymptotic first- and se
 test("shares finite first- and second-order time responses, the ±5 % band, and French performance marks", () => {
   const frame: CanvasObject = { id: "time-frame", kind: "time-response-diagram", x: 30, y: 40, width: 420, height: 240, annotations: defaultAnnotations("time-response-diagram") };
   const frameScene = finiteControlScene(frame); const frameTexts = frameScene.filter((primitive) => primitive.type === "text").map((primitive) => primitive.value);
-  assert.ok(frameTexts.includes("Réponse temporelle"));
+  assert.ok(frameTexts.includes("Time response"));
   assert.ok(frameTexts.some((value) => value.includes("y(t)")));
   assert.ok(frameTexts.some((value) => value === "t" || value.startsWith("t ")));
   const firstScene = finiteControlScene({ id: "time-first", kind: "time-response-trace", x: frame.x, y: frame.y, width: frame.width, height: frame.height, annotations: { ...defaultAnnotations("time-response-trace"), model: "premier ordre", input: "échelon", gain: "1", tau: "1", main: "y(t)" } });
@@ -1928,22 +1928,22 @@ const thermodynamicRepresentativePoint = (scene: NonNullable<ReturnType<typeof s
 };
 
 test("registers the nine French CPGE thermodynamic-diagram tools with exact defaults and sizes", () => {
-  const group = toolboxGroups.find((candidate) => candidate.title === "Diagrammes thermodynamiques");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Thermodynamic diagrams");
   assert.ok(group);
   assert.deepEqual(group.kinds, thermodynamicDiagramKinds);
   assert.deepEqual(connectorKinds.filter((kind) => thermodynamicDiagramKinds.includes(kind)), ["thermo-process"]);
   assert.deepEqual(stampKinds.filter((kind) => thermodynamicDiagramKinds.includes(kind)), [
     "thermo-diagram", "thermo-state", "thermo-isotherm-family", "phase-diagram-pt", "liquid-vapour-dome", "vapour-quality-line", "thermo-cycle", "pressure-work-area",
   ]);
-  assert.deepEqual(defaultAnnotations("thermo-diagram"), { diagramType: "P-V", title: "Diagramme de Clapeyron", xMin: "0", xMax: "10", yMin: "0", yMax: "10", xUnit: "m^3", yUnit: "Pa" });
-  assert.deepEqual(defaultAnnotations("thermo-state"), { main: "1", pressure: "P_1", volume: "V_1", temperature: "T_1", showCoordinates: "oui" });
-  assert.deepEqual(defaultAnnotations("thermo-process"), { processType: "isotherme", direction: "directe", main: "T = cste", exponent: "1.4", heat: "", work: "" });
+  assert.deepEqual(defaultAnnotations("thermo-diagram"), { diagramType: "P-V", title: "Clapeyron diagram", xMin: "0", xMax: "10", yMin: "0", yMax: "10", xUnit: "m^3", yUnit: "Pa" });
+  assert.deepEqual(defaultAnnotations("thermo-state"), { main: "1", pressure: "P_1", volume: "V_1", temperature: "T_1", showCoordinates: "yes" });
+  assert.deepEqual(defaultAnnotations("thermo-process"), { processType: "isothermal", direction: "forward", main: "T = const.", exponent: "1.4", heat: "", work: "" });
   assert.deepEqual(defaultAnnotations("thermo-isotherm-family"), { count: "4", main: "T_1 < T_2 < T_3 < T_4" });
-  assert.deepEqual(defaultAnnotations("phase-diagram-pt"), { title: "Diagramme de phases (P,T)", substance: "corps pur", fusionSlope: "positive" });
-  assert.deepEqual(defaultAnnotations("liquid-vapour-dome"), { title: "Équilibre liquide-vapeur", criticalPoint: "C" });
-  assert.deepEqual(defaultAnnotations("vapour-quality-line"), { quality: "0.5", main: "x = 0,5" });
-  assert.deepEqual(defaultAnnotations("thermo-cycle"), { cycleType: "Carnot", direction: "moteur", main: "Cycle de Carnot" });
-  assert.deepEqual(defaultAnnotations("pressure-work-area"), { main: "W = -∫P dV", areaType: "travail reçu" });
+  assert.deepEqual(defaultAnnotations("phase-diagram-pt"), { title: "Phase diagram (P,T)", substance: "pure substance", fusionSlope: "positive" });
+  assert.deepEqual(defaultAnnotations("liquid-vapour-dome"), { title: "Liquid–vapour equilibrium", criticalPoint: "C" });
+  assert.deepEqual(defaultAnnotations("vapour-quality-line"), { quality: "0.5", main: "x = 0.5" });
+  assert.deepEqual(defaultAnnotations("thermo-cycle"), { cycleType: "Carnot", direction: "engine", main: "Carnot cycle" });
+  assert.deepEqual(defaultAnnotations("pressure-work-area"), { main: "W = -∫P dV", areaType: "work received" });
   assert.deepEqual(Object.fromEntries(thermodynamicDiagramKinds.filter((kind) => kind !== "thermo-process").map((kind) => [kind, stampSize(kind)])), {
     "thermo-diagram": { width: 420, height: 280 }, "thermo-state": { width: 50, height: 50 }, "thermo-isotherm-family": { width: 420, height: 280 },
     "phase-diagram-pt": { width: 420, height: 280 }, "liquid-vapour-dome": { width: 420, height: 280 }, "vapour-quality-line": { width: 420, height: 280 },
@@ -2041,7 +2041,7 @@ test("shares the liquid-vapour dome, vapour-quality line, Carnot cycle, and pres
   const dome = finiteThermodynamicScene({ id: "dome", kind: "liquid-vapour-dome", x: 30, y: 40, width: 420, height: 280, annotations: defaultAnnotations("liquid-vapour-dome") });
   const domeText = foldedThermodynamicText(thermodynamicTexts(dome));
   assert.ok(domeText.includes("liquide") && domeText.includes("vapeur"));
-  assert.ok(domeText.includes("diphas") || domeText.includes("equilibre"));
+  assert.ok(domeText.includes("two-phase") || domeText.includes("equilibrium"));
   assert.ok(thermodynamicTexts(dome).some((value) => value === "C" || value.includes("critique")), "the two saturation branches meet at critical point C");
   assert.ok(thermodynamicCurves(dome).length >= 2 || dome.some((primitive) => primitive.type === "polyline" && primitive.closed), "the saturation branches must visibly form a dome");
 
@@ -2080,7 +2080,7 @@ test("provides four lossless French concours thermodynamics templates covering a
   });
   const coveredKinds = new Set(templates.flatMap((template) => template.objects.map((object) => object.kind)));
   assert.ok(thermodynamicDiagramKinds.every((kind) => coveredKinds.has(kind)), thermodynamicDiagramKinds.filter((kind) => !coveredKinds.has(kind)).join(", "));
-  assert.ok(templates.every((template) => template.category === "Thermodynamique"));
+  assert.ok(templates.every((template) => template.category === "Thermodynamics"));
   assert.ok(templates[0].objects.some((object) => object.kind === "thermo-process" && object.annotations?.processType));
   assert.ok(templates[3].objects.some((object) => object.kind === "thermo-cycle" && object.annotations?.cycleType === "Carnot"));
 
@@ -2188,7 +2188,7 @@ const directedArcSigns = (scene: NonNullable<ReturnType<typeof scientificSceneFo
   .filter((direction) => direction !== 0);
 
 test("registers the ten French CPGE induction and electromechanical tools with exact defaults and sizes", () => {
-  const group = toolboxGroups.find((candidate) => candidate.title === "Induction & conversion électromécanique");
+  const group = toolboxGroups.find((candidate) => candidate.title === "Induction & electromechanical conversion");
   assert.ok(group);
   assert.deepEqual(group.kinds, electromagneticInductionKinds);
   assert.equal(toolboxGroups.flatMap((candidate) => candidate.kinds).filter((kind) => kind === "laplace-rails").length, 1, "Laplace rails must not be duplicated across toolbox groups");
@@ -2197,16 +2197,16 @@ test("registers the ten French CPGE induction and electromechanical tools with e
     "uniform-field-region", "field-map", "oriented-current-loop", "magnetic-dipole", "laplace-rails",
     "rotating-rectangular-loop", "faraday-magnet-coil", "coupled-coils", "electromechanical-converter",
   ]);
-  assert.deepEqual(defaultAnnotations("uniform-field-region"), { fieldType: "magnétique", direction: "sortant", main: "B", density: "5" });
-  assert.deepEqual(defaultAnnotations("field-map"), { fieldType: "magnétique", sourceType: "uniforme", representation: "vecteurs", main: "B", density: "5" });
-  assert.deepEqual(defaultAnnotations("oriented-current-loop"), { loopShape: "circulaire", current: "i", normal: "n", orientation: "trigonométrique", showMoment: "oui" });
+  assert.deepEqual(defaultAnnotations("uniform-field-region"), { fieldType: "magnetic", direction: "outward", main: "B", density: "5" });
+  assert.deepEqual(defaultAnnotations("field-map"), { fieldType: "magnetic", sourceType: "uniform", representation: "vectors", main: "B", density: "5" });
+  assert.deepEqual(defaultAnnotations("oriented-current-loop"), { loopShape: "circular", current: "i", normal: "n", orientation: "counterclockwise", showMoment: "yes" });
   assert.deepEqual(defaultAnnotations("magnetic-dipole"), { main: "m", field: "B", angle: "θ", torque: "Γ" });
-  assert.deepEqual(defaultAnnotations("charged-particle-trajectory"), { charge: "q > 0", velocity: "v_0", field: "B", trajectoryType: "circulaire", main: "q" });
+  assert.deepEqual(defaultAnnotations("charged-particle-trajectory"), { charge: "q > 0", velocity: "v_0", field: "B", trajectoryType: "circular", main: "q" });
   assert.deepEqual(defaultAnnotations("laplace-rails"), { velocity: "v", current: "i", field: "B", force: "F_L" });
   assert.deepEqual(defaultAnnotations("rotating-rectangular-loop"), { current: "i", field: "B", flux: "Φ", angle: "θ", angularSpeed: "ω" });
-  assert.deepEqual(defaultAnnotations("faraday-magnet-coil"), { motion: "approche", emf: "e", current: "i", flux: "Φ", law: "Lenz" });
-  assert.deepEqual(defaultAnnotations("coupled-coils"), { primary: "N_1", secondary: "N_2", current1: "i_1", current2: "i_2", mutual: "M", dotConvention: "oui" });
-  assert.deepEqual(defaultAnnotations("electromechanical-converter"), { mode: "moteur", voltage: "u", current: "i", torque: "C_m", angularSpeed: "ω", power: "P_em" });
+  assert.deepEqual(defaultAnnotations("faraday-magnet-coil"), { motion: "approach", emf: "e", current: "i", flux: "Φ", law: "Lenz" });
+  assert.deepEqual(defaultAnnotations("coupled-coils"), { primary: "N_1", secondary: "N_2", current1: "i_1", current2: "i_2", mutual: "M", dotConvention: "yes" });
+  assert.deepEqual(defaultAnnotations("electromechanical-converter"), { mode: "motor", voltage: "u", current: "i", torque: "C_m", angularSpeed: "ω", power: "P_em" });
   assert.deepEqual(Object.fromEntries(electromagneticInductionKinds.filter((kind) => kind !== "charged-particle-trajectory").map((kind) => [kind, stampSize(kind)])), {
     "uniform-field-region": { width: 260, height: 180 }, "field-map": { width: 320, height: 240 }, "oriented-current-loop": { width: 220, height: 180 },
     "magnetic-dipole": { width: 180, height: 140 }, "laplace-rails": { width: 140, height: 90 }, "rotating-rectangular-loop": { width: 280, height: 220 },

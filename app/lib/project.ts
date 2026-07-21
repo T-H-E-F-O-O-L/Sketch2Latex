@@ -49,7 +49,7 @@ export function parseProject(value: string | unknown): ProjectFile {
   if (!objects || objects.some((object) => !validObject(object))) throw new Error("Le projet contient un ou plusieurs objets non reconnus.");
   return {
     version: finite(input.version) ? input.version : 1,
-    name: typeof input.name === "string" ? input.name : "Projet importé",
+    name: typeof input.name === "string" ? input.name : "Imported project",
     updatedAt: typeof input.updatedAt === "string" ? input.updatedAt : new Date().toISOString(),
     settings: settingsFrom(input.settings),
     objects: objects as CanvasObject[],

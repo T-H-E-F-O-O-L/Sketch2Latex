@@ -36,7 +36,21 @@ export const sharedScientificKinds: ObjectKind[] = [
   "ground", "transformer", "gbf", "oscilloscope", "transfer-block", "summing-junction", "takeoff-point", "op-amp", "op-amp-comparator", "op-amp-inverting", "op-amp-non-inverting", "op-amp-summing", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt",
 ];
 
-const gpsChoice = (value: string) => value.trim().toLocaleLowerCase("fr").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[ _]+/g, "-");
+const englishChoiceAliases: Record<string, string> = {
+  magnetic: "magnetique", electric: "electrique", outward: "sortant", inward: "entrant", vectors: "vecteurs", "field-lines": "lignes-de-champ", "symbols-⊙/⊗": "symboles-⊙/⊗",
+  circular: "circulaire", rectangular: "rectangulaire", counterclockwise: "trigonometrique", clockwise: "horaire", forward: "directe", reverse: "indirecte", engine: "moteur", motor: "moteur", receiver: "recepteur", generator: "generatrice",
+  approach: "approche", recession: "eloignement", stationary: "immobile", helical: "helicoidale", parabolic: "parabolique", straight: "rectiligne",
+  point: "ponctuelle", uniform: "uniforme", "straight-wire": "fil-rectiligne", loop: "spire", right: "droite", left: "gauche", "single-slit": "fente-simple", "young-double-slit": "trous-d-young", grating: "reseau", actual: "reel",
+  start: "debut", end: "fin", "start-to-end": "debut-vers-fin", "end-to-start": "fin-vers-debut", fork: "fourche", join: "jonction", binary: "binaire", analogue: "analogique",
+  staggered: "decalee", eclipsed: "eclipsee", saturated: "sature", alternating: "alterne", aromatic: "aromatique", interference: "interference",
+  magnitude: "module", exact: "reel", "first-order": "premier-ordre", "second-order": "deuxieme-ordre", data: "donnees", impulse: "impulsion", step: "echelon", ramp: "rampe", "rise-time": "temps-de-montee", "steady-state-error": "erreur-statique", "velocity-lag": "retard-de-trainage",
+  isobaric: "isobare", isochoric: "isochore", isothermal: "isotherme", adiabatic: "adiabatique", polytropic: "polytropique", "pure-substance": "corps-pur", water: "eau", "carbon-dioxide": "dioxyde-de-carbone", negative: "negative", "work-received": "travail-recu", "work-delivered": "travail-fourni",
+  yes: "oui", no: "non", none: "aucun", "material-removal": "enlevement", "material-removal-prohibited": "enlevement-interdit",
+};
+const gpsChoice = (value: string) => {
+  const normalized = value.trim().toLocaleLowerCase("en").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[ _]+/g, "-");
+  return englishChoiceAliases[normalized] ?? normalized;
+};
 const gpsEnabled = (value: string) => ["oui", "yes", "true", "1", "avec", "all-around", "tout-autour"].includes(gpsChoice(value));
 const compactLines = (value: string) => value.split(/\r?\n|;/).map((line) => line.trim()).filter(Boolean);
 const wrappedLines = (value: string, limit: number) => {
@@ -140,7 +154,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
   const x = object.x; const y = object.y; const width = object.width ?? 80; const height = object.height ?? 80; const cx = x + width / 2; const cy = y + height / 2;
   const label = (key: string, fallback: string) => annotation(object, key, fallback);
   if (object.kind === "sysml-requirement") {
-    const name = label("name", "Exigence").trim(); const reqId = label("reqId", "REQ-1").trim(); const statement = label("statement", "Le système doit satisfaire cette exigence.").trim(); const dividerY = y + Math.min(44, Math.max(38, height * .38));
+    const name = label("name", "Requirement").trim(); const reqId = label("reqId", "REQ-1").trim(); const statement = label("statement", "The system shall satisfy this requirement.").trim(); const dividerY = y + Math.min(44, Math.max(38, height * .38));
     const statementWidth = Math.max(18, Math.floor((width - 18) / 5.2) - 8); const rows = wrappedLines(statement, statementWidth); const statementRows = rows.length <= 1
       ? [`text = "${rows[0] ?? ""}"`]
       : rows.map((row, index) => `${index === 0 ? "text = \"" : ""}${row}${index === rows.length - 1 ? "\"" : ""}`);
@@ -343,7 +357,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "fringe-screen") {
-    const screenName = label("screenName", "Écran").trim(); const pointName = label("pointName", "M").trim(); const count = boundedInt(label("fringeCount", "7"), 7, 3, 15); const spacing = label("fringeSpacing", "i").trim();
+    const screenName = label("screenName", "Screen").trim(); const pointName = label("pointName", "M").trim(); const count = boundedInt(label("fringeCount", "7"), 7, 3, 15); const spacing = label("fringeSpacing", "i").trim();
     const screenLeft = x + width * .25; const screenWidth = width * .5; const screenTop = y + 12; const screenHeight = height - 38; const bandStep = screenHeight / (count + 1); const scene: ScientificPrimitive[] = [{ type: "rect", x: screenLeft, y: screenTop, width: screenWidth, height: screenHeight, fill: "light" }];
     for (let index = 1; index <= count; index += 1) {
       const bandY = screenTop + bandStep * index; const bandWidth = screenWidth * (.62 + .3 * Math.cos((index - (count + 1) / 2) * .6) ** 2);
@@ -492,7 +506,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     });
     scene.push(
       { type: "circle", cx, cy, r: Math.max(3, radius * .1), fill: "ink" },
-      { type: "text", x: cx, y: y + height - 5, value: staggered ? "décalée" : "éclipsée", anchor: "middle", fontSize: 9, technical: true },
+      { type: "text", x: cx, y: y + height - 5, value: staggered ? "staggered" : "eclipsed", anchor: "middle", fontSize: 9, technical: true },
     );
     return scene;
   }
@@ -588,7 +602,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "bode-slope") {
-    const x2 = object.x2 ?? x; const y2 = object.y2 ?? y; const dx = x2 - x; const dy = y2 - y; const length = Math.hypot(dx, dy) || 1; const nx = -dy / length; const ny = dx / length; const slope = label("slope", "-20").trim(); const main = label("main", `${slope} dB/décade`).trim();
+    const x2 = object.x2 ?? x; const y2 = object.y2 ?? y; const dx = x2 - x; const dy = y2 - y; const length = Math.hypot(dx, dy) || 1; const nx = -dy / length; const ny = dx / length; const slope = label("slope", "-20").trim(); const main = label("main", `${slope} dB/decade`).trim();
     return [
       { type: "line", x1: x, y1: y, x2, y2, strokeWidth: 2 },
       { type: "line", x1: x - nx * 4, y1: y - ny * 4, x2: x + nx * 4, y2: y + ny * 4 },
@@ -611,7 +625,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "time-response-diagram") {
-    const layout = timeLayoutFor(x, y, width, height); const title = label("title", "Réponse temporelle").trim(); const signal = label("signal", "y(t)").trim(); const input = label("input", "échelon").trim(); const unit = label("unit", "").trim();
+    const layout = timeLayoutFor(x, y, width, height); const title = label("title", "Time response").trim(); const signal = label("signal", "y(t)").trim(); const input = label("input", "step").trim(); const unit = label("unit", "").trim();
     const [timeMin, timeMax] = safeRange(finiteNumber(label("timeMin", "0"), 0), finiteNumber(label("timeMax", "10"), 10), 0, 10); const [yMin, yMax] = safeRange(finiteNumber(label("yMin", "0"), 0), finiteNumber(label("yMax", "1.5"), 1.5), 0, 1.5);
     const scene: ScientificPrimitive[] = [
       { type: "line", x1: layout.left, y1: layout.bottom, x2: layout.right + 7, y2: layout.bottom, arrowEnd: true },
@@ -619,7 +633,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
       { type: "text", x: (layout.left + layout.right) / 2, y: y + 17, value: title, anchor: "middle", fontSize: 12, math: false },
       { type: "text", x: layout.left - 7, y: layout.top, value: signal, anchor: "end", fontSize: 10 },
       { type: "text", x: layout.right, y: layout.bottom + 21, value: unit ? `t (${unit})` : "t", anchor: "end", fontSize: 9 },
-      { type: "text", x: layout.right, y: y + 17, value: `entrée : ${input}`, anchor: "end", fontSize: 9, math: false },
+      { type: "text", x: layout.right, y: y + 17, value: `input: ${input}`, anchor: "end", fontSize: 9, math: false },
     ];
     for (let index = 0; index <= 5; index += 1) {
       const timeValue = timeMin + ((timeMax - timeMin) * index) / 5; const tickX = mapLinear(timeValue, timeMin, timeMax, layout.left, layout.right);
@@ -696,7 +710,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "pole-zero-map") {
-    const title = label("main", "Pôles et zéros").trim(); const [realMin, realMax] = safeRange(finiteNumber(label("realMin", "-5"), -5), finiteNumber(label("realMax", "1"), 1), -5, 1); const [imagMin, imagMax] = safeRange(finiteNumber(label("imagMin", "-4"), -4), finiteNumber(label("imagMax", "4"), 4), -4, 4);
+    const title = label("main", "Poles and zeros").trim(); const [realMin, realMax] = safeRange(finiteNumber(label("realMin", "-5"), -5), finiteNumber(label("realMax", "1"), 1), -5, 1); const [imagMin, imagMax] = safeRange(finiteNumber(label("imagMin", "-4"), -4), finiteNumber(label("imagMax", "4"), 4), -4, 4);
     const left = x + Math.min(42, width * .18); const right = x + width - Math.min(20, width * .08); const top = y + Math.min(34, height * .16); const bottom = y + height - Math.min(30, height * .15); const axisX = mapLinear(clamp(0, realMin, realMax), realMin, realMax, left, right); const axisY = mapLinear(clamp(0, imagMin, imagMax), imagMax, imagMin, top, bottom); const toPoint = (entry: { real: number; imaginary: number }) => ({ x: mapLinear(clamp(entry.real, realMin, realMax), realMin, realMax, left, right), y: mapLinear(clamp(entry.imaginary, imagMin, imagMax), imagMax, imagMin, top, bottom) });
     const poles = label("poles", "-1+2i;-1-2i").split(/[;\n]+/).map(parseComplex).filter((entry): entry is { real: number; imaginary: number } => Boolean(entry)); const zeros = label("zeros", "").split(/[;\n]+/).map(parseComplex).filter((entry): entry is { real: number; imaginary: number } => Boolean(entry)); const scene: ScientificPrimitive[] = [
       { type: "rect", x: left, y: top, width: right - left, height: bottom - top },
@@ -800,7 +814,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     return scene;
   }
   if (object.kind === "liquid-vapour-dome") {
-    const layout = thermoLayoutFor(x, y, width, height); const plotWidth = layout.right - layout.left; const plotHeight = layout.bottom - layout.top; const title = label("title", "Équilibre liquide-vapeur").trim(); const criticalLabel = label("criticalPoint", "C").trim(); const critical = { x: layout.left + plotWidth * .52, y: layout.top + plotHeight * .18 }; const saturatedLiquid = { x: layout.left + plotWidth * .18, y: layout.bottom - 7 }; const saturatedVapour = { x: layout.left + plotWidth * .86, y: layout.bottom - 7 };
+    const layout = thermoLayoutFor(x, y, width, height); const plotWidth = layout.right - layout.left; const plotHeight = layout.bottom - layout.top; const title = label("title", "Liquid–vapour equilibrium").trim(); const criticalLabel = label("criticalPoint", "C").trim(); const critical = { x: layout.left + plotWidth * .52, y: layout.top + plotHeight * .18 }; const saturatedLiquid = { x: layout.left + plotWidth * .18, y: layout.bottom - 7 }; const saturatedVapour = { x: layout.left + plotWidth * .86, y: layout.bottom - 7 };
     return [
       { type: "line", x1: layout.left, y1: layout.bottom, x2: layout.right + 7, y2: layout.bottom, arrowEnd: true },
       { type: "line", x1: layout.left, y1: layout.bottom, x2: layout.left, y2: layout.top - 7, arrowEnd: true },
@@ -814,8 +828,8 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
       { type: "text", x: layout.left + plotWidth * .12, y: layout.top + plotHeight * .46, value: "liquide", anchor: "middle", fontSize: 9, math: false },
       { type: "text", x: layout.left + plotWidth * .52, y: layout.bottom - plotHeight * .24, value: "liquide + vapeur", anchor: "middle", fontSize: 9, math: false },
       { type: "text", x: layout.left + plotWidth * .91, y: layout.top + plotHeight * .5, value: "vapeur", anchor: "middle", fontSize: 9, math: false },
-      { type: "text", x: saturatedLiquid.x + 8, y: saturatedLiquid.y - 8, value: "liquide saturé", anchor: "start", fontSize: 8, math: false },
-      { type: "text", x: saturatedVapour.x - 8, y: saturatedVapour.y - 8, value: "vapeur saturée", anchor: "end", fontSize: 8, math: false },
+      { type: "text", x: saturatedLiquid.x + 8, y: saturatedLiquid.y - 8, value: "saturated liquid", anchor: "start", fontSize: 8, math: false },
+      { type: "text", x: saturatedVapour.x - 8, y: saturatedVapour.y - 8, value: "saturated vapour", anchor: "end", fontSize: 8, math: false },
     ];
   }
   if (object.kind === "vapour-quality-line") {
@@ -827,7 +841,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "thermo-cycle") {
-    const layout = thermoLayoutFor(x, y, width, height); const plotWidth = layout.right - layout.left; const plotHeight = layout.bottom - layout.top; const cycleType = gpsChoice(label("cycleType", "Carnot")); const receiver = gpsChoice(label("direction", "moteur")).startsWith("recep"); const main = label("main", "Cycle de Carnot").trim(); const at = (rx: number, ry: number): Point => ({ x: layout.left + plotWidth * rx, y: layout.top + plotHeight * ry });
+    const layout = thermoLayoutFor(x, y, width, height); const plotWidth = layout.right - layout.left; const plotHeight = layout.bottom - layout.top; const cycleType = gpsChoice(label("cycleType", "Carnot")); const receiver = gpsChoice(label("direction", "motor")).startsWith("recep"); const main = label("main", "Carnot cycle").trim(); const at = (rx: number, ry: number): Point => ({ x: layout.left + plotWidth * rx, y: layout.top + plotHeight * ry });
     let states: Point[];
     if (cycleType.startsWith("stirl")) states = [at(.28, .75), at(.28, .27), at(.73, .27), at(.73, .75)];
     else if (cycleType.startsWith("joule") || cycleType.startsWith("bray")) states = [at(.24, .72), at(.35, .31), at(.76, .31), at(.86, .72)];
@@ -995,7 +1009,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     for (let index = 0; index < 6; index += 1) scene.push({ type: "ellipse", cx: coilCenterX + (index - 2.5) * width * .032, cy, rx: width * .052, ry: height * .3, strokeWidth: 1.6 });
     const motionStart = approaching ? magnetRight + 9 : magnetRight + width * .18; const motionEnd = approaching ? magnetRight + width * .18 : magnetRight + 9; scene.push(
       { type: "line", x1: motionStart, y1: y + height * .2, x2: motionEnd, y2: y + height * .2, arrowEnd: true, strokeWidth: 1.8 },
-      { type: "text", x: (motionStart + motionEnd) / 2, y: y + height * .14, value: approaching ? "approche" : "éloignement", anchor: "middle", fontSize: 8, math: false },
+      { type: "text", x: (motionStart + motionEnd) / 2, y: y + height * .14, value: approaching ? "approach" : "recession", anchor: "middle", fontSize: 8, math: false },
       { type: "line", x1: magnetRight + 5, y1: cy - 13, x2: coilCenterX - width * .08, y2: cy - 13, arrowEnd: true, dashed: true },
       { type: "line", x1: magnetRight + 5, y1: cy + 13, x2: coilCenterX - width * .08, y2: cy + 13, arrowEnd: true, dashed: true },
       { type: "text", x: (magnetRight + coilCenterX) / 2, y: cy - 20, value: flux, anchor: "middle", fontSize: 10 },
@@ -1057,12 +1071,12 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
       { type: "text", x: x + width * .84, y: cy + height * .24, value: torque, anchor: "middle", fontSize: 9, vector: true },
       { type: "line", x1: powerStart, y1: y + 12, x2: powerEnd, y2: y + 12, arrowEnd: true, dashed: true },
       { type: "text", x: cx, y: y + 8, value: power, anchor: "middle", fontSize: 9 },
-      { type: "text", x: cx, y: blockBottom + 17, value: motor ? "conversion électrique → mécanique" : "conversion mécanique → électrique", anchor: "middle", fontSize: 8, math: false },
+      { type: "text", x: cx, y: blockBottom + 17, value: motor ? "electrical → mechanical conversion" : "mechanical → electrical conversion", anchor: "middle", fontSize: 8, math: false },
       { type: "circle", cx: x, cy: electricalTop, r: 3.2, fill: "paper" }, { type: "circle", cx: x, cy: electricalBottom, r: 3.2, fill: "paper" }, { type: "circle", cx: x + width, cy, r: 3.2, fill: "paper" },
     ];
   }
   if (object.kind === "sysml-frame") {
-    const diagram = label("diagram", "stm").trim() || "stm"; const name = label("name", "Système").trim();
+    const diagram = label("diagram", "stm").trim() || "stm"; const name = label("name", "System").trim();
     const tabWidth = Math.min(width * .62, Math.max(120, 52 + name.length * 7)); const tabHeight = Math.min(28, height * .18); const bevel = Math.min(16, tabHeight * .55);
     return [
       { type: "rect", x, y, width, height },
@@ -1088,7 +1102,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
     ];
   }
   if (object.kind === "state-node") {
-    const name = label("name", "État").trim(); const activities = [["entry", "entry / "], ["do", "do / "], ["exit", "exit / "]] as const;
+    const name = label("name", "State").trim(); const activities = [["entry", "entry / "], ["do", "do / "], ["exit", "exit / "]] as const;
     const populated = activities.map(([key, prefix]) => ({ prefix, value: label(key, "").trim() })).filter((activity) => activity.value);
     const scene: ScientificPrimitive[] = [{ type: "rect", x, y, width, height, rx: Math.min(12, height * .15), fill: "paper" }];
     if (!populated.length) return [...scene, { type: "text", x: cx, y: cy + 5, value: name, anchor: "middle", fontSize: 13, technical: true }];
@@ -1110,7 +1124,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
   }
   if (object.kind === "state-transition") {
     const x2 = object.x2 ?? x; const y2 = object.y2 ?? y; const dx = x2 - x; const dy = y2 - y; const length = Math.hypot(dx, dy) || 1; const nx = -dy / length; const ny = dx / length;
-    const event = label("event", "événement").trim(); const guard = label("guard", "").trim(); const action = label("action", "").trim(); const caption = `${event}${guard ? ` [${guard}]` : ""}${action ? ` / ${action}` : ""}`.trim();
+    const event = label("event", "event").trim(); const guard = label("guard", "").trim(); const action = label("action", "").trim(); const caption = `${event}${guard ? ` [${guard}]` : ""}${action ? ` / ${action}` : ""}`.trim();
     return [
       { type: "line", x1: x, y1: y, x2, y2, arrowEnd: true },
       ...(caption ? [{ type: "text", x: (x + x2) / 2 - nx * 12, y: (y + y2) / 2 - ny * 12 + 4, value: caption, anchor: "middle", fontSize: 10, math: false } as ScientificPrimitive] : []),
@@ -1943,7 +1957,7 @@ export function scientificSceneFor(object: CanvasObject): ScientificPrimitive[] 
   if (object.kind.startsWith("op-amp")) {
     const topInput = y + height * .37; const bottomInput = y + height * .66; const boxLeft = x + width * .28; const boxRight = x + width * .8; const outputX = x + width * .96;
     const feedback = ["op-amp-inverting", "op-amp-non-inverting", "op-amp-integrator", "op-amp-differentiator", "op-amp-schmitt"].includes(object.kind);
-    const variant = object.kind === "op-amp-comparator" ? "Comparateur" : object.kind === "op-amp-inverting" ? "Inverseur" : object.kind === "op-amp-non-inverting" ? "Non-inverseur" : object.kind === "op-amp-summing" ? "Sommateur" : object.kind === "op-amp-integrator" ? "Intégrateur" : object.kind === "op-amp-differentiator" ? "Dérivateur" : object.kind === "op-amp-schmitt" ? "Schmitt" : "AOP";
+    const variant = object.kind === "op-amp-comparator" ? "Comparator" : object.kind === "op-amp-inverting" ? "Inverting" : object.kind === "op-amp-non-inverting" ? "Non-inverting" : object.kind === "op-amp-summing" ? "Summing" : object.kind === "op-amp-integrator" ? "Integrator" : object.kind === "op-amp-differentiator" ? "Differentiator" : object.kind === "op-amp-schmitt" ? "Schmitt" : "Op-amp";
     const scene: ScientificPrimitive[] = [
       { type: "rect", x: boxLeft, y: y + height * .15, width: boxRight - boxLeft, height: height * .7, fill: "paper" },
       { type: "line", x1: x + width * .04, y1: topInput, x2: boxLeft, y2: topInput },

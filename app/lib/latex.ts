@@ -361,7 +361,7 @@ function metadataFromLatexBlock(block: string): CanvasObject | undefined {
     const object: unknown = JSON.parse(metadata[1]);
     if (!isCanvasObject(object)) throw new Error("invalid");
     return object;
-  } catch { throw new Error("Le bloc @sketch2latex contient des données invalides. Corrigez son JSON puis réessayez."); }
+  } catch { throw new Error("The @sketch2latex block contains invalid data. Correct its JSON and try again."); }
 }
 
 function pointsFromLatex(source: string) {
@@ -521,16 +521,16 @@ export function objectsFromLatex(source: string, currentObjects: CanvasObject[])
   const originals = new Map(currentObjects.map((object) => [object.id, object])); const seen = new Set<string>(); const resultIds = new Set<string>(); const objects: CanvasObject[] = [];
   let applied = 0; let preserved = 0;
   markers.forEach((marker, index) => {
-    const id = marker[1]; const original = originals.get(id); if (seen.has(id)) throw new Error(`L’identifiant ${id} est présent plusieurs fois dans le LaTeX.`);
+    const id = marker[1]; const original = originals.get(id); if (seen.has(id)) throw new Error(`The identifier ${id} appears more than once in the LaTeX.`);
     seen.add(id); const blockStart = (marker.index ?? 0) + marker[0].length; const blockEnd = markers[index + 1]?.index ?? source.length; const block = source.slice(blockStart, blockEnd); const metadata = metadataFromLatexBlock(block);
     if (!original) {
       if (!metadata) throw new Error(`Le nouvel objet ${id} doit inclure un bloc @sketch2latex valide.`);
-      if (resultIds.has(metadata.id)) throw new Error(`L’identifiant ${metadata.id} est présent plusieurs fois dans le LaTeX.`);
+      if (resultIds.has(metadata.id)) throw new Error(`The identifier ${metadata.id} appears more than once in the LaTeX.`);
       resultIds.add(metadata.id); objects.push(metadata); applied += 1; return;
     }
     const visual = objectFromLatexBlock(original, block);
     const next = metadata && JSON.stringify(metadata) !== JSON.stringify(original) ? mergeTikzEdits(metadata, visual, original) : visual;
-    if (resultIds.has(next.id)) throw new Error(`L’identifiant ${next.id} est présent plusieurs fois dans le LaTeX.`);
+    if (resultIds.has(next.id)) throw new Error(`The identifier ${next.id} appears more than once in the LaTeX.`);
     resultIds.add(next.id);
     if (next === original) preserved += 1; else applied += 1;
     objects.push(next);
