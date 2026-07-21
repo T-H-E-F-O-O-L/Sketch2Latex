@@ -15,20 +15,21 @@ test("server-renders the Sketch2LaTeX editor", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Sketch2LaTeX<\/title>/i);
-  assert.match(html, /Éditeur scientifique CPGE/);
-  assert.match(html, /Bibliothèque/);
-  assert.match(html, /Modèles/);
-  assert.match(html, /Maths &amp; Physique/);
-  assert.match(html, /Canevas scientifique interactif/);
+  assert.match(html, /Scientific diagram editor for STEM students/);
+  assert.match(html, /Library/);
+  assert.match(html, /Templates/);
+  assert.match(html, /Math &amp; Physics/);
+  assert.match(html, /Blank Canvas/);
+  assert.match(html, /Draw on PDF/);
   assert.match(html, /Ajouter un graphe/);
   assert.match(html, /SVG vectoriel/);
-  assert.match(html, /Type de trait/);
-  assert.match(html, /Mixte tiret-point/);
+  assert.match(html, /Stroke style/);
+  assert.match(html, /Dash-dot/);
   assert.doesNotMatch(html, /Compiler le LaTeX/);
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
-  const [page, css, templates, project, latex, concoursStyle, connectionGeometry, scientificScene, scientificLabel, mathKeyboard, mathCalculator, packageJson] = await Promise.all([
+  const [page, css, templates, project, latex, concoursStyle, connectionGeometry, scientificScene, scientificLabel, mathKeyboard, mathCalculator, pdfBackground, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/templates.ts", import.meta.url), "utf8"),
@@ -40,6 +41,7 @@ test("ships editor, persistence, template and vector-export workflows", async ()
     readFile(new URL("../app/lib/scientific-label.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/math-keyboard.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/math-calculator.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/pdf-background.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(page, /AUTOSAVE_KEY/);
@@ -53,7 +55,7 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /physicsFormulaGroups/);
   assert.match(page, /addMathEquation/);
   assert.match(page, /MathCalculator/);
-  assert.match(page, /Éditeur visuel de formule/);
+  assert.match(page, /Visual formula editor/);
   assert.doesNotMatch(page, /Langage simple/);
   assert.match(page, /data-export-formula/);
   assert.match(page, /getMathJaxRenderer/);
@@ -72,6 +74,8 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(css, /\.math-keyboard-grid/);
   assert.match(css, /\.canvas-wrap > svg/);
   assert.doesNotMatch(css, /\.canvas-wrap svg/);
+  assert.match(css, /\.pdf-background-canvas/);
+  assert.match(css, /pointer-events: none/);
   assert.match(templates, /Circuit RLC série/);
   assert.match(templates, /Dispersion par un prisme/);
   assert.match(templates, /Pile électrochimique/);
@@ -94,10 +98,15 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(mathKeyboard, /label: "f\(x\)"/);
   assert.match(mathKeyboard, /label: "ABC"/);
   assert.match(mathCalculator, /math-field/);
-  assert.match(mathCalculator, /Code LaTeX \(avancé\)/);
-  assert.match(mathCalculator, /delete-backward/);
+  assert.match(mathCalculator, /LaTeX code \(advanced\)/);
+  assert.match(mathCalculator, /deleteBackward/);
   assert.match(mathCalculator, /import\("mathlive"\)/);
   assert.match(mathCalculator, /mathLiveStatus/);
+  assert.match(pdfBackground, /normalizePdfPageDrawing/);
+  assert.match(pdfBackground, /restorePdfPageDrawing/);
+  assert.match(page, /pdf\.worker\.min\.mjs/);
+  assert.match(page, /Your PDF stays in your browser and is not uploaded/);
   assert.match(packageJson, /"svg2pdf\.js"/);
   assert.match(packageJson, /"mathlive"/);
+  assert.match(packageJson, /"pdfjs-dist"/);
 });

@@ -84,7 +84,8 @@ function electricalConnector(object: CanvasObject) {
   if (object.kind === "capacitor" || object.kind === "battery") {
     const g = object.kind === "battery" ? circuitGeometry.battery : circuitGeometry.capacitor;
     const negativeHalfPlate = "negativeHalfPlate" in g ? g.negativeHalfPlate : g.halfPlate; const positiveHalfPlate = "positiveHalfPlate" in g ? g.positiveHalfPlate : g.halfPlate;
-    const capacitorLabel = object.kind === "capacitor" ? `\n\\node[${labelNodeOptions()}] at (0,-${n(g.labelOffset)}) {${label("C")}};` : "";
+    const labelOffset = "labelOffset" in g ? g.labelOffset : 0;
+    const capacitorLabel = object.kind === "capacitor" ? `\n\\node[${labelNodeOptions()}] at (0,-${n(labelOffset)}) {${label("C")}};` : "";
     return connectorScope(object, `\\draw (-${halfLength},0) -- (${halfLength},0);\n\\draw (-${n(g.negativePlateOffset)},-${n(negativeHalfPlate)}) -- (-${n(g.negativePlateOffset)},${n(negativeHalfPlate)});\n\\draw (${n(g.positivePlateOffset)},-${n(positiveHalfPlate)}) -- (${n(g.positivePlateOffset)},${n(positiveHalfPlate)});${capacitorLabel}`);
   }
   if (object.kind === "switch") {

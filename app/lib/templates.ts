@@ -5,7 +5,7 @@ export type DiagramTemplate = {
   title: string;
   category: string;
   description: string;
-  sourceName: "TikZ.net" | "Janosh Diagrams" | "Sketch2LaTeX";
+  sourceName: string;
   sourceUrl: string;
   license: string;
   objects: CanvasObject[];
@@ -854,6 +854,72 @@ export const diagramTemplates: DiagramTemplate[] = [
       o("wire-right", { kind: "wire", x: 560, y: 100, x2: 560, y2: 225 }),
       o("current", { kind: "arrow", x: 390, y: 75, x2: 510, y2: 75, style: concours() }),
       o("current-label", { kind: "text", x: 450, y: 55, text: "e⁻" }),
+    ],
+  },
+  {
+    id: "lorentz-circular-motion",
+    title: "Lorentz force and circular motion",
+    category: "Électricité",
+    description: "A charged-particle trajectory in a uniform magnetic field, with an editable field map.",
+    sourceName: "Sketch2LaTeX",
+    sourceUrl: "https://tikz.net/dynamics_magnetic_field/",
+    license: "Original STEM teaching template",
+    objects: [
+      o("lorentz-field", { kind: "uniform-field-region", x: 110, y: 110, width: 320, height: 260, annotations: { fieldType: "magnétique", direction: "sortant", main: "B", density: "5" }, style: concours() }),
+      o("lorentz-map", { kind: "field-map", x: 500, y: 120, width: 260, height: 220, annotations: { fieldType: "magnétique", sourceType: "uniforme", representation: "vecteurs", main: "B", density: "5" }, style: concours() }),
+      o("lorentz-path", { kind: "charged-particle-trajectory", x: 150, y: 245, x2: 390, y2: 245, annotations: { charge: "q > 0", velocity: "v_0", field: "B", trajectoryType: "circulaire", main: "q" }, style: concours() }),
+    ],
+  },
+  {
+    id: "laplace-rails-induction",
+    title: "Laplace rails",
+    category: "Électricité",
+    description: "French rail experiment with current, magnetic field, velocity, force, and an oriented current loop.",
+    sourceName: "Sketch2LaTeX",
+    sourceUrl: "https://tikz.net/dynamics_magnetic_field/",
+    license: "Original STEM teaching template",
+    objects: [
+      o("rails-field", { kind: "uniform-field-region", x: 90, y: 110, width: 330, height: 250, annotations: { fieldType: "magnétique", direction: "entrant", main: "B", density: "5" }, style: concours() }),
+      o("rails-apparatus", { kind: "laplace-rails", x: 160, y: 185, width: 220, height: 145, annotations: { velocity: "v", current: "i", field: "B", force: "F_L" }, style: concours() }),
+      o("rails-loop", { kind: "oriented-current-loop", x: 520, y: 150, width: 240, height: 200, annotations: { loopShape: "circulaire", current: "i", normal: "n", orientation: "trigonométrique", showMoment: "oui" }, style: concours() }),
+    ],
+  },
+  {
+    id: "faraday-lenz-magnet-coil",
+    title: "Faraday–Lenz induction",
+    category: "Électricité",
+    description: "A moving magnet and fixed coil accompanied by the magnetic-dipole convention.",
+    sourceName: "Sketch2LaTeX",
+    sourceUrl: "https://tikz.net/dynamics_magnetic_field/",
+    license: "Original STEM teaching template",
+    objects: [
+      o("faraday-device", { kind: "faraday-magnet-coil", x: 100, y: 150, width: 430, height: 250, annotations: { motion: "approche", emf: "e", current: "i", flux: "Φ", law: "Lenz" }, style: concours() }),
+      o("faraday-dipole", { kind: "magnetic-dipole", x: 610, y: 185, width: 190, height: 150, annotations: { main: "m", field: "B", angle: "θ", torque: "Γ" }, style: concours() }),
+    ],
+  },
+  {
+    id: "mutual-induction-coupled-coils",
+    title: "Mutual induction",
+    category: "Électricité",
+    description: "Two coupled coils with the French polarity-dot convention and editable winding labels.",
+    sourceName: "Sketch2LaTeX",
+    sourceUrl: "https://tikz.net/electric_transformer/",
+    license: "Original STEM teaching template",
+    objects: [
+      o("mutual-coils", { kind: "coupled-coils", x: 250, y: 150, width: 400, height: 250, annotations: { primary: "N_1", secondary: "N_2", current1: "i_1", current2: "i_2", mutual: "M", dotConvention: "oui" }, style: concours() }),
+    ],
+  },
+  {
+    id: "rotating-loop-electromechanical-conversion",
+    title: "Rotating loop and energy conversion",
+    category: "Électricité",
+    description: "A rotating rectangular loop linked to a reversible electromechanical converter.",
+    sourceName: "Sketch2LaTeX",
+    sourceUrl: "https://tikz.net/dynamics_magnetic_field/",
+    license: "Original STEM teaching template",
+    objects: [
+      o("rotation-loop", { kind: "rotating-rectangular-loop", x: 100, y: 130, width: 320, height: 250, annotations: { current: "i", field: "B", flux: "Φ", angle: "θ", angularSpeed: "ω" }, style: concours() }),
+      o("rotation-converter", { kind: "electromechanical-converter", x: 520, y: 160, width: 300, height: 200, annotations: { mode: "moteur", voltage: "u", current: "i", torque: "C_m", angularSpeed: "ω", power: "P_em" }, style: concours() }),
     ],
   },
   {

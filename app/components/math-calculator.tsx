@@ -66,7 +66,7 @@ export function MathCalculator({ formula, onFormulaChange, onAdd, onAddDemonstra
     onFormulaChange(field.value);
   };
 
-  const runCommand = (command: "move-to-previous-char" | "move-to-next-char" | "delete-backward", focusMathField: boolean) => {
+  const runCommand = (command: "moveToPreviousChar" | "moveToNextChar" | "deleteBackward", focusMathField: boolean) => {
     const field = fieldRef.current; if (!field || mathLiveStatus !== "ready" || typeof field.executeCommand !== "function") return;
     if (focusMathField) field.focus(); field.executeCommand(command); onFormulaChange(field.value);
   };
@@ -93,9 +93,9 @@ export function MathCalculator({ formula, onFormulaChange, onAdd, onAddDemonstra
     </div>
     <div className="math-keyboard-actions" aria-label="Math keyboard actions">
       <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => clear(cameFromPointer(event))} aria-label="Clear the formula">AC</button>
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("move-to-previous-char", cameFromPointer(event))} aria-label="Move cursor left">←</button>
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("move-to-next-char", cameFromPointer(event))} aria-label="Move cursor right">→</button>
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("delete-backward", cameFromPointer(event))} aria-label="Delete previous character">⌫</button>
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("moveToPreviousChar", cameFromPointer(event))} aria-label="Move cursor left">←</button>
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("moveToNextChar", cameFromPointer(event))} aria-label="Move cursor right">→</button>
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("deleteBackward", cameFromPointer(event))} aria-label="Delete previous character">⌫</button>
       <button type="button" className="commit-formula" onPointerDown={keepMathfieldFocus} onClick={onAdd} disabled={!formula.trim()} aria-label="Add formula to canvas">↵</button>
     </div>
     <div className="math-primary-actions"><button type="button" onClick={onAdd} disabled={!formula.trim()}>Add formula</button><button type="button" onClick={onAddDemonstration} disabled={!formula.trim()}>Add as derivation</button></div>

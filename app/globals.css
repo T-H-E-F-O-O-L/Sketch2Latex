@@ -42,6 +42,19 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .mode-switch button:first-child { border-radius: 4px 0 0 4px; }
 .mode-switch button:last-child { border-radius: 0 4px 4px 0; }
 .app-shell > .status { max-width: none; min-height: 20px; margin: 0 0 8px; text-align: left; }
+.document-mode-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 9px; padding: 8px; border: 1px solid #ccd2d9; border-radius: 6px; background: #fff; }
+.background-mode-switch { display: flex; }
+.background-mode-switch button { border-radius: 0; }
+.background-mode-switch button:first-child { border-radius: 4px 0 0 4px; }
+.background-mode-switch button:last-child { border-radius: 0 4px 4px 0; }
+.pdf-file-name { max-width: 190px; overflow: hidden; color: #34404c; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-page-count, .pdf-privacy { color: #52606d; font-size: 11px; }
+.pdf-privacy { margin-left: auto; }
+.pdf-visibility, .pdf-opacity { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+.pdf-opacity input { width: 92px; }
+.pdf-opacity output { min-width: 34px; }
+.remove-pdf { color: #8b241d; }
+.pdf-error { margin: -2px 0 9px; padding: 8px 10px; border: 1px solid #db9b94; border-radius: 5px; color: #8c2e25; background: #fff5f3; font-size: 12px; }
 .command-bar { position: sticky; top: 0; z-index: 10; margin-bottom: 10px; padding: 8px; border: 1px solid #ccd2d9; border-radius: 6px; background: rgba(255,255,255,.96); box-shadow: 0 2px 7px rgba(0,0,0,.05); }
 .command-bar output { min-width: 44px; text-align: center; font-size: 12px; }
 .bar-separator { width: 1px; height: 26px; margin: 0 3px; background: #c9ced4; }
@@ -120,6 +133,17 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .selection-toolbar button { padding: 4px 6px; font-size: 11px; }
 .app-shell .canvas-wrap { width: 100%; max-height: calc(100vh - 165px); overflow: auto; background: #d7dce1; }
 .app-shell .canvas-wrap > svg { min-height: 480px; max-height: calc(100vh - 170px); background: white; cursor: crosshair; }
+.app-shell .pdf-canvas-wrap { position: relative; max-height: none; overflow: hidden; background: #cfd5db; }
+.app-shell .pdf-canvas-wrap > .pdf-background-canvas, .app-shell .pdf-canvas-wrap > .pdf-drawing-layer { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.app-shell .pdf-canvas-wrap > .pdf-background-canvas { z-index: 1; pointer-events: none; transition: opacity .15s ease; }
+.app-shell .pdf-canvas-wrap > .pdf-drawing-layer { z-index: 2; min-height: 0; max-height: none; background: transparent; touch-action: none; }
+.app-shell .pdf-canvas-wrap > .pdf-drawing-layer[aria-busy="true"] { pointer-events: none; }
+.pdf-empty-state { display: grid; place-items: center; align-content: center; gap: 10px; min-height: 420px; padding: 38px; text-align: center; background: #f8fafb; }
+.pdf-empty-state strong { font-size: 18px; }
+.pdf-empty-state p { max-width: 390px; margin: 0; color: #52606d; font-size: 13px; }
+.pdf-empty-state small { color: #687481; }
+.pdf-loading-overlay { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; color: #283746; background: rgba(244,247,249,.72); font-size: 13px; font-weight: 700; pointer-events: none; }
+.pdf-export-context { margin: 0 0 8px; padding: 7px; border-radius: 4px; color: #294f3b; background: #edf8f1; font-size: 11px; line-height: 1.35; }
 .app-shell .canvas-wrap.tool-select > svg { cursor: default; }
 .app-shell .canvas-wrap.tool-pan > svg { cursor: grab; }
 .app-shell .canvas-wrap.tool-eraser > svg { cursor: not-allowed; }

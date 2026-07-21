@@ -5,6 +5,7 @@
 
 import { PointerEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import katex from "katex";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
 import "katex/dist/katex.min.css";
 import { MathCalculator } from "./components/math-calculator";
 import { annotation, connectorKinds, defaultAnnotations, defaultDocumentSettings, labels, stampKinds, stampSize, toolboxGroups, type CanvasObject, type ConnectionPortName, type DocumentSettings, type ObjectKind, type Point, type StrokePattern } from "./lib/canvas-types";
@@ -21,6 +22,7 @@ import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
 import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
 import { fromWorkingUnit, toWorkingUnit, unitLabel } from "./lib/units";
+import { friendlyPdfError, normalizePdfPageDrawing, restorePdfPageDrawing, validatePdfFile, type PdfPageDrawing } from "./lib/pdf-background";
 
 const canvasWidth = 900;
 const canvasHeight = 560;
@@ -39,8 +41,8 @@ const annotationFieldLabels: Record<string, string> = {
   channel: "Canal", traceType: "Type de tracé", model: "Modèle", gain: "Gain statique", omega0: "Pulsation propre ω₀", damping: "Amortissement", slope: "Pente en dB/décade", marginType: "Type de marge", omegaC: "Pulsation de coupure ωc", marginValue: "Valeur de la marge",
   input: "Entrée", unit: "Unité", timeMin: "Temps minimal", timeMax: "Temps maximal", yMin: "Ordonnée minimale", yMax: "Ordonnée maximale", tau: "Constante de temps τ", target: "Valeur cible", performanceType: "Indicateur de performance",
   poles: "Pôles", zeros: "Zéros", realMin: "Partie réelle minimale", realMax: "Partie réelle maximale", imagMin: "Partie imaginaire minimale", imagMax: "Partie imaginaire maximale",
-  diagramType: "Type de diagramme", xMin: "Abscisse minimale", xMax: "Abscisse maximale", xUnit: "Unité de l’abscisse", yUnit: "Unité de l’ordonnée", pressure: "Pression", volume: "Volume", temperature: "Température", showCoordinates: "Afficher les coordonnées", processType: "Type de transformation", exponent: "Exposant polytropique γ", heat: "Transfert thermique Q", work: "Travail W", substance: "Corps étudié", fusionSlope: "Pente de la courbe de fusion", criticalPoint: "Point critique", quality: "Titre massique en vapeur x", cycleType: "Type de cycle", areaType: "Convention de travail",
-  fieldType: "Nature du champ", density: "Densité des symboles", representation: "Représentation du champ", loopShape: "Forme de la spire", current: "Courant", normal: "Normale orientée", showMoment: "Afficher le moment magnétique", field: "Champ appliqué", torque: "Couple électromagnétique", charge: "Charge de la particule", velocity: "Vitesse", trajectoryType: "Type de trajectoire", force: "Force de Laplace", flux: "Flux magnétique", angularSpeed: "Vitesse angulaire", motion: "Mouvement relatif", emf: "Force électromotrice induite", law: "Loi d’induction", primary: "Enroulement primaire", secondary: "Enroulement secondaire", current1: "Courant primaire", current2: "Courant secondaire", mutual: "Inductance mutuelle", dotConvention: "Convention des points", voltage: "Tension électrique", power: "Puissance électromagnétique",
+  diagramType: "Type de diagramme", xMin: "Abscisse minimale", xMax: "Abscisse maximale", xUnit: "Unité de l’abscisse", yUnit: "Unité de l’ordonnée", pressure: "Pression", volume: "Volume", showCoordinates: "Afficher les coordonnées", processType: "Type de transformation", exponent: "Exposant polytropique γ", heat: "Transfert thermique Q", work: "Travail W", substance: "Corps étudié", fusionSlope: "Pente de la courbe de fusion", criticalPoint: "Point critique", quality: "Titre massique en vapeur x", cycleType: "Type de cycle", areaType: "Convention de travail",
+  fieldType: "Nature du champ", density: "Densité des symboles", representation: "Représentation du champ", loopShape: "Forme de la spire", current: "Courant", normal: "Normale orientée", showMoment: "Afficher le moment magnétique", field: "Champ appliqué", torque: "Couple électromagnétique", velocity: "Vitesse", trajectoryType: "Type de trajectoire", force: "Force de Laplace", flux: "Flux magnétique", angularSpeed: "Vitesse angulaire", motion: "Mouvement relatif", emf: "Force électromotrice induite", law: "Loi d’induction", primary: "Enroulement primaire", secondary: "Enroulement secondaire", current1: "Courant primaire", current2: "Courant secondaire", mutual: "Inductance mutuelle", dotConvention: "Convention des points", voltage: "Tension électrique", power: "Puissance électromagnétique",
 };
 const annotationOptions: Partial<Record<string, string[]>> = {
   characteristic: ["position", "rectitude", "planéité", "circularité", "cylindricité", "profil de ligne", "profil de surface", "parallélisme", "perpendicularité", "angularité", "coaxialité", "symétrie", "battement circulaire", "battement total"],
@@ -59,6 +61,7 @@ type HistoryAction =
   | { type: "commit"; objects: CanvasObject[] }
   | { type: "transient"; objects: CanvasObject[] }
   | { type: "finishTransient"; snapshot: CanvasObject[] }
+  | { type: "reset"; objects: CanvasObject[] }
   | { type: "undo" }
   | { type: "redo" };
 
@@ -73,6 +76,7 @@ function historyReducer(state: HistoryState, action: HistoryAction): HistoryStat
   if (action.type === "commit") return { objects: action.objects, past: keepHistory([...state.past, state.objects]), future: [] };
   if (action.type === "transient") return { ...state, objects: action.objects };
   if (action.type === "finishTransient") return { ...state, past: keepHistory([...state.past, action.snapshot]), future: [] };
+  if (action.type === "reset") return { objects: action.objects, past: [], future: [] };
   if (action.type === "undo") {
     const previous = state.past.at(-1);
     return previous ? { objects: previous, past: state.past.slice(0, -1), future: [...state.future, state.objects] } : state;
@@ -252,7 +256,7 @@ function getMathJaxRenderer() {
   ]).then(([{ mathjax }, { TeX }, { AllPackages }, { SVG }, { browserAdaptor }, { RegisterHTMLHandler }]) => {
     const adaptor = browserAdaptor(); RegisterHTMLHandler(adaptor);
     const document = mathjax.document("", { InputJax: new TeX({ packages: AllPackages }), OutputJax: new SVG({ fontCache: "none" }) });
-    return (formula: string) => adaptor.outerHTML(adaptor.firstChild(document.convert(formula, { display: true })));
+    return (formula: string) => adaptor.outerHTML(adaptor.firstChild(document.convert(formula, { display: true })) as HTMLElement);
   });
   return mathJaxRenderer;
 }
@@ -309,7 +313,8 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "battery" || object.kind === "capacitor") {
     const g = object.kind === "battery" ? circuitGeometry.battery : circuitGeometry.capacitor;
     const negativeHalfPlate = "negativeHalfPlate" in g ? g.negativeHalfPlate : g.halfPlate; const positiveHalfPlate = "positiveHalfPlate" in g ? g.positiveHalfPlate : g.halfPlate;
-    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><line {...common} x1={midX - g.negativePlateOffset * ux - negativeHalfPlate * px} y1={midY - g.negativePlateOffset * uy - negativeHalfPlate * py} x2={midX - g.negativePlateOffset * ux + negativeHalfPlate * px} y2={midY - g.negativePlateOffset * uy + negativeHalfPlate * py} /><line {...common} x1={midX + g.positivePlateOffset * ux - positiveHalfPlate * px} y1={midY + g.positivePlateOffset * uy - positiveHalfPlate * py} x2={midX + g.positivePlateOffset * ux + positiveHalfPlate * px} y2={midY + g.positivePlateOffset * uy + positiveHalfPlate * py} />{object.kind === "capacitor" && <text className="diagram-label" x={midX + g.labelOffset * px} y={midY + g.labelOffset * py} textAnchor="middle" fill={color}>{scientificLabelSpans(a("main", "C"))}</text>}</g>;
+    const labelOffset = "labelOffset" in g ? g.labelOffset : 0;
+    return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><line {...common} x1={midX - g.negativePlateOffset * ux - negativeHalfPlate * px} y1={midY - g.negativePlateOffset * uy - negativeHalfPlate * py} x2={midX - g.negativePlateOffset * ux + negativeHalfPlate * px} y2={midY - g.negativePlateOffset * uy + negativeHalfPlate * py} /><line {...common} x1={midX + g.positivePlateOffset * ux - positiveHalfPlate * px} y1={midY + g.positivePlateOffset * uy - positiveHalfPlate * py} x2={midX + g.positivePlateOffset * ux + positiveHalfPlate * px} y2={midY + g.positivePlateOffset * uy + positiveHalfPlate * py} />{object.kind === "capacitor" && <text className="diagram-label" x={midX + labelOffset * px} y={midY + labelOffset * py} textAnchor="middle" fill={color}>{scientificLabelSpans(a("main", "C"))}</text>}</g>;
   }
   if (object.kind === "voltage-source" || object.kind === "current-source") {
     const g = circuitGeometry.source; const labelPoint = connectorLabelPointFor(object, -g.labelOffset);
@@ -327,17 +332,16 @@ function connectorPreview(object: CanvasObject, selected: boolean) {
   if (object.kind === "switch") return <g><line {...common} x1={object.x} y1={object.y} x2={midX - 12 * ux} y2={midY - 12 * uy} /><line {...common} x1={midX + 14 * ux} y1={midY + 14 * uy} x2={x2} y2={y2} /><line {...common} x1={midX - 12 * ux} y1={midY - 12 * uy} x2={midX + 12 * ux - 12 * px} y2={midY + 12 * uy - 12 * py} /><circle cx={midX - 12 * ux} cy={midY - 12 * uy} r="3" fill={color} /></g>;
   if (object.kind === "voltmeter" || object.kind === "ammeter") { const meter = circuitGeometry.meter; return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} /><circle cx={midX} cy={midY} r={meter.radius} fill="white" stroke={color} strokeWidth={strokeWidthFor(object, selected)} /><text x={midX} y={midY + meter.labelBaseline} textAnchor="middle" fontSize="14" fill={color}>{scientificLabelSpans(a("main", object.kind === "voltmeter" ? "V" : "A"))}</text></g>; }
   if (object.kind === "spring" || object.kind === "wave") { const points = object.kind === "spring" ? springPointsFor(object) : wavePointsFor(object); return <polyline {...common} points={points.map((point) => `${point.x},${point.y}`).join(" ")} />; }
-  if (object.kind === "wave") return <polyline {...common} points={Array.from({ length: 17 }, (_, i) => `${object.x + dx * i / 16 + Math.sin(i * Math.PI / 2) * 7 * px},${object.y + dy * i / 16 + Math.sin(i * Math.PI / 2) * 7 * py}`).join(" ")} />;
   if (object.kind.startsWith("bond-")) {
     const offsets = object.kind === "bond-single" ? [0] : object.kind === "bond-double" ? [-1, 1] : [-2, 0, 2];
     return <g>{offsets.map((offset) => <line key={offset} {...common} x1={object.x + px * offset * 4} y1={object.y + py * offset * 4} x2={x2 + px * offset * 4} y2={y2 + py * offset * 4} />)}</g>;
   }
-  if (object.kind === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
+  if ((object.kind as string) === "equilibrium-arrow") return <g><line {...common} x1={object.x + 3 * px} y1={object.y + 3 * py} x2={x2 + 3 * px} y2={y2 + 3 * py} markerEnd="url(#arrowhead)" /><line {...common} x1={x2 - 3 * px} y1={y2 - 3 * py} x2={object.x - 3 * px} y2={object.y - 3 * py} markerEnd="url(#arrowhead)" /></g>;
   if (object.kind === "force" || object.kind === "arrow" || object.kind === "signal-arrow") {
     const label = a("main", object.kind === "force" ? "F" : object.kind === "signal-arrow" ? "x(p)" : "").trim();
     return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" />{label && (object.kind === "force" ? vectorLabel(label, midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py) : <text className="diagram-label" x={midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px} y={midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py} textAnchor="middle" fill={color}>{scientificLabelSpans(label)}</text>)}</g>;
   }
-  if (object.kind === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py)}</g>;
+  if ((object.kind as string) === "dipole") return <g><line {...common} x1={object.x} y1={object.y} x2={x2} y2={y2} markerEnd="url(#arrowhead)" /><line {...common} x1={object.x - 5 * px} y1={object.y - 5 * py} x2={object.x + 5 * px} y2={object.y + 5 * py} />{vectorLabel(a("main", "μ"), midX - CONCOURS_CONNECTOR_LABEL_OFFSET * px, midY - CONCOURS_CONNECTOR_LABEL_OFFSET * py)}</g>;
   const markerEnd = ["arrow", "force", "light-ray", "heat-arrow", "work-arrow", "reaction-arrow", "dipole"].includes(object.kind) ? "url(#arrowhead)" : undefined;
   const markerStart = object.kind === "equilibrium-arrow" ? "url(#arrowhead)" : undefined;
   const dashed = object.kind === "hydrogen-bond" ? "5 4" : undefined;
@@ -547,7 +551,7 @@ async function cleanSvg(svg: SVGSVGElement, width: number, height: number) {
   copy.querySelectorAll<SVGGElement>("[data-export-formula]").forEach((placeholder) => {
     const formula = formulaForTypesetting(placeholder.dataset.exportFormula || "x");
     const parsed = new DOMParser().parseFromString(renderFormula(formula), "image/svg+xml");
-    const rendered = copy.ownerDocument.importNode(parsed.documentElement, true) as SVGSVGElement;
+    const rendered = copy.ownerDocument.importNode(parsed.documentElement, true) as unknown as SVGSVGElement;
     const x = Number(placeholder.dataset.exportX); const y = Number(placeholder.dataset.exportY); const width = Number(placeholder.dataset.exportWidth); const height = Number(placeholder.dataset.exportHeight);
     const viewBox = (rendered.getAttribute("viewBox") || "0 0 1 1").trim().split(/\s+/).map(Number); const ratio = viewBox[2] / viewBox[3] || 1;
     const renderedWidth = Math.min(width, height * ratio); const renderedHeight = renderedWidth / ratio;
@@ -763,6 +767,9 @@ function LegacyHome() {
 type ActiveTool = ObjectKind | "select" | "eraser" | "pan";
 type PanelName = "library" | "templates" | "math" | "project" | "document";
 type TemplateMode = "replace" | "insert" | "cursor";
+type WorkspaceMode = "blank" | "pdf";
+type BlankWorkspaceSnapshot = { objects: CanvasObject[]; settings: DocumentSettings; view: { x: number; y: number; zoom: number } };
+type ActivePdfPage = { documentId: string; pageIndex: number; width: number; height: number };
 
 const physicsFormulaGroups = [
   { title: "Mécanique", formulas: [["Deuxième loi de Newton", "\\sum \\vec F_{\\mathrm{ext}}=m\\vec a"], ["Énergie mécanique", "E_m=\\frac12 mv^2+E_p"], ["Oscillateur harmonique", "\\ddot x+\\omega_0^2x=0"], ["Moment cinétique", "\\vec L_O=\\vec r\\times\\vec p"]] },
@@ -772,11 +779,21 @@ const physicsFormulaGroups = [
   { title: "Électromagnétisme et quantique", formulas: [["Force de Lorentz", "\\vec F=q(\\vec E+\\vec v\\times\\vec B)"], ["Faraday", "e=-\\frac{d\\Phi}{dt}"], ["Photon", "E=h\\nu=\\frac{hc}{\\lambda}"], ["De Broglie", "\\lambda=\\frac{h}{p}"], ["Schrödinger", "i\\hbar\\frac{\\partial\\psi}{\\partial t}=\\hat H\\psi"]] },
   { title: "Chimie", formulas: [["Équilibre", "K^\\circ=\\prod_i a_i^{\\nu_i}"], ["Arrhenius", "k=Ae^{-E_a/(RT)}"], ["Nernst", "E=E^\\circ-\\frac{RT}{nF}\\ln Q_r"], ["Vitesse", "v=-\\frac{1}{\\nu_R}\\frac{d[R]}{dt}"]] },
   { title: "Démonstrations", formulas: [["Dérivation de Newton", "\\begin{aligned}\\sum\\vec F&=m\\vec a\\\\&=m\\frac{d\\vec v}{dt}\\\\\\Rightarrow\\quad \\vec v(t)&=\\vec v_0+\\frac{\\sum\\vec F}{m}t\\end{aligned}"], ["Réponse d’un circuit RC", "\\begin{aligned}E&=u_R+u_C\\\\&=RC\\frac{du_C}{dt}+u_C\\\\\\Rightarrow\\quad u_C(t)&=E\\left(1-e^{-t/(RC)}\\right)\\end{aligned}"], ["Conservation de l’énergie", "\\begin{aligned}\\Delta E_c&=W(\\vec F)\\\\\\Delta E_p&=-W(\\vec F_c)\\\\\\Rightarrow\\quad \\Delta(E_c+E_p)&=0\\end{aligned}"]] },
-] as const;
+];
 
 export default function Home() {
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfStageRef = useRef<HTMLDivElement>(null);
+  const pdfLoadTaskRef = useRef<PDFDocumentLoadingTask | undefined>(undefined);
+  const pdfRenderTaskRef = useRef<RenderTask | undefined>(undefined);
+  const pdfRenderSequenceRef = useRef(0);
+  const pdfDocumentSequenceRef = useRef(0);
+  const pdfPageStatesRef = useRef(new Map<string, Map<number, PdfPageDrawing>>());
+  const activePdfPageRef = useRef<ActivePdfPage | undefined>(undefined);
+  const blankWorkspaceRef = useRef<BlankWorkspaceSnapshot>({ objects: [], settings: defaultDocumentSettings, view: { x: 0, y: 0, zoom: 1 } });
   const dragChangedRef = useRef(false);
   const clipboardRef = useRef<CanvasObject[]>([]);
   const hydratedRef = useRef(false);
@@ -810,6 +827,19 @@ export default function Home() {
   const [marqueeEnabled, setMarqueeEnabled] = useState(true);
   const [clipboardCount, setClipboardCount] = useState(0);
   const [mathFormula, setMathFormula] = useState("\\int_{0}^{+\\infty} e^{-x^{2}}\\,\\mathrm{d}x=\\frac{\\sqrt{\\pi}}{2}");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("blank");
+  const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy>();
+  const [pdfDocumentId, setPdfDocumentId] = useState<string>();
+  const [pdfFileName, setPdfFileName] = useState<string>();
+  const [pdfPageIndex, setPdfPageIndex] = useState(0);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [pdfPage, setPdfPage] = useState<PDFPageProxy>();
+  const [pdfPageSize, setPdfPageSize] = useState<{ width: number; height: number }>();
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfRendering, setPdfRendering] = useState(false);
+  const [pdfError, setPdfError] = useState<string>();
+  const [pdfVisible, setPdfVisible] = useState(true);
+  const [pdfOpacity, setPdfOpacity] = useState(1);
 
   const selected = selectedIds.length === 1 ? objects.find((object) => object.id === selectedIds[0]) : undefined;
   const selectedObjects = useMemo(() => objects.filter((object) => selectedIds.includes(object.id)), [objects, selectedIds]);
@@ -855,6 +885,13 @@ export default function Home() {
   }, []);
   const undo = useCallback(() => dispatchHistory({ type: "undo" }), []);
   const redo = useCallback(() => dispatchHistory({ type: "redo" }), []);
+  const saveActivePdfPage = useCallback(() => {
+    const active = activePdfPageRef.current;
+    if (!active) return;
+    const pages = pdfPageStatesRef.current.get(active.documentId) ?? new Map<number, PdfPageDrawing>();
+    pages.set(active.pageIndex, normalizePdfPageDrawing(objects, active.width, active.height));
+    pdfPageStatesRef.current.set(active.documentId, pages);
+  }, [objects]);
 
   useEffect(() => {
     try {
@@ -871,12 +908,79 @@ export default function Home() {
 
   useEffect(() => {
     if (!hydratedRef.current) return;
+    if (workspaceMode !== "blank") return;
     const timer = window.setTimeout(() => {
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(makeProject(projectName, objects, settings)));
       const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); setLastSaved(time);
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [objects, projectName, settings]);
+  }, [objects, projectName, settings, workspaceMode]);
+
+  useEffect(() => {
+    if (!hydratedRef.current || workspaceMode !== "blank") return;
+    blankWorkspaceRef.current = { objects: deepCloneObjects(objects), settings: { ...settings }, view: { ...view } };
+  }, [objects, settings, view, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "pdf") return;
+    saveActivePdfPage();
+  }, [objects, saveActivePdfPage, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "pdf" || !pdfDocument || !pdfDocumentId) return;
+    const sequence = ++pdfDocumentSequenceRef.current;
+    pdfRenderTaskRef.current?.cancel();
+    setPdfLoading(true); setPdfRendering(false); setPdfError(undefined); setSelectedIds([]); setDraft(undefined); setCurveAnchor(undefined); setTool("select");
+    void (async () => {
+      try {
+        const page = await pdfDocument.getPage(pdfPageIndex + 1);
+        if (sequence !== pdfDocumentSequenceRef.current) return;
+        const viewport = page.getViewport({ scale: 1 });
+        const width = viewport.width; const height = viewport.height;
+        const drawing = pdfPageStatesRef.current.get(pdfDocumentId)?.get(pdfPageIndex);
+        activePdfPageRef.current = { documentId: pdfDocumentId, pageIndex: pdfPageIndex, width, height };
+        setPdfPage(page); setPdfPageSize({ width, height });
+        setSettings((current) => ({ ...current, width, height, orientation: width >= height ? "landscape" : "portrait", showGrid: false }));
+        setView({ x: 0, y: 0, zoom: 1 });
+        dispatchHistory({ type: "reset", objects: restorePdfPageDrawing(drawing, width, height) });
+      } catch (error) {
+        if (sequence !== pdfDocumentSequenceRef.current) return;
+        setPdfError(friendlyPdfError(error)); setPdfPage(undefined); setPdfPageSize(undefined); activePdfPageRef.current = undefined;
+      } finally {
+        if (sequence === pdfDocumentSequenceRef.current) setPdfLoading(false);
+      }
+    })();
+  }, [pdfDocument, pdfDocumentId, pdfPageIndex, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "pdf" || !pdfPage || !pdfPageSize) return;
+    const canvas = pdfCanvasRef.current; const stage = pdfStageRef.current;
+    if (!canvas || !stage) return;
+    let animationFrame = 0; let disposed = false;
+    const renderPage = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const cssWidth = stage.clientWidth; if (!cssWidth || disposed) return;
+        const sequence = ++pdfRenderSequenceRef.current;
+        pdfRenderTaskRef.current?.cancel();
+        const deviceScale = Math.max(1, window.devicePixelRatio || 1);
+        const renderScale = (cssWidth / pdfPageSize.width) * deviceScale;
+        const viewport = pdfPage.getViewport({ scale: renderScale });
+        canvas.width = Math.max(1, Math.floor(viewport.width)); canvas.height = Math.max(1, Math.floor(viewport.height));
+        canvas.style.width = "100%"; canvas.style.height = "100%";
+        const task = pdfPage.render({ canvas, viewport }); pdfRenderTaskRef.current = task; setPdfRendering(true);
+        void task.promise.then(() => { if (!disposed && sequence === pdfRenderSequenceRef.current) setPdfRendering(false); }).catch((error: unknown) => {
+          if (disposed || sequence !== pdfRenderSequenceRef.current || (error instanceof Error && error.name === "RenderingCancelledException")) return;
+          setPdfRendering(false); setPdfError("This PDF page could not be rendered.");
+        });
+      });
+    };
+    renderPage();
+    const observer = new ResizeObserver(renderPage); observer.observe(stage);
+    return () => { disposed = true; observer.disconnect(); window.cancelAnimationFrame(animationFrame); pdfRenderTaskRef.current?.cancel(); };
+  }, [pdfPage, pdfPageSize, workspaceMode]);
+
+  useEffect(() => () => { pdfRenderTaskRef.current?.cancel(); void pdfLoadTaskRef.current?.destroy(); }, []);
 
   useEffect(() => { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); }, [favorites]);
   useEffect(() => { localStorage.setItem(MODE_KEY, mode); }, [mode]);
@@ -1016,7 +1120,7 @@ export default function Home() {
     else if (object.annotations) { const key = Object.keys(object.annotations)[0]; const value = window.prompt(`Modifier ${key}`, object.annotations[key]); if (value !== null) updateOne(object.id, { annotations: { ...object.annotations, [key]: value } }); }
   };
 
-  const onWheel = (event: React.WheelEvent<SVGSVGElement>) => { event.preventDefault(); const factor = event.deltaY > 0 ? .9 : 1.1; setView((current) => ({ ...current, zoom: clamp(current.zoom * factor, .25, 4) })); };
+  const onWheel = (event: React.WheelEvent<SVGSVGElement>) => { event.preventDefault(); if (workspaceMode === "pdf") return; const factor = event.deltaY > 0 ? .9 : 1.1; setView((current) => ({ ...current, zoom: clamp(current.zoom * factor, .25, 4) })); };
   const fitView = () => setView({ x: 0, y: 0, zoom: 1 });
 
   const groupSelection = () => { if (selectedIds.length < 2) return; const groupId = `group-${objectId()}`; commitObjects(objects.map((object) => selectedIds.includes(object.id) ? { ...object, groupId } : object), "Sélection groupée."); };
@@ -1046,7 +1150,7 @@ export default function Home() {
   const applyTemplate = (templateId: string) => {
     const template = diagramTemplates.find((item) => item.id === templateId); if (!template) return;
     if (templateMode === "replace" && objects.length && !window.confirm("Remplacer le canevas actuel par ce modèle ? Le canevas reste récupérable avec Annuler.")) return;
-    let inserted = cloneTemplateObjects(template);
+    let inserted: CanvasObject[] = cloneTemplateObjects(template);
     if (templateMode === "cursor" && inserted.length) {
       const bounds = inserted.map(boundsFor); const left = Math.min(...bounds.map((value) => value.x)); const top = Math.min(...bounds.map((value) => value.y)); const right = Math.max(...bounds.map((value) => value.x + value.width)); const bottom = Math.max(...bounds.map((value) => value.y + value.height));
       inserted = inserted.map((object) => translateObject(object, lastCanvasPointRef.current.x - (left + right) / 2, lastCanvasPointRef.current.y - (top + bottom) / 2));
@@ -1061,8 +1165,78 @@ export default function Home() {
   const exportProject = () => downloadText(`${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "schema"}.sketch2latex.json`, JSON.stringify(makeProject(projectName, objects, settings), null, 2), "application/json");
   const importProject = async (file: File) => { try { const project = parseProject(await file.text()); if (objects.length && !window.confirm("Remplacer le canevas par le projet importé ?")) return; commitObjects(project.objects, `Projet « ${project.name} » importé.`); setProjectName(project.name); setSettings(project.settings); setSelectedIds([]); } catch (error) { setNotice(error instanceof Error ? error.message : "Import impossible."); } };
 
+  const switchWorkspaceMode = (next: WorkspaceMode) => {
+    if (next === workspaceMode) return;
+    setSelectedIds([]); setDraft(undefined); setCurveAnchor(undefined); setMarquee(undefined); setTool("select"); setLatexDraft(undefined);
+    if (next === "pdf") {
+      blankWorkspaceRef.current = { objects: deepCloneObjects(objects), settings: { ...settings }, view: { ...view } };
+      dispatchHistory({ type: "reset", objects: [] }); setWorkspaceMode("pdf"); setPanel((current) => current === "document" ? "library" : current);
+      if (!pdfDocument) setNotice("Choose a PDF to use as a local background.");
+    } else {
+      saveActivePdfPage(); activePdfPageRef.current = undefined;
+      const blank = blankWorkspaceRef.current; dispatchHistory({ type: "reset", objects: deepCloneObjects(blank.objects) }); setSettings({ ...blank.settings }); setView({ ...blank.view }); setWorkspaceMode("blank");
+      setNotice("Blank canvas restored. Your PDF page drawings are preserved.");
+    }
+  };
+
+  const uploadPdf = async (file: File) => {
+    const validationError = validatePdfFile(file);
+    if (validationError) { setPdfError(validationError); setNotice(validationError); return; }
+    if (pdfDocument && !window.confirm("Replace the current PDF? Drawings attached to its pages will be removed.")) return;
+    const previousLoadingTask = pdfLoadTaskRef.current;
+    const sequence = ++pdfDocumentSequenceRef.current; setPdfLoading(true); setPdfError(undefined); setNotice(`Opening ${file.name} locally…`);
+    try {
+      const pdfjs = await import("pdfjs-dist");
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const loadingTask = pdfjs.getDocument({ data: bytes }); pdfLoadTaskRef.current = loadingTask;
+      let passwordProtected = false;
+      loadingTask.onPassword = () => { passwordProtected = true; void loadingTask.destroy(); };
+      loadingTask.onProgress = ({ loaded, total }: { loaded: number; total: number }) => {
+        if (sequence !== pdfDocumentSequenceRef.current || !total) return;
+        setNotice(`Opening ${file.name} locally… ${Math.min(100, Math.round((loaded / total) * 100))}%`);
+      };
+      let document: PDFDocumentProxy;
+      try { document = await loadingTask.promise; }
+      catch (error) { if (passwordProtected) throw new Error("PasswordException: password required"); throw error; }
+      if (sequence !== pdfDocumentSequenceRef.current) { await loadingTask.destroy(); return; }
+      if (!document.numPages) { await loadingTask.destroy(); throw new Error("empty PDF"); }
+      saveActivePdfPage();
+      if (pdfDocumentId) pdfPageStatesRef.current.delete(pdfDocumentId);
+      if (previousLoadingTask && previousLoadingTask !== loadingTask) await previousLoadingTask.destroy();
+      const documentId = `pdf-${Date.now()}-${objectId()}`;
+      pdfPageStatesRef.current.set(documentId, new Map()); activePdfPageRef.current = undefined;
+      setPdfDocument(document); setPdfDocumentId(documentId); setPdfFileName(file.name); setPdfPageCount(document.numPages); setPdfPageIndex(0); setPdfPage(undefined); setPdfPageSize(undefined); setPdfVisible(true); setWorkspaceMode("pdf"); setPanel((current) => current === "document" ? "library" : current);
+      dispatchHistory({ type: "reset", objects: [] }); setSelectedIds([]); setNotice(`${file.name} opened locally. Choose a page and draw above it.`);
+    } catch (error) {
+      if (sequence !== pdfDocumentSequenceRef.current) return;
+      const message = friendlyPdfError(error); setPdfError(message); setNotice(message);
+    } finally {
+      if (sequence === pdfDocumentSequenceRef.current) setPdfLoading(false);
+    }
+  };
+
+  const changePdfPage = (nextIndex: number) => {
+    if (!pdfDocument || pdfLoading || pdfRendering) return;
+    const bounded = clamp(nextIndex, 0, Math.max(0, pdfPageCount - 1)); if (bounded === pdfPageIndex) return;
+    saveActivePdfPage(); setPdfLoading(true); setPdfPageIndex(bounded); setNotice(`Opening PDF page ${bounded + 1}…`);
+  };
+
+  const removePdf = async () => {
+    saveActivePdfPage();
+    const pages = pdfDocumentId ? pdfPageStatesRef.current.get(pdfDocumentId) : undefined;
+    const hasDrawings = objects.length > 0 || [...(pages?.values() ?? [])].some((drawing) => drawing.objects.length > 0);
+    if (hasDrawings && !window.confirm("Remove this PDF and its page drawings? This cannot be undone.")) return;
+    ++pdfDocumentSequenceRef.current; pdfRenderTaskRef.current?.cancel(); activePdfPageRef.current = undefined;
+    if (pdfDocumentId) pdfPageStatesRef.current.delete(pdfDocumentId);
+    await pdfLoadTaskRef.current?.destroy(); pdfLoadTaskRef.current = undefined;
+    setPdfDocument(undefined); setPdfDocumentId(undefined); setPdfFileName(undefined); setPdfPage(undefined); setPdfPageSize(undefined); setPdfPageCount(0); setPdfPageIndex(0); setPdfError(undefined); setPdfLoading(false); setPdfRendering(false);
+    const blank = blankWorkspaceRef.current; dispatchHistory({ type: "reset", objects: deepCloneObjects(blank.objects) }); setSettings({ ...blank.settings }); setView({ ...blank.view }); setWorkspaceMode("blank"); setSelectedIds([]); setTool("select"); setNotice("PDF removed. Blank canvas restored.");
+  };
+
   const applyLatexToCanvas = () => { try { const result = objectsFromLatex(latexSource, objects); const protectedCount = result.objects.filter((object) => object.kind === "raw-tikz").length; commitObjects(result.objects, `${result.applied} objet${result.applied > 1 ? "s" : ""} appliqué${result.applied > 1 ? "s" : ""} depuis le TikZ${protectedCount ? ` · ${protectedCount} bloc(s) non reconnu(s) conservé(s) sans perte` : ""}.`); setSelectedIds([]); setLatexDraft(undefined); } catch (error) { setNotice(error instanceof Error ? error.message : "TikZ invalide."); } };
   const copyLatex = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copié."); };
+  const downloadLatex = () => { downloadText(`${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.tex`, latexSource, "application/x-tex"); setNotice("LaTeX downloaded."); };
   const exportSvg = async () => { if (!svgRef.current) return; try { const copy = await cleanSvg(svgRef.current, settings.width, settings.height); downloadText("stem-diagram.svg", new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("Vector SVG exported."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export SVG."); } };
   const exportPdf = async () => {
     const pageWidth = canvasUnitsToPoints(settings.width); const pageHeight = canvasUnitsToPoints(settings.height);
@@ -1071,7 +1245,7 @@ export default function Home() {
     catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(await cleanSvg(svgRef.current!, settings.width, settings.height), settings.width, settings.height); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); pdf.addImage(image, "PNG", 0, 0, pageWidth, pageHeight); pdf.save("stem-diagram.pdf"); setNotice("PDF exported in compatibility mode."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export PDF."); } }
   };
 
-  const clearCanvas = () => { if (!objects.length || !window.confirm("Effacer tout le canevas ? Vous pourrez encore utiliser Annuler.")) return; commitObjects([], "Canevas effacé. Cliquez sur Annuler pour le restaurer."); setSelectedIds([]); };
+  const clearCanvas = () => { if (!objects.length || !window.confirm(workspaceMode === "pdf" ? `Clear the drawing on PDF page ${pdfPageIndex + 1}? You can still use Undo.` : "Effacer tout le canevas ? Vous pourrez encore utiliser Annuler.")) return; commitObjects([], workspaceMode === "pdf" ? `Drawing cleared from PDF page ${pdfPageIndex + 1}. Use Undo to restore it.` : "Canevas effacé. Cliquez sur Annuler pour le restaurer."); setSelectedIds([]); };
   const changeMode = (next: "beginner" | "advanced") => { setMode(next); if (next === "beginner") setPanel("library"); setNotice(next === "beginner" ? "Mode essentiel : outils courants et propriétés principales." : "Mode avancé : calques, document, métadonnées et synchronisation complète."); };
 
   const renderSelectionHandles = (object: CanvasObject) => {
@@ -1084,11 +1258,21 @@ export default function Home() {
     <header className="app-header"><div><p className="eyebrow">Scientific diagram editor for STEM students</p><h1>Sketch2LaTeX</h1></div><div className="header-actions"><label className="project-name">Project <input value={projectName} onChange={(event) => setProjectName(event.target.value)} /></label><span className="save-state">{lastSaved ? `Saved at ${lastSaved}` : "Autosave enabled"}</span><div className="mode-switch" role="group" aria-label="Tool level"><button className={mode === "beginner" ? "active" : ""} onClick={() => changeMode("beginner")}>Essential</button><button className={mode === "advanced" ? "active" : ""} onClick={() => changeMode("advanced")}>Advanced</button></div></div></header>
     <p className="status" aria-live="polite">{notice}</p>
     <span hidden data-clipboard-count={clipboardCount} />
+    <section className="document-mode-bar" aria-label="Drawing background">
+      <div className="background-mode-switch" role="group" aria-label="Canvas mode"><button className={workspaceMode === "blank" ? "active" : ""} onClick={() => switchWorkspaceMode("blank")}>Blank Canvas</button><button className={workspaceMode === "pdf" ? "active" : ""} onClick={() => switchWorkspaceMode("pdf")}>Draw on PDF</button></div>
+      {workspaceMode === "pdf" && <>
+        <button onClick={() => pdfInputRef.current?.click()} disabled={pdfLoading}>{pdfDocument ? "Replace PDF" : "Upload PDF"}</button>
+        <input ref={pdfInputRef} hidden type="file" accept=".pdf,application/pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPdf(file); event.currentTarget.value = ""; }} />
+        {pdfDocument && <><span className="pdf-file-name" title={pdfFileName}>{pdfFileName}</span><button onClick={() => changePdfPage(pdfPageIndex - 1)} disabled={pdfLoading || pdfRendering || pdfPageIndex === 0}>Previous</button><span className="pdf-page-count">Page {pdfPageIndex + 1} of {pdfPageCount}</span><button onClick={() => changePdfPage(pdfPageIndex + 1)} disabled={pdfLoading || pdfRendering || pdfPageIndex >= pdfPageCount - 1}>Next</button><label className="pdf-visibility"><input type="checkbox" checked={pdfVisible} onChange={(event) => setPdfVisible(event.target.checked)} /> Show PDF</label><label className="pdf-opacity">Opacity <input type="range" min="0.1" max="1" step="0.05" value={pdfOpacity} onChange={(event) => setPdfOpacity(Number(event.target.value))} disabled={!pdfVisible} /><output>{Math.round(pdfOpacity * 100)}%</output></label><button className="remove-pdf" onClick={() => void removePdf()}>Remove PDF</button></>}
+        <span className="pdf-privacy">Your PDF stays in your browser and is not uploaded.</span>
+      </>}
+    </section>
+    {workspaceMode === "pdf" && pdfError && <p className="pdf-error" role="alert">{pdfError}</p>}
     {/* eslint-disable-next-line react-hooks/refs */}
-    <nav className="command-bar" aria-label="Commandes du document"><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd+Z">↶ Annuler</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd+Y">↷ Rétablir</button><button onClick={copySelection} disabled={!selectedIds.length}>Copier</button><button onClick={pasteSelection} disabled={!clipboardRef.current.length}>Coller</button><button onClick={duplicateSelection} disabled={!selectedIds.length}>Dupliquer</button><button onClick={deleteSelected} disabled={!selectedIds.length}>Supprimer</button><button onClick={clearCanvas} disabled={!objects.length}>Tout effacer</button><span className="bar-separator" /><button onClick={() => setTool("select")} className={tool === "select" ? "active" : ""}>Sélection</button><button onClick={() => setTool("pan")} className={tool === "pan" ? "active" : ""}>Main</button><button onClick={() => setTool("eraser")} className={tool === "eraser" ? "active" : ""}>Gomme</button><label className="snap-toggle"><input type="checkbox" checked={settings.snapToGrid} onChange={(event) => setSettings({ ...settings, snapToGrid: event.target.checked })} /> Aimantation</label><button onClick={() => setView((current) => ({ ...current, zoom: clamp(current.zoom - .2, .25, 4) }))}>−</button><output>{Math.round(view.zoom * 100)}%</output><button onClick={() => setView((current) => ({ ...current, zoom: clamp(current.zoom + .2, .25, 4) }))}>+</button><button onClick={fitView}>Ajuster</button></nav>
+    <nav className="command-bar" aria-label="Commandes du document"><button onClick={undo} disabled={!past.length} title="Ctrl/Cmd+Z">↶ Annuler</button><button onClick={redo} disabled={!future.length} title="Ctrl/Cmd+Y">↷ Rétablir</button><button onClick={copySelection} disabled={!selectedIds.length}>Copier</button><button onClick={pasteSelection} disabled={!clipboardRef.current.length}>Coller</button><button onClick={duplicateSelection} disabled={!selectedIds.length}>Dupliquer</button><button onClick={deleteSelected} disabled={!selectedIds.length}>Supprimer</button><button onClick={clearCanvas} disabled={!objects.length}>Tout effacer</button><span className="bar-separator" /><button onClick={() => setTool("select")} className={tool === "select" ? "active" : ""}>Sélection</button><button onClick={() => setTool("pan")} className={tool === "pan" ? "active" : ""} disabled={workspaceMode === "pdf"} title={workspaceMode === "pdf" ? "Pan is disabled to keep drawings aligned with the PDF." : undefined}>Main</button><button onClick={() => setTool("eraser")} className={tool === "eraser" ? "active" : ""}>Gomme</button><label className="snap-toggle"><input type="checkbox" checked={settings.snapToGrid} onChange={(event) => setSettings({ ...settings, snapToGrid: event.target.checked })} /> Aimantation</label><button onClick={() => setView((current) => ({ ...current, zoom: clamp(current.zoom - .2, .25, 4) }))} disabled={workspaceMode === "pdf"}>−</button><output>{Math.round(view.zoom * 100)}%</output><button onClick={() => setView((current) => ({ ...current, zoom: clamp(current.zoom + .2, .25, 4) }))} disabled={workspaceMode === "pdf"}>+</button><button onClick={fitView} disabled={workspaceMode === "pdf"}>Ajuster</button></nav>
     <section className="editor-layout">
       <aside className="left-panel">
-        <div className="panel-tabs"><button className={panel === "library" ? "active" : ""} onClick={() => setPanel("library")}>Library</button><button className={panel === "templates" ? "active" : ""} onClick={() => setPanel("templates")}>Templates</button><button className={panel === "math" ? "active" : ""} onClick={() => setPanel("math")}>Math & Physics</button><button className={panel === "project" ? "active" : ""} onClick={() => setPanel("project")}>Project</button>{mode === "advanced" && <button className={panel === "document" ? "active" : ""} onClick={() => setPanel("document")}>Document</button>}</div>
+        <div className="panel-tabs"><button className={panel === "library" ? "active" : ""} onClick={() => setPanel("library")}>Library</button><button className={panel === "templates" ? "active" : ""} onClick={() => setPanel("templates")}>Templates</button><button className={panel === "math" ? "active" : ""} onClick={() => setPanel("math")}>Math & Physics</button><button className={panel === "project" ? "active" : ""} onClick={() => setPanel("project")}>Project</button>{mode === "advanced" && workspaceMode === "blank" && <button className={panel === "document" ? "active" : ""} onClick={() => setPanel("document")}>Document</button>}</div>
         {(panel === "library" || panel === "templates") && <input className="panel-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tools or templates…" />}
         {panel === "library" && <div className="library-scroll">{favorites.some((kind) => Object.hasOwn(labels, kind) && visibleLibraryKinds.has(kind as ObjectKind)) && <section className="tool-group"><h2>Favorites</h2><div className="tool-grid">{favorites.filter((kind): kind is ObjectKind => Object.hasOwn(labels, kind) && visibleLibraryKinds.has(kind as ObjectKind)).map((kind) => <button key={kind} className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button>)}</div></section>}{filteredGroups.map((group) => <details key={group.title} open={group.title === "Tools" || mode === "advanced"}><summary>{group.title}</summary><div className="tool-grid">{group.kinds.map((kind) => kind === "select" ? null : <div className="tool-item" key={kind}><button className={tool === kind ? "active" : ""} onClick={() => setTool(kind)}>{labels[kind]}</button><button className={`favorite-button ${favorites.includes(kind) ? "active" : ""}`} onClick={() => toggleFavorite(kind)} aria-label={`${favorites.includes(kind) ? "Remove" : "Add"} ${labels[kind]} ${favorites.includes(kind) ? "from" : "to"} favorites`}>★</button></div>)}</div></details>)}<section className="style-section"><h2>Drawing style</h2><label>Color <input type="color" value={selected?.style?.stroke ?? drawingStyle.stroke} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, stroke: event.target.value } }) : setDrawingStyle({ ...drawingStyle, stroke: event.target.value })} /></label><label>Thickness <input type="range" min="1" max="8" value={selected?.style?.strokeWidth ?? drawingStyle.strokeWidth} onChange={(event) => selected ? updateSelected({ style: { ...selected.style, strokeWidth: Number(event.target.value) } }) : setDrawingStyle({ ...drawingStyle, strokeWidth: Number(event.target.value) })} /></label><label>Stroke style<select value={selected?.style?.strokePattern ?? drawingStyle.strokePattern ?? "solid"} onChange={(event) => { const strokePattern = event.target.value as StrokePattern; if (selected) updateSelected({ style: { ...selected.style, strokePattern } }); else setDrawingStyle({ ...drawingStyle, strokePattern }); }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="dash-dot">Dash-dot</option></select></label></section></div>}
         {panel === "templates" && <div className="library-scroll"><label className="template-mode">Template placement<select value={templateMode} onChange={(event) => setTemplateMode(event.target.value as TemplateMode)}><option value="replace">Replace canvas</option><option value="insert">Add to document</option><option value="cursor">Place at the latest canvas point</option></select></label><div className="category-chips">{categories.map((category) => <button key={category} className={templateCategory === category ? "active" : ""} onClick={() => setTemplateCategory(category)}>{category === "All" ? category : templateCategoryLabels[category]}</button>)}</div>{filteredTemplates.map((template) => <article className="template-card" key={template.id}><h2>{template.title}</h2><p>{template.description}</p><p className="template-meta">{template.sourceName} · {template.license}</p><div><button onClick={() => applyTemplate(template.id)}>{templateMode === "replace" ? "Use this template" : templateMode === "insert" ? "Add to document" : "Place on canvas"}</button> <a href={template.sourceUrl} target="_blank" rel="noreferrer">Source</a></div></article>)}</div>}
@@ -1098,23 +1282,28 @@ export default function Home() {
       </aside>
       <section className="canvas-column">
         {selectedIds.length > 1 && <div className="selection-toolbar"><strong>{selectedIds.length} objets</strong><button onClick={groupSelection}>Grouper</button><button onClick={ungroupSelection}>Dissocier</button><button onClick={() => alignSelection("left")}>Aligner à gauche</button><button onClick={() => alignSelection("center")}>Centrer horizontalement</button><button onClick={() => alignSelection("top")}>Aligner en haut</button><button onClick={() => alignSelection("middle")}>Centrer verticalement</button><button onClick={() => reorder(true)}>Premier plan</button><button onClick={() => reorder(false)}>Arrière-plan</button></div>}
-        <div className={`canvas-wrap tool-${tool}`}><svg ref={svgRef} tabIndex={0} shapeRendering="geometricPrecision" viewBox={`${view.x} ${view.y} ${settings.width / view.zoom} ${settings.height / view.zoom}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDoubleClick={onDoubleClick} onWheel={onWheel} aria-label="Canevas scientifique interactif">
+        <div ref={workspaceMode === "pdf" ? pdfStageRef : undefined} className={`canvas-wrap tool-${tool}${workspaceMode === "pdf" ? " pdf-canvas-wrap" : ""}`} style={workspaceMode === "pdf" && pdfPageSize ? { aspectRatio: `${pdfPageSize.width} / ${pdfPageSize.height}` } : undefined}>
+          {workspaceMode === "pdf" && !pdfDocument && <div className="pdf-empty-state"><strong>Draw on a PDF</strong><p>Upload one compiled PDF, choose a page, then draw with the existing tools.</p><button onClick={() => pdfInputRef.current?.click()} disabled={pdfLoading}>{pdfLoading ? "Opening PDF…" : "Upload PDF"}</button><small>Your PDF stays in your browser and is not uploaded.</small></div>}
+          {workspaceMode === "pdf" && pdfDocument && <canvas ref={pdfCanvasRef} className="pdf-background-canvas" style={{ opacity: pdfVisible ? pdfOpacity : 0 }} aria-hidden="true" />}
+          {(workspaceMode === "blank" || pdfDocument) && <svg ref={svgRef} className={workspaceMode === "pdf" ? "pdf-drawing-layer" : undefined} tabIndex={0} shapeRendering="geometricPrecision" viewBox={`${view.x} ${view.y} ${settings.width / view.zoom} ${settings.height / view.zoom}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDoubleClick={onDoubleClick} onWheel={onWheel} aria-label={workspaceMode === "pdf" ? `Drawing layer over PDF page ${pdfPageIndex + 1}` : "Canevas scientifique interactif"} aria-busy={workspaceMode === "pdf" && (pdfLoading || pdfRendering)}>
           <defs><marker id="arrowhead" viewBox={`0 0 ${CONCOURS_ARROW.length} ${CONCOURS_ARROW.width}`} refX={CONCOURS_ARROW.length - .5} refY={CONCOURS_ARROW.width / 2} markerWidth={CONCOURS_ARROW.length} markerHeight={CONCOURS_ARROW.width} markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d={`M 0 0 L ${CONCOURS_ARROW.length} ${CONCOURS_ARROW.width / 2} L 0 ${CONCOURS_ARROW.width} z`} fill="context-stroke" /></marker><pattern id="small-grid" width={settings.gridSize} height={settings.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${settings.gridSize} 0 L 0 0 0 ${settings.gridSize}`} fill="none" stroke="#d8dde3" strokeWidth="1" /></pattern></defs>
-          <rect width={settings.width} height={settings.height} fill="white" />{settings.showGrid && <rect data-export-ignore="true" width={settings.width} height={settings.height} fill="url(#small-grid)" />}
+          <rect width={settings.width} height={settings.height} fill={workspaceMode === "pdf" ? "transparent" : "white"} />{settings.showGrid && <rect data-export-ignore="true" width={settings.width} height={settings.height} fill="url(#small-grid)" />}
           {objects.map((object) => object.hidden ? null : <g key={object.id} data-id={object.id} className={`diagram-object${object.locked ? " editor-locked" : ""}`} transform={transformFor(object)}>{preview(object, selectedIds.includes(object.id))}</g>)}
           {junctionPointsFor(objects).map((point, index) => <circle key={`junction-${index}`} className="circuit-junction" cx={point.x} cy={point.y} r={JUNCTION_RADIUS} />)}
           {(connectorKinds.includes(tool as ObjectKind) || drag?.mode === "endpoint-start" || drag?.mode === "endpoint-end") && <g data-export-ignore="true">{objects.filter((object) => !object.hidden && !object.locked).flatMap((object) => portsFor(object).map((port) => <circle key={`port-${object.id}-${port.name}`} className="snap-port" cx={port.x} cy={port.y} r="5" />))}</g>}
           {selectedObjects.map(renderSelectionHandles)}
           {draft && <g opacity=".6" transform={transformFor(draft)}>{preview(draft, true)}</g>}
           {marquee && <rect data-export-ignore="true" className="marquee" x={Math.min(marquee.start.x, marquee.end.x)} y={Math.min(marquee.start.y, marquee.end.y)} width={Math.abs(marquee.end.x - marquee.start.x)} height={Math.abs(marquee.end.y - marquee.start.y)} />}
-        </svg></div>
-        <div className="canvas-help">Molette : zoom · Outil Main : déplacer la vue · Maj-clic : sélection multiple · Alt : ignorer la grille · Double-clic : éditer un libellé · Flèches : déplacer</div>
+        </svg>}
+          {workspaceMode === "pdf" && pdfDocument && (pdfLoading || pdfRendering) && <div className="pdf-loading-overlay" role="status">{pdfLoading ? "Loading page…" : "Rendering page…"}</div>}
+        </div>
+        <div className="canvas-help">{workspaceMode === "pdf" ? "PDF page locked behind the drawing layer · Shift-click: multi-select · Alt: ignore grid · Double-click: edit label · Arrow keys: move" : "Molette : zoom · Outil Main : déplacer la vue · Maj-clic : sélection multiple · Alt : ignorer la grille · Double-clic : éditer un libellé · Flèches : déplacer"}</div>
         <div className="graph-composer"><h2>Ajouter un graphe</h2><label>Fonctions (séparées par ;)<input value={expression} onChange={(event) => setExpression(event.target.value)} /></label><label>x min:max<input value={xRange} onChange={(event) => setXRange(event.target.value)} /></label><label>y min:max<input value={yRange} onChange={(event) => setYRange(event.target.value)} /></label><button onClick={addFunction}>Ajouter</button></div>
       </section>
       <aside className="right-panel">
         <section className="properties-panel"><h2>Propriétés</h2>{selected ? <><p className="object-kind">{labels[selected.kind]} · coordonnées en {unitLabel(settings.unit)}</p><div className="property-grid"><label>X<input type="number" step="any" value={toWorkingUnit(selected.x, settings.unit)} onChange={(event) => updateSelected({ x: fromWorkingUnit(Number(event.target.value), settings.unit) })} /></label><label>Y<input type="number" step="any" value={toWorkingUnit(selected.y, settings.unit)} onChange={(event) => updateSelected({ y: fromWorkingUnit(Number(event.target.value), settings.unit) })} /></label>{selected.width !== undefined && <label>Largeur<input type="number" min="0.001" step="any" value={toWorkingUnit(selected.width, settings.unit)} onChange={(event) => updateSelected({ width: fromWorkingUnit(Number(event.target.value), settings.unit) })} /></label>}{selected.height !== undefined && <label>Hauteur<input type="number" min="0.001" step="any" value={toWorkingUnit(selected.height, settings.unit)} onChange={(event) => updateSelected({ height: fromWorkingUnit(Number(event.target.value), settings.unit) })} /></label>}{!uprightObjectKinds.includes(selected.kind) && <label>Rotation<input type="number" min="-180" max="180" value={selected.rotation ?? 0} onChange={(event) => updateSelected({ rotation: Number(event.target.value) })} /></label>}</div>{(selected.kind === "text" || selected.kind === "equation") && <label>{selected.kind === "equation" ? "Formule LaTeX" : "Texte"}<textarea className="small-textarea" value={selected.text ?? ""} onChange={(event) => updateSelected({ text: event.target.value })} /></label>}{selected.kind === "raw-tikz" && <label>Bloc TikZ protégé<textarea className="small-textarea raw-tikz-editor" value={selected.rawTikz ?? ""} onChange={(event) => updateSelected({ rawTikz: event.target.value })} /><small>Ce bloc reste intact à l’export et à la réimportation.</small></label>}{selected.annotations && <div className="annotation-fields">{Object.entries(selected.annotations).map(([key, value]) => <label key={key}>{annotationFieldLabels[key] ?? key}<input list={annotationOptions[key] ? `annotation-options-${key}` : undefined} value={value} onChange={(event) => updateSelected({ annotations: { ...selected.annotations, [key]: event.target.value } })} />{annotationOptions[key] && <datalist id={`annotation-options-${key}`}>{annotationOptions[key]!.map((option) => <option key={option} value={option} />)}</datalist>}</label>)}</div>}{selected.kind === "axes" && selected.graph && <div className="annotation-fields"><label>Courbes<input value={(selected.graph.expressions ?? [selected.graph.expression]).join("; ")} onChange={(event) => updateSelected({ graph: { ...selected.graph!, expression: event.target.value.split(";")[0].trim(), expressions: event.target.value.split(";").map((value) => value.trim()).filter(Boolean) } })} /></label><label>x min<input type="number" value={selected.graph.xMin} onChange={(event) => updateSelected({ graph: { ...selected.graph!, xMin: Number(event.target.value) } })} /></label><label>x max<input type="number" value={selected.graph.xMax} onChange={(event) => updateSelected({ graph: { ...selected.graph!, xMax: Number(event.target.value) } })} /></label><label>y min<input type="number" value={selected.graph.yMin ?? -5} onChange={(event) => updateSelected({ graph: { ...selected.graph!, yMin: Number(event.target.value) } })} /></label><label>y max<input type="number" value={selected.graph.yMax ?? 5} onChange={(event) => updateSelected({ graph: { ...selected.graph!, yMax: Number(event.target.value) } })} /></label><label>Axe x<input value={selected.graph.xLabel ?? "x"} onChange={(event) => updateSelected({ graph: { ...selected.graph!, xLabel: event.target.value } })} /></label><label>Axe y<input value={selected.graph.yLabel ?? "y"} onChange={(event) => updateSelected({ graph: { ...selected.graph!, yLabel: event.target.value } })} /></label><label><input type="checkbox" checked={selected.graph.showGrid !== false} onChange={(event) => updateSelected({ graph: { ...selected.graph!, showGrid: event.target.checked } })} /> Grille</label></div>}<div className="property-actions"><button onClick={() => reorder(true)}>Premier plan</button><button onClick={() => reorder(false)}>Arrière-plan</button><button onClick={() => updateSelected({ scale: 1, scaleX: 1, scaleY: 1, rotation: 0 })}>Réinitialiser</button></div></> : selectedIds.length > 1 ? <p>{selectedIds.length} objets sélectionnés. Utilisez la barre d’alignement au-dessus du canevas.</p> : <p>Sélectionnez un objet pour modifier ses coordonnées, dimensions, texte et annotations.</p>}</section>
         {mode === "advanced" && <section className="layers-panel"><h2>Calques</h2><label><input type="checkbox" checked={marqueeEnabled} onChange={(event) => setMarqueeEnabled(event.target.checked)} /> Sélection par zone</label><div className="layer-list">{[...objects].reverse().map((object) => <div key={object.id} className={selectedIds.includes(object.id) ? "selected" : ""}><button onClick={() => chooseObject(object.id, false)}>{labels[object.kind]}</button><button title={object.hidden ? "Afficher" : "Masquer"} onClick={() => updateOne(object.id, { hidden: !object.hidden })}>{object.hidden ? "○" : "●"}</button><button title={object.locked ? "Déverrouiller" : "Verrouiller"} onClick={() => updateOne(object.id, { locked: !object.locked })}>{object.locked ? "🔒" : "🔓"}</button></div>)}</div></section>}
-        <section className="export-panel"><h2>Exporter</h2><div className="export-buttons"><button onClick={exportSvg}>SVG vectoriel</button><button onClick={exportPdf}>PDF vectoriel</button><button onClick={copyLatex}>Copier LaTeX</button></div><p className={`round-trip ${roundTrip.ok ? "ok" : "warning"}`}>{roundTrip.ok ? "✓" : "⚠"} {roundTrip.message}</p><p className="latex-hint">Le canevas reste l’aperçu de référence. Exportez le TikZ/LaTeX puis compilez-le dans votre outil LaTeX préféré, par exemple Overleaf.</p><label><input type="checkbox" checked={snippetOnly} onChange={(event) => setSnippetOnly(event.target.checked)} /> Extrait TikZ seul</label>{mode === "advanced" && <><div className="latex-actions"><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Appliquer au canevas</button><button onClick={() => setLatexDraft(undefined)} disabled={!latexDirty}>Annuler l’édition</button></div><textarea className="latex-editor" value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} spellCheck="false" aria-label="Code LaTeX/TikZ éditable" /><p className="latex-hint">L’import reconnaît les lignes, formes, courbes, chemins et équations. Les commandes non prises en charge deviennent des blocs TikZ protégés, conservés sans perte.</p></>}</section>
+        <section className="export-panel"><h2>Exporter</h2>{workspaceMode === "pdf" && pdfDocument && <p className="pdf-export-context">Created on PDF page {pdfPageIndex + 1}. The PDF background is not included.</p>}<div className="export-buttons"><button onClick={exportSvg}>SVG vectoriel</button><button onClick={exportPdf}>PDF vectoriel</button><button onClick={copyLatex}>Copier LaTeX</button><button onClick={downloadLatex}>Download LaTeX</button></div><p className={`round-trip ${roundTrip.ok ? "ok" : "warning"}`}>{roundTrip.ok ? "✓" : "⚠"} {roundTrip.message}</p><p className="latex-hint">The canvas is the reference preview. Export TikZ/LaTeX and compile it in your preferred LaTeX tool, such as Overleaf.</p><label><input type="checkbox" checked={snippetOnly} onChange={(event) => setSnippetOnly(event.target.checked)} /> TikZ snippet only</label>{mode === "advanced" && <><div className="latex-actions"><button onClick={applyLatexToCanvas} disabled={!latexDirty}>Apply to canvas</button><button onClick={() => setLatexDraft(undefined)} disabled={!latexDirty}>Discard code edits</button></div><textarea className="latex-editor" value={latexSource} onChange={(event) => setLatexDraft(event.target.value === latex ? undefined : event.target.value)} spellCheck="false" aria-label="Editable LaTeX/TikZ code" /><p className="latex-hint">Supported lines, shapes, curves, paths, and equations can be reimported. Unsupported commands remain protected TikZ blocks.</p></>}</section>
       </aside>
     </section>
   </main>;

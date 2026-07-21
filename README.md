@@ -1,98 +1,73 @@
-# vinext-starter
+# Sketch2LaTeX
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Sketch2LaTeX is a browser-based scientific diagram editor for STEM students. Draw with reusable physics, mechanics, optics, chemistry, and mathematics components, then export the drawing as standalone TikZ/LaTeX, SVG, or PDF.
 
-## Prerequisites
+## PDF background mode
 
-- Node.js `>=22.13.0`
+The editor supports two independent workspaces:
 
-## Quick Start
+- **Blank Canvas** keeps the existing drawing workflow.
+- **Draw on PDF** opens an already-compiled PDF from the student's computer and places the existing SVG drawing editor directly above the selected page.
+
+PDF files are parsed and rendered locally with PDF.js. They are never uploaded, stored in a database, sent to an API, or included in the generated TikZ/LaTeX. Only the active page is rendered. Every PDF page has its own normalized drawing snapshot so annotations remain aligned after responsive resizing and are restored when navigating between pages.
+
+PDF controls include previous/next page navigation, page count, background opacity, hide/show, replacement, and confirmed removal. The PDF renderer uses device-pixel-ratio-aware canvases and ignores stale or cancelled renders during navigation and resizing.
+
+## Local setup
+
+Requirements: Node.js 22.13 or newer.
 
 ```bash
 npm install
 npm run dev
+```
+
+Open the local URL printed by the development server.
+
+## Production build
+
+```bash
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+Additional checks:
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+npm run lint
+npm run test:latex
+npm test
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+## Manual test: blank canvas
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+1. Select **Blank Canvas**.
+2. Add, move, resize, rotate, undo, and redo several drawing objects.
+3. Generate or copy the TikZ/LaTeX and verify it contains the drawing.
+4. Switch to **Draw on PDF**, then return to **Blank Canvas**.
+5. Confirm the original blank drawing is restored.
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+## Manual test: PDF mode
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+1. Select **Draw on PDF** and upload a valid `.pdf` file.
+2. Confirm page 1 appears and the privacy note is visible.
+3. Draw over page 1, navigate to page 2, and add a different drawing.
+4. Return to page 1 and confirm its original drawing is restored in the same positions.
+5. Resize the browser and confirm the drawing remains registered with the PDF page.
+6. Change opacity, hide/show the background, and verify drawing tools still receive pointer input.
+7. Copy or download the generated TikZ/LaTeX and confirm it contains only drawing commands, not PDF content.
+8. Remove the PDF, accept the confirmation when drawings exist, and confirm the blank canvas returns.
+9. Try a non-PDF, empty, corrupted, and password-protected PDF and confirm a useful error appears.
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## Current limitations
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+- PDF files are session-only and are not restored after a browser refresh.
+- PDF page drawings are kept in memory for the current document session; removing or replacing the PDF intentionally clears them after confirmation.
+- Canvas pan and zoom are disabled in PDF mode so the drawing and PDF layers retain exact registration. Responsive fit-width scaling remains supported.
+- Password-protected PDFs must be unlocked before import.
+- The PDF is visual context only. Sketch2LaTeX does not modify the original document or insert generated code into its LaTeX source.
 
-## Useful Commands
+## Implementation notes
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+The app uses Vinext, React, TypeScript, and Vite. Drawing state uses the existing reducer and `CanvasObject` serialization, while TikZ generation remains in `app/lib/latex.ts`. PDF support adds only a browser-side PDF.js rendering layer and a small normalized-coordinate adapter.
 
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Codex and GPT-5.6 helped inspect the existing editor architecture, integrate PDF.js without replacing working features, design the page-specific snapshot mapping, add reliability checks, and document the final test workflow. No OpenAI API is used by the application.
