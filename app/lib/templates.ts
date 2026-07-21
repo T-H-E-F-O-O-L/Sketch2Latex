@@ -132,7 +132,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Planche concours reliant réponse indicielle, bande à ±5 %, temps de réponse, diagrammes de Bode réel et asymptotique, pulsation de cassure et pôle réel.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/textes/cpge/cpge-mathematiques-physique-sciences-de-lingenieur-mpsi-mp/mp-cycle-complet-2021/18309-mpsi-et-mp-sciences-industrielles-de-lingenieur-2021.pdf",
-    license: "Création originale — conventions d’automatique des concours CPGE français",
+    license: "Original creation — STEM control-systems conventions",
     objects: [
       o("fo-time-frame", { kind: "time-response-diagram", x: 25, y: 50, width: 420, height: 240, annotations: { title: "Réponse indicielle — premier ordre", input: "échelon", signal: "s(t)", unit: "s", timeMin: "0", timeMax: "10", yMin: "0", yMax: "1.5" } }),
       o("fo-time-trace", { kind: "time-response-trace", x: 25, y: 50, width: 420, height: 240, annotations: { model: "premier ordre", input: "échelon", gain: "1", tau: "1", omega0: "1", damping: "1", main: "s(t)" }, style: concours(2.2) }),
@@ -156,7 +156,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Planche concours d’un deuxième ordre pseudo-périodique avec premier dépassement D1, temps de réponse à 5 %, résonance de Bode et pôles complexes conjugués.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/concours-examens/18275/18275-sciences-industrielles-2025-doc-reponse.pdf",
-    license: "Création originale — conventions d’automatique des concours CPGE français",
+    license: "Original creation — STEM control-systems conventions",
     objects: [
       o("so-time-frame", { kind: "time-response-diagram", x: 25, y: 40, width: 420, height: 240, annotations: { title: "Réponse indicielle — deuxième ordre", input: "échelon", signal: "s(t)", unit: "s", timeMin: "0", timeMax: "10", yMin: "0", yMax: "1.5" } }),
       o("so-time-trace", { kind: "time-response-trace", x: 25, y: 40, width: 420, height: 240, annotations: { model: "deuxième ordre", input: "échelon", gain: "1", tau: "1", omega0: "2", damping: "0.35", main: "s(t)" }, style: concours(2.2) }),
@@ -181,7 +181,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Boucle fermée compacte et comparaison fréquentielle avant/après correction PI, avec cassure une décade sous la coupure, pentes asymptotiques et marges de phase et de gain.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/concours-examens/18289/18289-sciences-industrielles-2025.pdf",
-    license: "Création originale — conventions d’automatique des concours CPGE français",
+    license: "Original creation — STEM control-systems conventions",
     objects: [
       o("pi-title", { kind: "text", x: 285, y: 30, text: "Boucle fermée avec correcteur proportionnel-intégral" }),
       o("pi-input", { kind: "signal-arrow", x: 25, y: 100, x2: 100, y2: 100, annotations: { main: "E(p)" }, bindings: { endId: "pi-sum", endPort: "input-left" }, style: concours() }),
@@ -220,10 +220,10 @@ export const diagramTemplates: DiagramTemplate[] = [
     id: "motorized-gate-systems",
     title: "Portail motorisé — chaîne fonctionnelle, stm et chronogramme",
     category: "Systèmes & SysML",
-    description: "Planche CPGE réunissant chaîne d’information-énergie, machine à états SysML v1 et chronogrammes cohérents d’un portail motorisé.",
+    description: "STEM reference sheet combining an information-and-energy chain, a SysML v1 state machine, and coherent timing diagrams for a motorized gate.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://eduscol.education.fr/sti/sites/eduscol.education.fr.sti/files/textes/cpge/cpge-technologie-et-sciences-industrielles-tsi/17201-programme-de-sii-filiere-tsi-2021.pdf",
-    license: "Création originale — conventions SysML v1 et chaînes fonctionnelles des concours CPGE français",
+    license: "Original creation — SysML v1 and STEM functional-chain conventions",
     objects: [
       o("gate-ibd-frame", { kind: "sysml-frame", x: 20, y: 18, width: 860, height: 147, annotations: { diagram: "ibd", name: "Portail motorisé — chaîne fonctionnelle" } }),
       o("gate-sensors", { kind: "functional-block", x: 45, y: 63, width: 125, height: 72, annotations: { function: "Acquérir", constituent: "Capteurs" } }),
@@ -259,10 +259,10 @@ export const diagramTemplates: DiagramTemplate[] = [
     id: "sysml-requirements-architecture",
     title: "Portail motorisé — REQ, BDD et IBD SysML",
     category: "Systèmes & SysML",
-    description: "Planche de référence CPGE reliant exigences, décomposition des blocs et architecture interne d’un portail motorisé.",
+    description: "STEM reference sheet linking requirements, block decomposition, and the internal architecture of a motorized gate.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/concours-examens/18284/18284-si-psi.pdf",
-    license: "Création originale — conventions SysML v1 des concours CPGE français",
+    license: "Original creation — STEM SysML v1 conventions",
     objects: [
       o("sra-req-frame", { kind: "sysml-frame", x: 15, y: 15, width: 410, height: 250, annotations: { diagram: "req", name: "Portail motorisé — exigences" } }),
       o("sra-bdd-frame", { kind: "sysml-frame", x: 440, y: 15, width: 445, height: 250, annotations: { diagram: "bdd", name: "Portail motorisé — définition" } }),
@@ -305,7 +305,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Expérience de Young avec sources cohérentes S1 et S2, différence de marche, franges et profil d’intensité.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://www.concours-commun-inp.fr/_resource/annales%20%C3%A9crits/2024/MP/2024_MP5P.pdf?download=true",
-    license: "Création originale — conventions d’optique ondulatoire des concours CPGE français",
+    license: "Original creation — STEM wave-optics conventions",
     objects: [
       o("young-title", { kind: "text", x: 300, y: 50, text: "Interférences de Young - doubles fentes" }),
       o("young-source", { kind: "wave-source", x: 50, y: 220, width: 70, height: 70, annotations: { name: "S", sourceType: "ponctuelle", phase: "0" } }),
@@ -326,7 +326,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Onde plane, fente de largeur a, cône de diffraction, écran éloigné et profil sinc carré.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://www.concours-commun-inp.fr/_resource/annales%20%C3%A9crits/2024/MP/2024_MP5P.pdf?download=true",
-    license: "Création originale — conventions d’optique ondulatoire des concours CPGE français",
+    license: "Original creation — STEM wave-optics conventions",
     objects: [
       o("fraunhofer-title", { kind: "text", x: 275, y: 50, text: "Diffraction de Fraunhofer - fente simple" }),
       o("fraunhofer-source", { kind: "wave-source", x: 40, y: 200, width: 70, height: 70, annotations: { name: "S", sourceType: "plane", phase: "0" } }),
@@ -347,7 +347,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Propagation sinusoïdale avec retard et déphasage, puis superposition donnant une onde stationnaire avec nœuds et ventres.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://cache.media.education.gouv.fr/file/SPE1-MEN-MESRI-4-2-2021/64/8/spe779_annexe_1373648.pdf",
-    license: "Création originale — programme officiel MPSI et conventions des concours CPGE français",
+    license: "Original creation — STEM mechanics and diagram conventions",
     objects: [
       o("waves-title", { kind: "text", x: 250, y: 50, text: "Propagation, retard, déphasage et onde stationnaire" }),
       o("waves-source", { kind: "wave-source", x: 50, y: 115, width: 70, height: 70, annotations: { name: "S", sourceType: "ponctuelle", phase: "φ_0" } }),
@@ -410,7 +410,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Formes mésomères, flèches de déplacement d’un doublet, flèche monoélectronique et étape SN2 annotée.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://www.concours-centrale-supelec.fr/sites/default/files/documents/X010.pdf",
-    license: "Création originale — conventions IUPAC et attendus des concours CPGE français",
+    license: "Original creation — IUPAC and STEM chemistry conventions",
     objects: [
       o("mechanism-title", { kind: "text", x: 300, y: 40, text: "Mésomérie - transferts électroniques - SN2" }),
       o("mesomeric-ring-1", { kind: "skeletal-ring", x: 40, y: 60, width: 150, height: 140, annotations: { ringSize: "6", ringType: "alterné", substituent1: "O^-", substituent2: "" } }),
@@ -434,8 +434,8 @@ export const diagramTemplates: DiagramTemplate[] = [
     id: "mechanical-transmissions",
     title: "Transmissions mécaniques usuelles",
     category: "Mécanique",
-    description: "Planche CPGE des transmissions par engrenage, pignon-crémaillère, poulies-courroie et vis-écrou.",
-    sourceName: "Référentiel CPGE PTSI / PT – S3.2.13 Transmetteurs de puissance",
+    description: "STEM reference sheet for gear, rack-and-pinion, belt-and-pulley, and screw-and-nut transmissions.",
+    sourceName: "STEM mechanical power-transmission reference",
     sourceUrl: "https://sti.eduscol.education.fr/referentiels-par-savoirs-cpge-cpge-physique-technologie-ptsi-ptpt-cycle-complet-2021-s3-resoudre-26",
     license: "Création originale – conventions des schémas cinématiques français",
     objects: [
@@ -456,7 +456,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     id: "advanced-mechanical-transmissions",
     title: "Transmissions mécaniques avancées",
     category: "Mécanique",
-    description: "Planche CPGE de la roue-vis sans fin, du train épicycloïdal et du mécanisme came-poussoir, avec repères fonctionnels français.",
+    description: "STEM reference sheet for worm gear, planetary gear train, and cam-follower mechanisms with functional reference points.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/concours-examens/15776/15776-caplp-ext-2023-gm-opt-prod-epreuve-1.pdf",
     license: "Création originale d’après des sujets officiels Éduscol et les conventions des schémas cinématiques français",
@@ -741,7 +741,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Repère (P,V) de concours avec réseau d’isothermes, états repérés, transformations usuelles orientées et aire algébrique du travail des forces de pression.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://cache.media.education.gouv.fr/file/SPE1-MEN-MESRI-4-2-2021/64/8/spe779_annexe_1373648.pdf",
-    license: "Création originale — conventions thermodynamiques du programme MPSI",
+    license: "Original creation — STEM thermodynamics conventions",
     objects: [
       o("clapeyron-frame", { kind: "thermo-diagram", x: 120, y: 120, width: 420, height: 280, annotations: { diagramType: "P-V", title: "Diagramme de Clapeyron — gaz parfait", xMin: "0", xMax: "10", yMin: "0", yMax: "10", xUnit: "m^3", yUnit: "Pa" }, style: concours(1.5) }),
       o("clapeyron-isotherms", { kind: "thermo-isotherm-family", x: 120, y: 120, width: 420, height: 280, annotations: { count: "4", main: "T_1 < T_2 < T_3 < T_4" }, style: concours(1.1) }),
@@ -763,7 +763,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Domaines solide, liquide et vapeur séparés par les courbes d’équilibre, avec point triple, point critique et pente de fusion réglable.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://cache.media.education.gouv.fr/file/SPE1-MEN-MESRI-4-2-2021/64/8/spe779_annexe_1373648.pdf",
-    license: "Création originale — conventions thermodynamiques du programme MPSI",
+    license: "Original creation — STEM thermodynamics conventions",
     objects: [
       o("phase-pt-water", { kind: "phase-diagram-pt", x: 120, y: 120, width: 420, height: 280, annotations: { title: "Diagramme de phases (P,T)", substance: "eau", fusionSlope: "négative" }, style: concours(1.7) }),
     ],
@@ -775,7 +775,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Dôme liquide-vapeur sur un diagramme (P,v), point critique, états de saturation et isotitres x pour lire la composition d’un mélange diphasé.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://cache.media.education.gouv.fr/file/SPE1-MEN-MESRI-4-2-2021/64/8/spe779_annexe_1373648.pdf",
-    license: "Création originale — conventions thermodynamiques du programme MPSI",
+    license: "Original creation — STEM thermodynamics conventions",
     objects: [
       o("dome-main", { kind: "liquid-vapour-dome", x: 120, y: 120, width: 420, height: 280, annotations: { title: "Équilibre liquide-vapeur dans (P,v)", criticalPoint: "C" }, style: concours(1.8) }),
       o("dome-quality-20", { kind: "vapour-quality-line", x: 120, y: 120, width: 420, height: 280, annotations: { quality: "0.2", main: "x=0{,}2" }, style: concours(1.1, "dashed") }),
@@ -793,7 +793,7 @@ export const diagramTemplates: DiagramTemplate[] = [
     description: "Cycle réversible orienté composé de deux isothermes et de deux adiabatiques, avec quatre états et aire représentative du travail net fourni.",
     sourceName: "Sketch2LaTeX",
     sourceUrl: "https://cache.media.education.gouv.fr/file/SPE1-MEN-MESRI-4-2-2021/64/8/spe779_annexe_1373648.pdf",
-    license: "Création originale — conventions thermodynamiques du programme MPSI",
+    license: "Original creation — STEM thermodynamics conventions",
     objects: [
       o("carnot-frame", { kind: "thermo-diagram", x: 120, y: 120, width: 420, height: 280, annotations: { diagramType: "P-V", title: "Cycle de Carnot moteur", xMin: "0", xMax: "10", yMin: "0", yMax: "10", xUnit: "m^3", yUnit: "Pa" }, style: concours(1.5) }),
       o("carnot-work", { kind: "pressure-work-area", x: 120, y: 120, width: 420, height: 280, annotations: { areaType: "travail fourni", main: "W_{\\mathrm{cycle}}<0" }, style: concours(1.1) }),

@@ -3,14 +3,14 @@ export type MathKeyboardTab = "numbers" | "functions" | "letters" | "symbols";
 export type MathKeyboardKey = { id: string; label: string; insert?: string; ariaLabel: string; caseAware?: boolean; action?: "toggle-case" };
 
 export const mathKeyboardTabs: Array<{ id: MathKeyboardTab; label: string; ariaLabel: string }> = [
-  { id: "numbers", label: "123", ariaLabel: "Nombres et opérations" },
-  { id: "functions", label: "f(x)", ariaLabel: "Fonctions et analyse" },
-  { id: "letters", label: "ABC", ariaLabel: "Lettres et alphabet grec" },
-  { id: "symbols", label: "#&¬", ariaLabel: "Ensembles, logique et symboles" },
+  { id: "numbers", label: "123", ariaLabel: "Numbers and operations" },
+  { id: "functions", label: "f(x)", ariaLabel: "Functions and calculus" },
+  { id: "letters", label: "ABC", ariaLabel: "Letters and Greek alphabet" },
+  { id: "symbols", label: "#&¬", ariaLabel: "Sets, logic and symbols" },
 ];
 
 const key = (id: string, label: string, insert: string, ariaLabel: string, extras: Partial<MathKeyboardKey> = {}): MathKeyboardKey => ({ id, label, insert, ariaLabel, ...extras });
-const letters = "abcdefghijklmnopqrstuvwxyz".split("").map((letter) => key(`letter-${letter}`, letter, letter, `Lettre ${letter}`, { caseAware: true }));
+const letters = "abcdefghijklmnopqrstuvwxyz".split("").map((letter) => key(`letter-${letter}`, letter, letter, `Letter ${letter}`, { caseAware: true }));
 
 export const mathKeyboardLayouts: Record<MathKeyboardTab, MathKeyboardKey[]> = {
   numbers: [

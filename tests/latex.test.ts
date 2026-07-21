@@ -710,7 +710,7 @@ test("provides a French CPGE mechanical-transmission reference model", () => {
   const template = diagramTemplates.find((candidate) => candidate.id === "mechanical-transmissions");
   assert.ok(template);
   assert.deepEqual(template.objects.filter((object) => ["gear-pair", "rack-pinion", "belt-drive", "screw-nut"].includes(object.kind)).map((object) => object.kind), ["gear-pair", "rack-pinion", "belt-drive", "screw-nut"]);
-  assert.match(template.sourceName, /CPGE PTSI/);
+  assert.match(template.sourceName, /STEM mechanical/);
   const output = documentFor(template.objects);
   assert.match(output, /Engrenage extérieur/);
   assert.match(output, /Pignon-crémaillère/);

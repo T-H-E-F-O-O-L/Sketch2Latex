@@ -54,8 +54,8 @@ export function MathCalculator({ formula, onFormulaChange, onAdd, onAddDemonstra
 
   const resolveKey = (key: MathKeyboardKey) => {
     if (!uppercase) return key;
-    if (key.caseAware) return { ...key, label: key.label.toUpperCase(), insert: key.insert?.toUpperCase(), ariaLabel: `Lettre ${key.label.toUpperCase()}` };
-    return uppercaseGreek[key.id] ? { ...key, ...uppercaseGreek[key.id], ariaLabel: `${key.ariaLabel}, majuscule` } : key;
+    if (key.caseAware) return { ...key, label: key.label.toUpperCase(), insert: key.insert?.toUpperCase(), ariaLabel: `Letter ${key.label.toUpperCase()}` };
+    return uppercaseGreek[key.id] ? { ...key, ...uppercaseGreek[key.id], ariaLabel: `${key.ariaLabel}, uppercase` } : key;
   };
 
   const insertKey = (sourceKey: MathKeyboardKey, focusMathField: boolean) => {
@@ -81,24 +81,24 @@ export function MathCalculator({ formula, onFormulaChange, onAdd, onAddDemonstra
     const next = mathKeyboardTabs[nextIndex]; setActiveTab(next.id); requestAnimationFrame(() => document.getElementById(`math-keyboard-tab-${next.id}`)?.focus());
   };
 
-  return <section className="math-calculator" aria-label="Calculatrice mathématique">
-    <div className="visual-math-field-wrap" aria-busy={mathLiveStatus === "loading"}><math-field ref={attachField} className="visual-math-field" aria-label="Éditeur visuel de formule" aria-describedby="math-editor-help" math-virtual-keyboard-policy="manual" onInput={(event: FormEvent<HTMLElement>) => onFormulaChange((event.currentTarget as MathfieldElement).value)} /></div>
-    <p id="math-editor-help">{mathLiveStatus === "loading" ? "Chargement de l’éditeur mathématique…" : "Saisissez au clavier ou utilisez les touches ci-dessous. Cliquez dans la formule pour déplacer le curseur."}</p>
-    {mathLiveStatus === "error" && <div className="math-load-error" role="alert"><span>L’éditeur mathématique n’a pas pu démarrer.</span><button type="button" onClick={() => { setMathLiveStatus("loading"); loadMathLive(); }}>Réessayer</button></div>}
-    <div className="math-keyboard-tabs" role="tablist" aria-label="Catégories du clavier mathématique">
+  return <section className="math-calculator" aria-label="Mathematical calculator">
+    <div className="visual-math-field-wrap" aria-busy={mathLiveStatus === "loading"}><math-field ref={attachField} className="visual-math-field" aria-label="Visual formula editor" aria-describedby="math-editor-help" math-virtual-keyboard-policy="manual" onInput={(event: FormEvent<HTMLElement>) => onFormulaChange((event.currentTarget as MathfieldElement).value)} /></div>
+    <p id="math-editor-help">{mathLiveStatus === "loading" ? "Loading the mathematical editor…" : "Type with your keyboard or use the keys below. Click in the formula to move the cursor."}</p>
+    {mathLiveStatus === "error" && <div className="math-load-error" role="alert"><span>The mathematical editor could not start.</span><button type="button" onClick={() => { setMathLiveStatus("loading"); loadMathLive(); }}>Try again</button></div>}
+    <div className="math-keyboard-tabs" role="tablist" aria-label="Math keyboard categories">
       {mathKeyboardTabs.map((tab, index) => <button key={tab.id} id={`math-keyboard-tab-${tab.id}`} type="button" role="tab" aria-label={tab.ariaLabel} aria-selected={activeTab === tab.id} aria-controls="math-keyboard-panel" tabIndex={activeTab === tab.id ? 0 : -1} className={activeTab === tab.id ? "active" : ""} onClick={() => setActiveTab(tab.id)} onKeyDown={(event) => chooseTabFromKeyboard(event, index)}>{tab.label}</button>)}
     </div>
     <div id="math-keyboard-panel" className="math-keyboard-grid" role="tabpanel" aria-labelledby={`math-keyboard-tab-${activeTab}`}>
       {mathKeyboardLayouts[activeTab].map((sourceKey) => { const key = resolveKey(sourceKey); return <button key={sourceKey.id} type="button" className={`math-key${sourceKey.action === "toggle-case" ? " case-key" : ""}`} aria-label={key.ariaLabel} aria-pressed={sourceKey.action === "toggle-case" ? uppercase : undefined} disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => insertKey(sourceKey, cameFromPointer(event))}><span aria-hidden="true" dangerouslySetInnerHTML={{ __html: renderedKeyLabel(key.label) }} /></button>; })}
     </div>
-    <div className="math-keyboard-actions" aria-label="Actions du clavier mathématique">
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => clear(cameFromPointer(event))} aria-label="Effacer toute la formule">AC</button>
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("move-to-previous-char", cameFromPointer(event))} aria-label="Déplacer le curseur vers la gauche">←</button>
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("move-to-next-char", cameFromPointer(event))} aria-label="Déplacer le curseur vers la droite">→</button>
-      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("delete-backward", cameFromPointer(event))} aria-label="Effacer le caractère précédent">⌫</button>
-      <button type="button" className="commit-formula" onPointerDown={keepMathfieldFocus} onClick={onAdd} disabled={!formula.trim()} aria-label="Ajouter la formule au canevas">↵</button>
+    <div className="math-keyboard-actions" aria-label="Math keyboard actions">
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => clear(cameFromPointer(event))} aria-label="Clear the formula">AC</button>
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("move-to-previous-char", cameFromPointer(event))} aria-label="Move cursor left">←</button>
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("move-to-next-char", cameFromPointer(event))} aria-label="Move cursor right">→</button>
+      <button type="button" disabled={mathLiveStatus !== "ready"} onPointerDown={keepMathfieldFocus} onClick={(event) => runCommand("delete-backward", cameFromPointer(event))} aria-label="Delete previous character">⌫</button>
+      <button type="button" className="commit-formula" onPointerDown={keepMathfieldFocus} onClick={onAdd} disabled={!formula.trim()} aria-label="Add formula to canvas">↵</button>
     </div>
-    <div className="math-primary-actions"><button type="button" onClick={onAdd} disabled={!formula.trim()}>Ajouter la formule</button><button type="button" onClick={onAddDemonstration} disabled={!formula.trim()}>Ajouter comme démonstration</button></div>
-    <details className="advanced-latex-editor"><summary>Code LaTeX (avancé)</summary><label>LaTeX modifiable<textarea className="math-input" value={formula} onChange={(event) => onFormulaChange(event.target.value)} spellCheck="false" aria-label="Code LaTeX avancé de la formule" /></label></details>
+    <div className="math-primary-actions"><button type="button" onClick={onAdd} disabled={!formula.trim()}>Add formula</button><button type="button" onClick={onAddDemonstration} disabled={!formula.trim()}>Add as derivation</button></div>
+    <details className="advanced-latex-editor"><summary>LaTeX code (advanced)</summary><label>Editable LaTeX<textarea className="math-input" value={formula} onChange={(event) => onFormulaChange(event.target.value)} spellCheck="false" aria-label="Advanced formula LaTeX code" /></label></details>
   </section>;
 }
