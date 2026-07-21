@@ -43,3 +43,6 @@ next-env.d.ts
 /.logs/
 /.npm-cache/
 *.tsbuildinfo
+
+# local deployment bundles
+.sites-*.tar.gz

@@ -1,21 +1,76 @@
 # Sketch2LaTeX
 
-Sketch2LaTeX is a browser-based scientific diagram editor for STEM students. Draw with reusable physics, mechanics, optics, chemistry, and mathematics components, then export the drawing as standalone TikZ/LaTeX, SVG, or PDF.
+Turn visual STEM thinking into precise, editable TikZ diagrams.
 
-## PDF background mode
+[Live Demo](https://sketch2latex-20260710.imouchiha3.chatgpt.site/) · [Demo Video](ADD_VIDEO_URL)
 
-The editor supports two independent workspaces:
+Built for OpenAI Build Week using Codex and GPT-5.6.
 
-- **Blank Canvas** keeps the existing drawing workflow.
-- **Draw on PDF** opens an already-compiled PDF from the student's computer and places the existing SVG drawing editor directly above the selected page.
+## Inspiration
 
-PDF files are parsed and rendered locally with PDF.js. They are never uploaded, stored in a database, sent to an API, or included in the generated TikZ/LaTeX. Only the active page is rendered. Every PDF page has its own normalized drawing snapshot so annotations remain aligned after responsive resizing and are restored when navigating between pages.
+STEM students often understand mathematical and scientific diagrams visually, yet turning those ideas into professional TikZ can be slow and difficult. Sketch2LaTeX makes technical drawing approachable without requiring users to master TikZ syntax first.
 
-PDF controls include previous/next page navigation, page count, background opacity, hide/show, replacement, and confirmed removal. The PDF renderer uses device-pixel-ratio-aware canvases and ignores stale or cancelled renders during navigation and resizing.
+## What it does
 
-## Local setup
+Sketch2LaTeX provides two workspaces:
 
-Requirements: Node.js 22.13 or newer.
+- **Blank Canvas** for creating diagrams from scratch.
+- **Draw on PDF** for placing editable drawing objects over an already-compiled PDF.
+
+Users can combine drawing tools, text, formulas, and reusable physics, mechanics, optics, mathematics, chemistry, and other STEM components. The result can be exported as editable TikZ/LaTeX, SVG, or PDF.
+
+Uploaded PDFs are visual backgrounds only. PDF.js processes them locally in the browser; they are not uploaded or included in generated TikZ/LaTeX.
+
+## Why it helps education
+
+- Reduces the TikZ learning barrier.
+- Helps students focus on scientific ideas instead of syntax.
+- Helps teachers create worksheets, lessons, and technical diagrams.
+- Produces editable technical output rather than static screenshots.
+- Lets students work in the context of existing notes and exercises.
+
+## Main features
+
+- Scientific SVG drawing canvas with undo and redo.
+- Reusable STEM components and searchable templates.
+- Rich multiline text and visual mathematical formula editing.
+- Group selection, proportional transformations, rotation, and smart connections.
+- TikZ/LaTeX generation, copying, and download.
+- SVG and PDF export.
+- Local PDF background mode with page navigation.
+- Page-specific drawing state and responsive PDF alignment.
+- PDF opacity, visibility, replacement, and removal controls.
+- Standard document presets, including common screen and print formats.
+- Local project saving in the browser.
+
+## Built with Codex and GPT-5.6
+
+Codex with GPT-5.6 supported the application architecture, SVG drawing canvas, scientific component libraries, TikZ generation, geometry and coordinate synchronization, PDF.js integration, page-specific drawing persistence, testing, debugging, interface decisions, and documentation.
+
+The application itself does not call the OpenAI API. Codex and GPT-5.6 were development tools used to build and refine the project.
+
+Primary Codex `/feedback` Session ID: `ADD_SESSION_ID`
+
+## How it works
+
+- React and TypeScript provide the interface and editor state.
+- Vinext and Vite build the application for the web and Codex Sites.
+- The editor represents each drawing as serializable canvas objects rendered in SVG.
+- A dedicated generator converts those objects and their geometry into TikZ/LaTeX.
+- PDF.js renders uploaded PDF pages locally beneath the drawing layer.
+- Normalized page coordinates keep annotations aligned as the viewport changes.
+- Browser-only file processing avoids a server upload workflow.
+
+## Privacy
+
+- Uploaded PDFs stay in the browser and are never sent to an application server.
+- PDFs are not stored in a database.
+- PDF content is not inserted into generated TikZ/LaTeX.
+- Only drawing objects are converted into TikZ/LaTeX.
+
+## Local installation
+
+Requirements: Node.js 22.13.0 or newer.
 
 ```bash
 npm install
@@ -30,7 +85,7 @@ Open the local URL printed by the development server.
 npm run build
 ```
 
-Additional checks:
+## Tests
 
 ```bash
 npm run lint
@@ -38,36 +93,41 @@ npm run test:latex
 npm test
 ```
 
-## Manual test: blank canvas
+## Manual demo
 
-1. Select **Blank Canvas**.
-2. Add, move, resize, rotate, undo, and redo several drawing objects.
-3. Generate or copy the TikZ/LaTeX and verify it contains the drawing.
-4. Switch to **Draw on PDF**, then return to **Blank Canvas**.
-5. Confirm the original blank drawing is restored.
-
-## Manual test: PDF mode
-
-1. Select **Draw on PDF** and upload a valid `.pdf` file.
-2. Confirm page 1 appears and the privacy note is visible.
-3. Draw over page 1, navigate to page 2, and add a different drawing.
-4. Return to page 1 and confirm its original drawing is restored in the same positions.
-5. Resize the browser and confirm the drawing remains registered with the PDF page.
-6. Change opacity, hide/show the background, and verify drawing tools still receive pointer input.
-7. Copy or download the generated TikZ/LaTeX and confirm it contains only drawing commands, not PDF content.
-8. Remove the PDF, accept the confirmation when drawings exist, and confirm the blank canvas returns.
-9. Try a non-PDF, empty, corrupted, and password-protected PDF and confirm a useful error appears.
+1. Open **Blank Canvas**.
+2. Create a physics or geometry diagram.
+3. Generate and copy its TikZ/LaTeX.
+4. Return to the project launcher and open **Draw on PDF**.
+5. Upload an already-compiled PDF.
+6. Draw above the first page.
+7. Navigate between pages and confirm each page keeps its own drawings.
+8. Export the drawing layer without embedding the source PDF in TikZ.
 
 ## Current limitations
 
 - PDF files are session-only and are not restored after a browser refresh.
-- PDF page drawings are kept in memory for the current document session; removing or replacing the PDF intentionally clears them after confirmation.
-- Canvas pan and zoom are disabled in PDF mode so the drawing and PDF layers retain exact registration. Responsive fit-width scaling remains supported.
+- Removing or replacing a PDF clears its page drawings after confirmation.
+- Canvas pan and zoom are disabled in PDF mode to preserve exact registration; responsive fit-width scaling remains supported.
 - Password-protected PDFs must be unlocked before import.
-- The PDF is visual context only. Sketch2LaTeX does not modify the original document or insert generated code into its LaTeX source.
+- The original PDF is not modified.
+- Generated code is not inserted into the original LaTeX source.
+- There is no server-side LaTeX compilation.
+- The application requires no OpenAI API and has no runtime AI conversion.
 
-## Implementation notes
+## Future roadmap
 
-The app uses Vinext, React, TypeScript, and Vite. Drawing state uses the existing reducer and `CanvasObject` serialization, while TikZ generation remains in `app/lib/latex.ts`. PDF support adds only a browser-side PDF.js rendering layer and a small normalized-coordinate adapter.
+- Direct `.tex` project integration.
+- Optional LaTeX compilation and an Overleaf workflow.
+- Diagram understanding and educational checking.
+- Real-time collaboration.
 
-Codex and GPT-5.6 helped inspect the existing editor architecture, integrate PDF.js without replacing working features, design the page-specific snapshot mapping, add reliability checks, and document the final test workflow. No OpenAI API is used by the application.
+These items are future work and are not part of the current application.
+
+## Repository and hackathon evidence
+
+The repository commit history documents the development performed during the hackathon. It preserves the progression of the editor, component system, export pipeline, PDF workflow, tests, and release preparation.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
