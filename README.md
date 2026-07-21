@@ -1,8 +1,12 @@
+<p align="center">
+  <img src="docs/assets/sketch2latex-logo.png" alt="Sketch2LaTeX logo" width="280">
+</p>
+
 # Sketch2LaTeX
 
 Turn visual STEM thinking into precise, editable TikZ diagrams.
 
-[Live Demo](https://sketch2latex-20260710.imouchiha3.chatgpt.site/) · [Demo Video](ADD_VIDEO_URL)
+[Live Demo](https://sketch2latex-20260710.imouchiha3.chatgpt.site/) · [Watch the Demo Video](https://www.youtube.com/watch?v=g26Ggc5HqOU)
 
 Built for OpenAI Build Week using Codex and GPT-5.6.
 
