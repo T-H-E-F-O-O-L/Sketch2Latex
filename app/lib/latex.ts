@@ -195,7 +195,11 @@ function stamp(object: CanvasObject) {
 
 function objectToLatexBase(object: CanvasObject): string {
   const scientificScene = scientificSceneFor(object);
-  if (scientificScene) return scientificSceneToTikz(scientificScene);
+  if (scientificScene) {
+    const rendered = scientificSceneToTikz(scientificScene);
+    if (["datum-feature", "feature-control-frame", "surface-texture"].includes(object.kind)) return `% sketch2latex callout anchors ${point(object.x, object.y)} -- ${end(object)}\n${rendered}`;
+    return rendered;
+  }
   const origin = point(object.x, object.y);
   switch (object.kind) {
     case "line": return `\\draw ${origin} -- ${end(object)};`;
@@ -274,7 +278,8 @@ const matrixNumber = (value: number) => (Math.round(value * 100000) / 100000).to
 
 export function objectToLatex(object: CanvasObject): string {
   const rawBody = objectToLatexBase(object); const style = tikzStyle(object); const body = rawBody && style ? `\\begin{scope}[${style}]\n${rawBody}\n\\end{scope}` : rawBody;
-  const scaleX = object.scaleX ?? object.scale ?? 1; const scaleY = object.scaleY ?? object.scale ?? 1; const rotation = object.rotation ?? 0;
+  const uprightObject = ["datum-feature", "feature-control-frame", "surface-texture", "chemical-atom"].includes(object.kind);
+  const scaleX = uprightObject ? 1 : object.scaleX ?? object.scale ?? 1; const scaleY = uprightObject ? 1 : object.scaleY ?? object.scale ?? 1; const rotation = uprightObject ? 0 : object.rotation ?? 0;
   if (!body || (scaleX === 1 && scaleY === 1 && rotation === 0)) return body;
   const center = objectCenter(object); const cx = center.x / SCALE; const cy = -center.y / SCALE;
   const angle = (-rotation * Math.PI) / 180;
@@ -416,6 +421,7 @@ function annotationsFromLatexBlock(original: CanvasObject, block: string): Canva
 function objectFromLatexBlock(original: CanvasObject, block: string): CanvasObject {
   const withAnnotations = annotationsFromLatexBlock(original, block);
   if (block.includes("\\begin{scope}[cm=") || block.includes("\\begin{scope}[transform canvas={cm=")) return withAnnotations;
+  if (["bond-wedge-solid", "bond-wedge-hashed", "bond-wavy", "electron-pair-arrow", "single-electron-arrow", "mesomeric-arrow", "reaction-arrow", "thermo-process", "charged-particle-trajectory"].includes(original.kind)) return withAnnotations;
   const connectorScopeMatch = connectorKinds.includes(original.kind) ? block.match(/\\begin\{scope\}\[shift=\{\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\},\s*rotate=\s*(-?\d+(?:\.\d+)?)/) : undefined;
   if (connectorScopeMatch) {
     const localSource = block.slice((connectorScopeMatch.index ?? 0) + connectorScopeMatch[0].length);
