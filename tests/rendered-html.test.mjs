@@ -9,23 +9,18 @@ async function render() {
   return worker.fetch(new Request("http://localhost/", { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
 
-test("server-renders the Sketch2LaTeX editor", async () => {
+test("server-renders the Sketch2LaTeX project launcher", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Sketch2LaTeX<\/title>/i);
   assert.match(html, /Scientific diagram editor for STEM students/);
-  assert.match(html, /Library/);
-  assert.match(html, /Templates/);
-  assert.match(html, /Math &amp; Physics/);
-  assert.match(html, /Blank Canvas/);
+  assert.match(html, /Start drawing/);
+  assert.match(html, /Saved projects/);
+  assert.match(html, /Blank canvas/);
   assert.match(html, /Draw on PDF/);
-  assert.match(html, /Graphs/);
-  assert.match(html, /Vector SVG/);
-  assert.match(html, /Stroke style/);
-  assert.match(html, /Dash-dot/);
-  assert.doesNotMatch(html, /Compile LaTeX/);
+  assert.match(html, /The PDF never leaves your browser/);
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
@@ -46,6 +41,8 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   ]);
   assert.match(page, /AUTOSAVE_KEY/);
   assert.match(page, /resolveConnections/);
+  assert.match(page, /startBlankProject/);
+  assert.match(page, /showProjectLauncher/);
   assert.match(page, /svg2pdf\.js/);
   assert.match(page, /objectsFromLatex/);
   assert.match(page, /groupSelection/);
@@ -71,6 +68,7 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
   assert.match(css, /\.snap-port/);
+  assert.match(css, /\.project-launcher/);
   assert.match(css, /\.circuit-junction/);
   assert.match(css, /\.math-calculator/);
   assert.match(css, /\.math-keyboard-grid/);

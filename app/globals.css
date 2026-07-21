@@ -28,6 +28,19 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 @media (max-width: 1000px) { .toolbox { grid-template-columns: repeat(2, 1fr); }.workspace { grid-template-columns: 1fr; }.canvas-wrap > svg { min-height: auto; } textarea { min-height: 320px; } }
 @media (max-width: 600px) { main { padding: 12px; } header { align-items: start; flex-direction: column; }.status { text-align: left; }.toolbox { grid-template-columns: 1fr; } }
 
+/* Project launcher */
+.project-launcher { display: grid; place-items: center; min-height: 100vh; max-width: none; padding: 32px; background: #edf0f3; }
+.launcher-card { width: min(920px, 100%); padding: 30px; border: 1px solid #c7cdd3; border-radius: 12px; background: #fff; box-shadow: 0 16px 45px rgba(32,43,54,.12); }
+.launcher-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.launcher-heading-actions { display: flex; align-items: center; gap: 8px; }
+.launcher-heading h1 { font-size: 32px; }.launcher-heading p:last-child { margin: 7px 0 0; color: #52606d; }
+.launcher-badge { padding: 7px 10px; border: 1px solid #aab4be; border-radius: 999px; color: #334150; background: #f6f8fa; font-size: 12px; font-weight: 700; }
+.new-project-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.new-project-card { display: grid; gap: 8px; min-height: 150px; padding: 20px; text-align: left; border: 2px solid #c5ccd4; border-radius: 9px; background: #fbfcfd; }
+.new-project-card:hover { border-color: #315aa6; background: #f3f7ff; }.new-project-card strong { font-size: 21px; }.new-project-card span { color: #344250; line-height: 1.4; }.new-project-card small { align-self: end; color: #66727e; }
+.launcher-projects { margin-top: 28px; }.launcher-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; }.launcher-section-title h2 { margin: 0; font-size: 16px; }.launcher-section-title span { color: #66727e; font-size: 12px; }
+.launcher-project-row { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 6px; padding: 12px 14px; text-align: left; border-color: #d4d9de; }.launcher-project-row > span { display: grid; gap: 3px; }.launcher-project-row small, .launcher-project-row time { color: #65717d; font-size: 11px; }.launcher-project-row.latest { border-color: #8ea7cf; background: #f1f6ff; }.launcher-empty { padding: 20px; text-align: center; color: #65717d; border: 1px dashed #c7cdd3; border-radius: 7px; }
+
 /* Application workspace */
 .app-shell { max-width: none; min-height: 100vh; padding: 14px; background: #f4f5f7; }
 .app-header { align-items: center; margin: 0 0 8px; }
@@ -204,4 +217,4 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 @media (max-width: 1250px) { .editor-layout { grid-template-columns: 240px minmax(450px,1fr) 290px; }.app-shell.panel-math .editor-layout { grid-template-columns: 320px minmax(450px,1fr) 290px; }.tool-grid { grid-template-columns: 1fr; } }
 @media (max-width: 980px) { .editor-layout, .app-shell.panel-math .editor-layout { grid-template-columns: 220px minmax(0,1fr); }.right-panel { position: static; grid-column: 1 / -1; max-height: none; }.left-panel { top: 55px; }.graph-composer { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 701px) and (max-width: 980px) { .app-shell.panel-math .editor-layout { grid-template-columns: 330px minmax(0,1fr); } }
-@media (max-width: 700px) { .app-shell { padding: 8px; }.app-header { align-items: flex-start; }.header-actions { justify-content: flex-start; }.editor-layout, .app-shell.panel-math .editor-layout { grid-template-columns: 1fr; }.left-panel { position: static; height: auto; max-height: 70vh; }.library-scroll { height: auto; max-height: 40vh; }.tool-grid { grid-template-columns: 1fr 1fr; }.canvas-column { grid-row: 1; }.command-bar { position: static; }.app-shell .canvas-wrap > svg { min-height: 360px; } }
+@media (max-width: 700px) { .project-launcher { padding: 14px; }.launcher-card { padding: 20px; }.launcher-heading { display: grid; }.new-project-options { grid-template-columns: 1fr; }.launcher-project-row { align-items: start; flex-direction: column; gap: 7px; }.app-shell { padding: 8px; }.app-header { align-items: flex-start; }.header-actions { justify-content: flex-start; }.editor-layout, .app-shell.panel-math .editor-layout { grid-template-columns: 1fr; }.left-panel { position: static; height: auto; max-height: 70vh; }.library-scroll { height: auto; max-height: 40vh; }.tool-grid { grid-template-columns: 1fr 1fr; }.canvas-column { grid-row: 1; }.command-bar { position: static; }.app-shell .canvas-wrap > svg { min-height: 360px; } }

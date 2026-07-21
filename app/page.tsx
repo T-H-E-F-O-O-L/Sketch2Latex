@@ -893,6 +893,9 @@ export default function Home() {
   const [templateMode, setTemplateMode] = useState<TemplateMode>("replace");
   const [projectName, setProjectName] = useState("My diagram");
   const [savedProjects, setSavedProjects] = useState<ProjectFile[]>([]);
+  const [latestDraft, setLatestDraft] = useState<ProjectFile>();
+  const [launcherOpen, setLauncherOpen] = useState(true);
+  const [workspaceStarted, setWorkspaceStarted] = useState(false);
   const [notice, setNotice] = useState("Ready. This project is saved automatically on this device.");
   const [lastSaved, setLastSaved] = useState<string>();
   const [snippetOnly, setSnippetOnly] = useState(false);
@@ -977,30 +980,28 @@ export default function Home() {
   useEffect(() => {
     try {
       const autosave = localStorage.getItem(AUTOSAVE_KEY);
-      if (autosave) {
-        const project = parseProject(autosave); dispatchHistory({ type: "transient", objects: project.objects }); setSettings(project.settings); setProjectName(project.name); setNotice("Latest autosave restored.");
-      }
+      if (autosave) setLatestDraft(parseProject(autosave));
       setFavorites(JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? "[]"));
       setMode(localStorage.getItem(MODE_KEY) === "advanced" ? "advanced" : "beginner");
       setSavedProjects(storedProjects());
-    } catch { setNotice("The local draft could not be read; an empty project was opened."); }
+    } catch { setNotice("The local draft could not be read. Start a blank canvas or open a saved project."); }
     hydratedRef.current = true;
   }, []);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydratedRef.current || launcherOpen) return;
     if (workspaceMode !== "blank") return;
     const timer = window.setTimeout(() => {
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(makeProject(projectName, objects, settings)));
       const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); setLastSaved(time);
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [objects, projectName, settings, workspaceMode]);
+  }, [launcherOpen, objects, projectName, settings, workspaceMode]);
 
   useEffect(() => {
-    if (!hydratedRef.current || workspaceMode !== "blank") return;
+    if (!hydratedRef.current || launcherOpen || workspaceMode !== "blank") return;
     blankWorkspaceRef.current = { objects: deepCloneObjects(objects), settings: { ...settings }, view: { ...view } };
-  }, [objects, settings, view, workspaceMode]);
+  }, [launcherOpen, objects, settings, view, workspaceMode]);
 
   useEffect(() => {
     if (workspaceMode !== "pdf") return;
@@ -1254,7 +1255,23 @@ export default function Home() {
   const toggleFavorite = (kind: string) => setFavorites((current) => current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind]);
 
   const saveProject = () => { const project = makeProject(projectName, objects, settings); saveNamedProject(project); localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project)); setSavedProjects(storedProjects()); setNotice(`Project “${project.name}” saved on this device.`); };
-  const loadProject = (name: string) => { const project = savedProjects.find((item) => item.name === name); if (!project) return; if (objects.length && !window.confirm(`Open “${name}” and replace the canvas?`)) return; commitObjects(project.objects, `Project “${name}” opened.`); setSettings(project.settings); setProjectName(project.name); setSelectedIds([]); fitView(); };
+  const openProject = (project: ProjectFile, fromLauncher = false) => {
+    if (!fromLauncher && objects.length && !window.confirm(`Open “${project.name}” and replace the canvas?`)) return;
+    dispatchHistory({ type: "reset", objects: deepCloneObjects(project.objects) }); setSettings({ ...project.settings }); setProjectName(project.name); setSelectedIds([]); setView({ x: 0, y: 0, zoom: 1 }); setWorkspaceMode("blank"); setPanel("library"); setWorkspaceStarted(true); setLauncherOpen(false); setNotice(`Project “${project.name}” opened.`);
+  };
+  const loadProject = (name: string) => { const project = savedProjects.find((item) => item.name === name); if (project) openProject(project); };
+  const startBlankProject = () => {
+    const initial = { objects: [] as CanvasObject[], settings: { ...defaultDocumentSettings }, view: { x: 0, y: 0, zoom: 1 } };
+    blankWorkspaceRef.current = initial; dispatchHistory({ type: "reset", objects: [] }); setSettings(initial.settings); setView(initial.view); setWorkspaceMode("blank"); setProjectName("Untitled diagram"); setSelectedIds([]); setPanel("document"); setWorkspaceStarted(true); setLauncherOpen(false); setNotice("Choose the document size and grid, then start drawing.");
+  };
+  const startPdfProject = () => {
+    blankWorkspaceRef.current = { objects: [], settings: { ...defaultDocumentSettings }, view: { x: 0, y: 0, zoom: 1 } }; dispatchHistory({ type: "reset", objects: [] }); setSelectedIds([]); setWorkspaceMode("pdf"); setPanel("library"); setProjectName("PDF annotation"); setWorkspaceStarted(true); setLauncherOpen(false); setNotice("Choose a PDF to use as a local drawing background."); window.setTimeout(() => pdfInputRef.current?.click(), 0);
+  };
+  const showProjectLauncher = () => {
+    if (workspaceMode === "blank") localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(makeProject(projectName, objects, settings)));
+    try { const autosave = localStorage.getItem(AUTOSAVE_KEY); setLatestDraft(autosave ? parseProject(autosave) : undefined); } catch { setLatestDraft(undefined); }
+    setSavedProjects(storedProjects()); setLauncherOpen(true);
+  };
   const exportProject = () => {
     const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "schema"}.sketch2latex.json`;
     const filename = promptForDownloadFilename(suggestedName, ".sketch2latex.json");
@@ -1358,8 +1375,22 @@ export default function Home() {
     return <g key={`selection-${object.id}`} data-export-ignore="true">{selectionOverlay(object)}</g>;
   };
 
+  if (launcherOpen) return <main className="project-launcher">
+    <section className="launcher-card" aria-labelledby="launcher-title">
+      <div className="launcher-heading"><div><p className="eyebrow">Scientific diagram editor for STEM students</p><h1 id="launcher-title">Start drawing</h1><p>Choose a workspace or continue a project saved on this device.</p></div><div className="launcher-heading-actions"><span className="launcher-badge">Sketch2LaTeX</span>{workspaceStarted && <button onClick={() => setLauncherOpen(false)}>Back to editor</button>}</div></div>
+      <div className="new-project-options">
+        <button className="new-project-card" onClick={startBlankProject}><strong>Blank canvas</strong><span>Choose the document size, grid, and orientation before drawing.</span><small>Best for circuits, mechanics, optics, chemistry, and formulas</small></button>
+        <button className="new-project-card" onClick={startPdfProject}><strong>Draw on PDF</strong><span>Open a PDF locally and add vector drawings above any page.</span><small>The PDF never leaves your browser</small></button>
+      </div>
+      <div className="launcher-projects"><div className="launcher-section-title"><h2>Saved projects</h2><span>{savedProjects.length + (latestDraft ? 1 : 0)} available</span></div>
+        {latestDraft && <button className="launcher-project-row latest" onClick={() => openProject(latestDraft, true)}><span><strong>Continue latest draft</strong><small>{latestDraft.name}</small></span><time>{new Date(latestDraft.updatedAt).toLocaleString()}</time></button>}
+        {savedProjects.length ? savedProjects.map((project) => <button className="launcher-project-row" key={`${project.name}-${project.updatedAt}`} onClick={() => openProject(project, true)}><span><strong>{project.name}</strong><small>{project.objects.length} object{project.objects.length === 1 ? "" : "s"}</small></span><time>{new Date(project.updatedAt).toLocaleString()}</time></button>) : !latestDraft && <p className="launcher-empty">No projects saved yet. Start with a blank canvas or a PDF.</p>}
+      </div>
+    </section>
+  </main>;
+
   return <main className={`app-shell mode-${mode} panel-${panel}`}>
-    <header className="app-header"><div><p className="eyebrow">Scientific diagram editor for STEM students</p><h1>Sketch2LaTeX</h1></div><div className="header-actions"><label className="project-name">Project <input value={projectName} onChange={(event) => setProjectName(event.target.value)} /></label><span className="save-state">{lastSaved ? `Saved at ${lastSaved}` : "Autosave enabled"}</span><div className="mode-switch" role="group" aria-label="Tool level"><button className={mode === "beginner" ? "active" : ""} onClick={() => changeMode("beginner")}>Essential</button><button className={mode === "advanced" ? "active" : ""} onClick={() => changeMode("advanced")}>Advanced</button></div></div></header>
+    <header className="app-header"><div><p className="eyebrow">Scientific diagram editor for STEM students</p><h1>Sketch2LaTeX</h1></div><div className="header-actions"><button onClick={showProjectLauncher}>Projects</button><label className="project-name">Project <input value={projectName} onChange={(event) => setProjectName(event.target.value)} /></label><span className="save-state">{lastSaved ? `Saved at ${lastSaved}` : "Autosave enabled"}</span><div className="mode-switch" role="group" aria-label="Tool level"><button className={mode === "beginner" ? "active" : ""} onClick={() => changeMode("beginner")}>Essential</button><button className={mode === "advanced" ? "active" : ""} onClick={() => changeMode("advanced")}>Advanced</button></div></div></header>
     <p className="status" aria-live="polite">{notice}</p>
     <span hidden data-clipboard-count={clipboardCount} />
     <section className="document-mode-bar" aria-label="Drawing background">
