@@ -10,7 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "test:latex": "node --import tsx --test tests/latex.test.ts tests/math-keyboard.test.ts tests/pdf-background.test.ts tests/document-presets.test.ts tests/project-download.test.ts tests/selection-transforms.test.ts tests/smart-snapping.test.ts",
+    "test:latex": "node --import tsx --test tests/latex.test.ts tests/math-keyboard.test.ts tests/pdf-background.test.ts tests/document-presets.test.ts tests/project-download.test.ts tests/selection-transforms.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

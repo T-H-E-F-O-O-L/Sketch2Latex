@@ -9,22 +9,27 @@ async function render() {
   return worker.fetch(new Request("http://localhost/", { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
 
-test("server-renders the Sketch2LaTeX project launcher", async () => {
+test("server-renders the Sketch2LaTeX editor", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Sketch2LaTeX<\/title>/i);
   assert.match(html, /Scientific diagram editor for STEM students/);
-  assert.match(html, /Start drawing/);
-  assert.match(html, /Saved projects/);
-  assert.match(html, /Blank canvas/);
+  assert.match(html, /Library/);
+  assert.match(html, /Templates/);
+  assert.match(html, /Math &amp; Physics/);
+  assert.match(html, /Blank Canvas/);
   assert.match(html, /Draw on PDF/);
-  assert.match(html, /The PDF never leaves your browser/);
+  assert.match(html, /Graphs/);
+  assert.match(html, /Vector SVG/);
+  assert.match(html, /Stroke style/);
+  assert.match(html, /Dash-dot/);
+  assert.doesNotMatch(html, /Compile LaTeX/);
 });
 
 test("ships editor, persistence, template and vector-export workflows", async () => {
-  const [page, css, templates, project, latex, concoursStyle, connectionGeometry, scientificScene, scientificLabel, mathKeyboard, mathCalculator, pdfBackground, smartSnapping, packageJson] = await Promise.all([
+  const [page, css, templates, project, latex, concoursStyle, connectionGeometry, scientificScene, scientificLabel, mathKeyboard, mathCalculator, pdfBackground, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/templates.ts", import.meta.url), "utf8"),
@@ -37,14 +42,10 @@ test("ships editor, persistence, template and vector-export workflows", async ()
     readFile(new URL("../app/lib/math-keyboard.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/math-calculator.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/pdf-background.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/lib/smart-snapping.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(page, /AUTOSAVE_KEY/);
   assert.match(page, /resolveConnections/);
-  assert.match(page, /startBlankProject/);
-  assert.match(page, /showProjectLauncher/);
-  assert.match(page, /Smart snap/);
   assert.match(page, /svg2pdf\.js/);
   assert.match(page, /objectsFromLatex/);
   assert.match(page, /groupSelection/);
@@ -70,8 +71,6 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(css, /\.editor-layout/);
   assert.match(css, /\.endpoint-handle/);
   assert.match(css, /\.snap-port/);
-  assert.match(css, /\.project-launcher/);
-  assert.match(css, /\.smart-snap-guides/);
   assert.match(css, /\.circuit-junction/);
   assert.match(css, /\.math-calculator/);
   assert.match(css, /\.math-keyboard-grid/);
@@ -107,8 +106,6 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(mathCalculator, /mathLiveStatus/);
   assert.match(pdfBackground, /normalizePdfPageDrawing/);
   assert.match(pdfBackground, /restorePdfPageDrawing/);
-  assert.match(smartSnapping, /snapIntersections/);
-  assert.match(smartSnapping, /source: "alignment"/);
   assert.match(page, /pdf\.worker\.min\.mjs/);
   assert.match(page, /panel === "graphs"/);
   assert.match(page, /Graph builder/);
