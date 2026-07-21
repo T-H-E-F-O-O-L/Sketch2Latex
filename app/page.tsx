@@ -1349,7 +1349,10 @@ export default function Home() {
   };
 
   const applyLatexToCanvas = () => { try { const result = objectsFromLatex(latexSource, objects); const protectedCount = result.objects.filter((object) => object.kind === "raw-tikz").length; commitObjects(result.objects, `${result.applied} object${result.applied > 1 ? "s" : ""} applied from TikZ${protectedCount ? ` · ${protectedCount} unrecognized block(s) preserved without loss` : ""}.`); setSelectedIds([]); setLatexDraft(undefined); } catch (error) { setNotice(error instanceof Error ? error.message : "Invalid TikZ."); } };
-  const copyLatex = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copied."); };
+  const copyLatex = async () => {
+    try { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copied."); }
+    catch { setNotice("Could not copy LaTeX. Open Advanced mode and copy the generated code manually."); }
+  };
   const downloadLatex = () => { const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.tex`; const filename = promptForDownloadFilename(suggestedName, ".tex"); if (!filename) return; downloadText(filename, latexSource, "application/x-tex"); setNotice("LaTeX downloaded."); };
   const exportSvg = async () => { if (!svgRef.current) return; const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.svg`; const filename = promptForDownloadFilename(suggestedName, ".svg"); if (!filename) return; try { const copy = await cleanSvg(svgRef.current, settings.width, settings.height); downloadText(filename, new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("Vector SVG exported."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export SVG."); } };
   const exportPdf = async () => {

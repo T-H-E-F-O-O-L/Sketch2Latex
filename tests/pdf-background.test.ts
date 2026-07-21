@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { CanvasObject } from "../app/lib/canvas-types";
-import { friendlyPdfError, normalizePdfPageDrawing, restorePdfPageDrawing, validatePdfFile } from "../app/lib/pdf-background";
+import { friendlyPdfError, MAX_PDF_FILE_SIZE, normalizePdfPageDrawing, restorePdfPageDrawing, validatePdfFile } from "../app/lib/pdf-background";
 
 const objects: CanvasObject[] = [
   { id: "line-1", kind: "line", x: 90, y: 56, x2: 450, y2: 280, style: { stroke: "#111111", strokeWidth: 2 } },
@@ -38,6 +38,7 @@ test("validates local PDF file metadata", () => {
   assert.equal(validatePdfFile({ name: "course.PDF", size: 10, type: "" }), undefined);
   assert.match(validatePdfFile({ name: "course.png", size: 10, type: "image/png" }) ?? "", /PDF file/);
   assert.match(validatePdfFile({ name: "empty.pdf", size: 0, type: "application/pdf" }) ?? "", /empty/);
+  assert.match(validatePdfFile({ name: "large.pdf", size: MAX_PDF_FILE_SIZE + 1, type: "application/pdf" }) ?? "", /larger than 100 MB/);
 });
 
 test("turns PDF.js failures into useful messages", () => {

@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://sketch2latex-20260710.imouchiha3.chatgpt.site/"),
   title: "Sketch2LaTeX",
   description: "Draw STEM diagrams on a blank canvas or over a PDF and export clean, editable TikZ/LaTeX.",
+  icons: { icon: "/favicon.svg" },
   openGraph: {
     title: "Sketch2LaTeX",
     description: "Draw STEM diagrams on a blank canvas or over a PDF and export clean, editable TikZ/LaTeX.",

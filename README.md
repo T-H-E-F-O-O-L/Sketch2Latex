@@ -4,7 +4,9 @@
 
 # Sketch2LaTeX
 
-Turn visual STEM thinking into precise, editable TikZ diagrams.
+A tool that turns visual STEM ideas into editable LaTeX and TikZ.
+
+Sketch2LaTeX helps students and teachers draw mathematical, scientific, and engineering diagrams and convert them into editable LaTeX/TikZ code.
 
 [Live Demo](https://sketch2latex-20260710.imouchiha3.chatgpt.site/) · [Watch the Demo Video](https://www.youtube.com/watch?v=g26Ggc5HqOU)
 
@@ -55,8 +57,6 @@ Codex with GPT-5.6 supported the application architecture, SVG drawing canvas, s
 
 The application itself does not call the OpenAI API. Codex and GPT-5.6 were development tools used to build and refine the project.
 
-Primary Codex `/feedback` Session ID: `ADD_SESSION_ID`
-
 ## How it works
 
 - React and TypeScript provide the interface and editor state.
@@ -66,6 +66,18 @@ Primary Codex `/feedback` Session ID: `ADD_SESSION_ID`
 - PDF.js renders uploaded PDF pages locally beneath the drawing layer.
 - Normalized page coordinates keep annotations aligned as the viewport changes.
 - Browser-only file processing avoids a server upload workflow.
+
+## Project structure
+
+- `app/page.tsx` — editor interface, canvas interactions, PDF workflow, and exports.
+- `app/components/` — focused interactive UI components, including the visual formula editor.
+- `app/lib/` — typed geometry, templates, project persistence, PDF validation, and TikZ generation.
+- `tests/` — automated checks for export fidelity, formulas, PDF state, downloads, and selection transforms.
+- `worker/` and `.openai/` — Cloudflare Worker entry point and Codex Sites hosting configuration.
+
+## Core value
+
+Sketch2LaTeX removes the difficulty of manually writing complex TikZ code, especially for students who understand a diagram visually but struggle to reproduce it in LaTeX.
 
 ## Privacy
 
@@ -116,6 +128,7 @@ npm test
 - Removing or replacing a PDF clears its page drawings after confirmation.
 - Canvas pan and zoom are disabled in PDF mode to preserve exact registration; responsive fit-width scaling remains supported.
 - Password-protected PDFs must be unlocked before import.
+- PDF imports are limited to 100 MB to protect browser memory.
 - The original PDF is not modified.
 - Generated code is not inserted into the original LaTeX source.
 - There is no server-side LaTeX compilation.

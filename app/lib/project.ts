@@ -36,17 +36,17 @@ function settingsFrom(value: unknown): DocumentSettings {
 }
 
 export function makeProject(name: string, objects: CanvasObject[], settings: DocumentSettings): ProjectFile {
-  return { version: PROJECT_VERSION, name: name.trim() || "Sans titre", updatedAt: new Date().toISOString(), settings: { ...settings }, objects };
+  return { version: PROJECT_VERSION, name: name.trim() || "Untitled diagram", updatedAt: new Date().toISOString(), settings: { ...settings }, objects };
 }
 
 export function parseProject(value: string | unknown): ProjectFile {
   let parsed: unknown;
   try { parsed = typeof value === "string" ? JSON.parse(value) : value; }
-  catch { throw new Error("Ce fichier ne contient pas de JSON valide."); }
-  if (!parsed || typeof parsed !== "object") throw new Error("Le projet est vide ou invalide.");
+  catch { throw new Error("This file does not contain valid JSON."); }
+  if (!parsed || typeof parsed !== "object") throw new Error("This project is empty or invalid.");
   const input = parsed as Record<string, unknown>;
   const objects = Array.isArray(input.objects) ? input.objects : Array.isArray(parsed) ? parsed : undefined;
-  if (!objects || objects.some((object) => !validObject(object))) throw new Error("Le projet contient un ou plusieurs objets non reconnus.");
+  if (!objects || objects.some((object) => !validObject(object))) throw new Error("This project contains one or more unrecognized objects.");
   return {
     version: finite(input.version) ? input.version : 1,
     name: typeof input.name === "string" ? input.name : "Imported project",
@@ -82,8 +82,14 @@ export function normalizeDownloadFilename(value: string, fallback: string, exten
 }
 
 export function promptForDownloadFilename(suggestedName: string, extension: string) {
-  const value = window.prompt("Download file as", suggestedName);
-  return value === null ? undefined : normalizeDownloadFilename(value, suggestedName, extension);
+  try {
+    const value = window.prompt("Download file as", suggestedName);
+    return value === null ? undefined : normalizeDownloadFilename(value, suggestedName, extension);
+  } catch {
+    // Embedded browsers can disable native prompts. Keep downloads functional
+    // with the visible project-based suggestion in that environment.
+    return normalizeDownloadFilename(suggestedName, suggestedName, extension);
+  }
 }
 
 export function downloadText(filename: string, contents: string, type = "text/plain") {

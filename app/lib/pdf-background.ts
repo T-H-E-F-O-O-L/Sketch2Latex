@@ -8,6 +8,8 @@ export type PdfPageDrawing = {
 
 type PdfFileDescriptor = Pick<File, "name" | "size" | "type">;
 
+export const MAX_PDF_FILE_SIZE = 100 * 1024 * 1024;
+
 const finiteDimension = (value: number) => Number.isFinite(value) && value > 0;
 
 function scaleObject(object: CanvasObject, scaleX: number, scaleY: number): CanvasObject {
@@ -41,6 +43,7 @@ export function restorePdfPageDrawing(drawing: PdfPageDrawing | undefined, width
 
 export function validatePdfFile(file: PdfFileDescriptor): string | undefined {
   if (!file.size) return "This PDF is empty.";
+  if (file.size > MAX_PDF_FILE_SIZE) return "This PDF is larger than 100 MB. Choose a smaller file to avoid exhausting browser memory.";
   const extensionIsPdf = file.name.toLocaleLowerCase("en").endsWith(".pdf");
   const mimeIsPdf = !file.type || file.type === "application/pdf";
   return extensionIsPdf && mimeIsPdf ? undefined : "Choose a PDF file (.pdf).";
