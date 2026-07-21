@@ -46,7 +46,7 @@ export type CanvasObject = {
   rawTikz?: string;
   annotations?: Record<string, string>;
   style?: { stroke?: string; strokeWidth?: number; strokePattern?: StrokePattern; fill?: string; fontSize?: number; fontWeight?: "normal" | "bold" };
-  graph?: { expression: string; expressions?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
+  graph?: { expression: string; expressions?: string[]; colors?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
   bindings?: { startId?: string; endId?: string; startPort?: ConnectionPortName; endPort?: ConnectionPortName; startRatio?: number; endRatio?: number; startAnchor?: Point; endAnchor?: Point };
   groupId?: string;
   locked?: boolean;

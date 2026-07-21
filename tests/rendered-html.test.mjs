@@ -61,6 +61,8 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(page, /formulaForTypesetting/);
   assert.match(page, /canvasUnitsToPoints/);
   assert.match(page, /EXPORTED_SVG_STYLE/);
+  assert.match(page, /text\.setAttribute\("stroke", "none"\)/);
+  assert.match(page, /text\.setAttribute\("font-size", String\(CONCOURS_LABEL_SIZE\)\)/);
   assert.match(page, /editor-locked/);
   assert.match(page, /scientificScenePreview/);
   assert.match(page, /strokePattern/);
@@ -108,6 +110,10 @@ test("ships editor, persistence, template and vector-export workflows", async ()
   assert.match(smartSnapping, /snapIntersections/);
   assert.match(smartSnapping, /source: "alignment"/);
   assert.match(page, /pdf\.worker\.min\.mjs/);
+  assert.match(page, /panel === "graphs"/);
+  assert.match(page, /Graph builder/);
+  assert.match(page, /graphColorFor/);
+  assert.match(page, /graphAxisColor/);
   assert.match(page, /Your PDF stays in your browser and is not uploaded/);
   assert.match(packageJson, /"svg2pdf\.js"/);
   assert.match(packageJson, /"mathlive"/);

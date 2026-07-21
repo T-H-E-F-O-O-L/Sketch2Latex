@@ -8,6 +8,7 @@ const objects: CanvasObject[] = [
   { id: "rect-1", kind: "rect", x: 180, y: 112, width: 270, height: 168, annotations: { main: "A" } },
   { id: "curve-1", kind: "curve", x: 0, y: 0, x2: 900, y2: 560, control: { x: 300, y: 140 } },
   { id: "free-1", kind: "freehand", x: 90, y: 56, points: [{ x: 90, y: 56 }, { x: 180, y: 112 }] },
+  { id: "graph-1", kind: "axes", x: 90, y: 56, width: 360, height: 224, graph: { expression: "sin(x)", expressions: ["sin(x)", "cos(x)"], colors: ["#1769aa", "#c62828"], xMin: -5, xMax: 5 } },
 ];
 
 const closeTo = (actual: number | undefined, expected: number) => assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-10, `${actual} ≉ ${expected}`);
@@ -22,6 +23,7 @@ test("normalizes PDF drawings and restores every geometric field", () => {
   const restored = restorePdfPageDrawing(normalized, 900, 560);
   restored.forEach((object, index) => { closeTo(object.x, objects[index].x); closeTo(object.y, objects[index].y); });
   assert.deepEqual(restored.map((object) => object.kind), objects.map((object) => object.kind));
+  assert.deepEqual(restored[4].graph?.colors, ["#1769aa", "#c62828"]);
 });
 
 test("restores a normalized drawing proportionally on a resized page", () => {

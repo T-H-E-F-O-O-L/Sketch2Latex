@@ -6,7 +6,7 @@ import { JUNCTION_RADIUS, junctionPointsFor } from "./connection-geometry";
 import { scientificLabelToLatex } from "./scientific-label";
 import { scientificSceneFor, scientificSceneToTikz } from "./scientific-scene";
 import { simplifyFreehandPoints } from "./freehand-path";
-import { GRAPH_TIKZ_STYLES, graphPointSetsFor } from "./graph";
+import { GRAPH_TIKZ_STYLES, graphColorFor, graphPointSetsFor } from "./graph";
 
 const SCALE = CANVAS_UNITS_PER_CM;
 const n = (value: number) => (Math.round((value / SCALE) * 100) / 100).toFixed(2);
@@ -117,13 +117,19 @@ function labelledArrowConnector(object: CanvasObject, label: string, vector = fa
   return connectorScope(object, `\\draw[-{Latex}] (-${halfLength},0) -- (${halfLength},0);${startTick}${annotationNode}`);
 }
 
+function tikzColorOption(color?: string) {
+  const trimmed = color?.trim();
+  const match = trimmed?.match(/^#([0-9a-f]{6})$/i);
+  if (!match || match[1].toLowerCase() === "111111") return undefined;
+  const value = Number.parseInt(match[1], 16); const red = (value >> 16) & 255; const green = (value >> 8) & 255; const blue = value & 255;
+  return `color={rgb,255:red,${red};green,${green};blue,${blue}}`;
+}
+
 function tikzStyle(object: CanvasObject) {
   const options: string[] = []; const color = object.style?.stroke?.trim();
   const match = color?.match(/^#([0-9a-f]{6})$/i);
-  if (match && match[1].toLowerCase() !== "111111") {
-    const value = Number.parseInt(match[1], 16); const red = (value >> 16) & 255; const green = (value >> 8) & 255; const blue = value & 255;
-    options.push(`color={rgb,255:red,${red};green,${green};blue,${blue}}`);
-  }
+  const colorOption = match ? tikzColorOption(color) : undefined;
+  if (colorOption) options.push(colorOption);
   const strokeWidth = object.style?.strokeWidth;
   if (strokeWidth !== undefined && strokeWidth !== 2) options.push(`line width=${tikzStrokeWidth(strokeWidth).toFixed(2)}pt`);
   const strokePattern = TIKZ_STROKE_PATTERNS[object.style?.strokePattern ?? "solid"];
@@ -257,7 +263,17 @@ function objectToLatexBase(object: CanvasObject): string {
         const gridX = object.x + width * index / 8; const gridY = object.y + height * index / 8;
         return `\\draw[gray!${CONCOURS_GRAPH_GRID_PERCENT}] ${point(gridX, object.y)} -- ${point(gridX, object.y + height)};\n\\draw[gray!${CONCOURS_GRAPH_GRID_PERCENT}] ${point(object.x, gridY)} -- ${point(object.x + width, gridY)};`;
       }).join("\n") : "";
-      const plots = graphPointSetsFor(object).flatMap((segments, index) => segments.map((segment) => `\\draw[${GRAPH_TIKZ_STYLES[index % GRAPH_TIKZ_STYLES.length]}] plot coordinates {${segment.map((coordinate) => point(coordinate.x, coordinate.y)).join(" ")}};`)).join("\n");
+      const plots = graphPointSetsFor(object)
+        .flatMap((segments, index) => {
+          const options = [
+            GRAPH_TIKZ_STYLES[index % GRAPH_TIKZ_STYLES.length],
+            tikzColorOption(graphColorFor(object, index)),
+          ].filter(Boolean).join(",");
+          return segments.map((segment) =>
+            `\\draw[${options}] plot coordinates {${segment.map((coordinate) => point(coordinate.x, coordinate.y)).join(" ")}};`,
+          );
+        })
+        .join("\n");
       return `\\begin{scope}\n\\clip ${point(object.x, object.y)} rectangle ${point(object.x + width, object.y + height)};\n${grid}\n${plots}\n\\end{scope}\n\\draw[-{Latex}] ${point(object.x, horizontalAxis)} -- ${point(object.x + width, horizontalAxis)};\n\\draw[-{Latex}] ${point(verticalAxis, object.y + height)} -- ${point(verticalAxis, object.y)};\n\\node[${labelNodeOptions("base east")}] at ${point(object.x + width - 4, horizontalAxis - 8)} {${componentLabel(graph?.xLabel ?? "x")}};\n\\node[${labelNodeOptions("base west")}] at ${point(verticalAxis + 9, object.y + 15)} {${componentLabel(graph?.yLabel ?? "y")}};`;
     }
     default: return stamp(object);

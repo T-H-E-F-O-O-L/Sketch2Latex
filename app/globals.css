@@ -89,7 +89,7 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .tool-item > button { border-radius: 4px 0 0 4px; }
 .tool-item .favorite-button { min-width: 27px; padding: 3px; border-left: 0; border-radius: 0 4px 4px 0; color: #98a0a8; }
 .tool-item .favorite-button.active { color: #a56a00; background: #fff5d6; }
-.tool-group h2, .style-section h2, .project-panel h2, .document-panel h2, .math-panel h2, .properties-panel h2, .layers-panel h2, .export-panel h2, .graph-composer h2 { margin: 10px 0 7px; font-size: 13px; }
+.tool-group h2, .style-section h2, .project-panel h2, .document-panel h2, .math-panel h2, .graph-panel h2, .properties-panel h2, .layers-panel h2, .export-panel h2 { margin: 10px 0 7px; font-size: 13px; }
 .style-section { display: grid; gap: 7px; padding: 4px 2px; }
 .style-section label { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
 .template-card { margin: 8px 0; padding: 10px; border: 1px solid #d9dde1; border-radius: 5px; }
@@ -181,11 +181,24 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 .equation-render { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: hidden; color: #111; font-size: 16px; }
 .equation-render .katex-display { margin: 0; }
 .canvas-help { padding: 6px 3px; color: #5f6973; font-size: 11px; }
-.graph-composer { display: grid; grid-template-columns: minmax(180px,2fr) 110px 110px auto; align-items: end; gap: 6px; margin-top: 5px; padding: 8px; border: 1px solid #c7cdd3; border-radius: 5px; background: #fff; }
-.graph-composer h2 { grid-column: 1 / -1; margin: 0; }
-.graph-composer label { display: grid; gap: 3px; font-size: 11px; }
-.graph-composer input { min-width: 0; width: 100%; padding: 6px; border: 1px solid #aaa; border-radius: 4px; }
-.properties-panel, .layers-panel, .export-panel { padding: 10px; border-bottom: 1px solid #d7dce1; }
+.graph-panel { display: grid; align-content: start; gap: 9px; height: calc(100% - 48px); overflow: auto; padding: 12px; }
+.graph-panel h2 { margin: 0; font-size: 15px; }
+.graph-panel > p, .graph-panel > small { margin: 0; color: #5c6670; font-size: 11px; line-height: 1.4; }
+.graph-panel > label, .graph-range-grid label { display: grid; gap: 4px; font-size: 11px; font-weight: 600; }
+.graph-panel input:not([type="color"]) { min-width: 0; width: 100%; padding: 7px; border: 1px solid #aab2bb; border-radius: 4px; }
+.graph-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.graph-preset-grid button { display: grid; gap: 3px; min-width: 0; padding: 7px; text-align: left; }
+.graph-preset-grid code { overflow: hidden; color: #59636d; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.graph-color-list { display: grid; gap: 4px; }
+.graph-color-list label, .graph-properties-panel label { display: grid; grid-template-columns: minmax(0, 1fr) 36px; align-items: center; gap: 7px; font-size: 11px; }
+.graph-color-list span, .graph-properties-panel span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graph-color-list input[type="color"], .graph-axis-color input, .graph-properties-panel input[type="color"] { width: 36px; height: 28px; padding: 1px; border: 1px solid #aab2bb; border-radius: 4px; background: #fff; }
+.graph-range-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.graph-axis-color { grid-template-columns: minmax(0, 1fr) 36px !important; align-items: center; }
+.graph-add-button { padding: 9px; font-weight: 700; }
+.properties-panel, .graph-properties-panel, .layers-panel, .export-panel { padding: 10px; border-bottom: 1px solid #d7dce1; }
+.graph-properties-panel h2 { margin: 0 0 8px; font-size: 13px; }
+.graph-properties-panel { display: grid; gap: 5px; }
 .object-kind { margin: 0 0 8px; color: #4c5965; font-size: 12px; }
 .property-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .properties-panel label, .annotation-fields label { display: grid; gap: 3px; margin: 5px 0; font-size: 11px; }
@@ -207,4 +220,4 @@ footer { margin: 14px 0 0; color: #555; font-size: 12px; }
 @media (max-width: 1250px) { .editor-layout { grid-template-columns: 240px minmax(450px,1fr) 290px; }.app-shell.panel-math .editor-layout { grid-template-columns: 320px minmax(450px,1fr) 290px; }.tool-grid { grid-template-columns: 1fr; } }
 @media (max-width: 980px) { .editor-layout, .app-shell.panel-math .editor-layout { grid-template-columns: 220px minmax(0,1fr); }.right-panel { position: static; grid-column: 1 / -1; max-height: none; }.left-panel { top: 55px; }.graph-composer { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 701px) and (max-width: 980px) { .app-shell.panel-math .editor-layout { grid-template-columns: 330px minmax(0,1fr); } }
-@media (max-width: 700px) { .project-launcher { padding: 14px; }.launcher-card { padding: 20px; }.launcher-heading { display: grid; }.new-project-options { grid-template-columns: 1fr; }.launcher-project-row { align-items: start; flex-direction: column; gap: 7px; }.app-shell { padding: 8px; }.app-header { align-items: flex-start; }.header-actions { justify-content: flex-start; }.editor-layout, .app-shell.panel-math .editor-layout { grid-template-columns: 1fr; }.left-panel { position: static; height: auto; max-height: 70vh; }.library-scroll { height: auto; max-height: 40vh; }.tool-grid { grid-template-columns: 1fr 1fr; }.canvas-column { grid-row: 1; }.command-bar { position: static; }.graph-composer { grid-template-columns: 1fr; }.graph-composer h2 { grid-column: auto; }.app-shell .canvas-wrap > svg { min-height: 360px; } }
+@media (max-width: 700px) { .project-launcher { padding: 14px; }.launcher-card { padding: 20px; }.launcher-heading { display: grid; }.new-project-options { grid-template-columns: 1fr; }.launcher-project-row { align-items: start; flex-direction: column; gap: 7px; }.app-shell { padding: 8px; }.app-header { align-items: flex-start; }.header-actions { justify-content: flex-start; }.editor-layout, .app-shell.panel-math .editor-layout { grid-template-columns: 1fr; }.left-panel { position: static; height: auto; max-height: 70vh; }.library-scroll { height: auto; max-height: 40vh; }.tool-grid { grid-template-columns: 1fr 1fr; }.canvas-column { grid-row: 1; }.command-bar { position: static; }.app-shell .canvas-wrap > svg { min-height: 360px; } }

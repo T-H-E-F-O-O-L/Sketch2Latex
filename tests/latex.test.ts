@@ -7,7 +7,7 @@ import { documentFor, objectsFromLatex, objectToLatex, roundTripReport } from ".
 import { makeProject, parseProject } from "../app/lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "../app/lib/templates";
 import { fromWorkingUnit, toWorkingUnit } from "../app/lib/units";
-import { CONCOURS_GRAPH_GRID_PERCENT, CONCOURS_LIGHT_FILL, canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
+import { CONCOURS_GRAPH_GRID_PERCENT, CONCOURS_LIGHT_FILL, EXPORTED_SVG_STYLE, canvasUnitsToCentimeters, canvasUnitsToPoints } from "../app/lib/concours-style";
 import { junctionPointsFor, pointOnSegmentAt, pointOnWireAt, portsFor } from "../app/lib/connection-geometry";
 import { connectorLabelPointFor, springPointsFor, wavePointsFor } from "../app/lib/connector-paths";
 import { simplifyFreehandPoints } from "../app/lib/freehand-path";
@@ -27,6 +27,12 @@ assert.equal(scientificLabelToLatex("u_C(t)"), "$u_{C}(t)$");
 assert.equal(scientificLabelToLatex("x^2"), "$x^{2}$");
 assert.equal(scientificLabelToLatex("F₁", true), "$\\vec{F}_{1}$");
 assert.equal(scientificLabelToLatex("$F_1$", true), "$\\vec{F}_{1}$");
+});
+
+test("keeps short electrical labels visible in SVG and PDF exports", () => {
+assert.match(EXPORTED_SVG_STYLE, /text \{[^}]*stroke: none;[^}]*paint-order: normal;/s);
+assert.doesNotMatch(EXPORTED_SVG_STYLE, /stroke:\s*#fff/);
+assert.match(EXPORTED_SVG_STYLE, /\.diagram-label \{[^}]*font-size: 14px;[^}]*font-style: italic;/s);
 });
 
 test("uses the shared label grammar in component and scientific-scene TikZ", () => {
@@ -861,6 +867,33 @@ test("uses monochrome concours line styles and identical sampled graph points", 
   assert.match(output, /\{\$u\$\}/);
   assert.equal(CONCOURS_GRAPH_GRID_PERCENT, 14);
   assert.equal(CONCOURS_LIGHT_FILL, "#e0e0e0");
+});
+
+test("exports independent graph colors without losing line-style distinctions", () => {
+  const graph: CanvasObject = {
+    id: "colored-graph",
+    kind: "axes",
+    x: 40,
+    y: 50,
+    width: 300,
+    height: 190,
+    style: { stroke: "#2b2b2b" },
+    graph: {
+      expression: "sin(x)",
+      expressions: ["sin(x)", "cos(x)"],
+      colors: ["#1769aa", "#c62828"],
+      xMin: -5,
+      xMax: 5,
+      yMin: -2,
+      yMax: 2,
+    },
+  };
+  const output = objectToLatex(graph);
+  assert.match(output, /\\draw\[solid,color=\{rgb,255:red,23;green,105;blue,170\}\] plot coordinates/);
+  assert.match(output, /\\draw\[dash pattern=on 4\.54pt off 2\.27pt,color=\{rgb,255:red,198;green,40;blue,40\}\] plot coordinates/);
+  assert.match(output, /\\begin\{scope\}\[color=\{rgb,255:red,43;green,43;blue,43\}\]/);
+  assert.equal((output.match(/\\draw\[-\{Latex\}\]/g) ?? []).length, 2);
+  assert.equal(parseProject(JSON.stringify(makeProject("Colored graph", [graph]))).objects[0].graph?.colors?.[1], "#c62828");
 });
 
 test("accepts the French concours π glyph in graph expressions", () => {

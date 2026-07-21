@@ -24,7 +24,7 @@ function scaleObject(object: CanvasObject, scaleX: number, scaleY: number): Canv
     annotations: object.annotations ? { ...object.annotations } : undefined,
     style: object.style ? { ...object.style } : undefined,
     bindings: object.bindings ? { ...object.bindings } : undefined,
-    graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined,
+    graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined, colors: object.graph.colors ? [...object.graph.colors] : undefined } : undefined,
   };
 }
 

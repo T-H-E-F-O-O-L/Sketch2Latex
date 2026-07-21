@@ -54,8 +54,13 @@ function segmentsForExpression(object: CanvasObject, expression: string): Point[
 }
 
 const GRAPH_PATTERN_SEGMENTS = [undefined, [8, 4], [2, 3], [10, 3, 2, 3]] as const;
+export const DEFAULT_GRAPH_COLORS = ["#1769aa", "#c62828", "#2e7d32", "#6a1b9a", "#ef6c00", "#00838f"] as const;
 export const GRAPH_CANVAS_DASHES = GRAPH_PATTERN_SEGMENTS.map((pattern) => pattern?.join(" "));
 export const GRAPH_TIKZ_STYLES = GRAPH_PATTERN_SEGMENTS.map((pattern) => pattern ? `dash pattern=${pattern.map((length, index) => `${index % 2 ? "off" : "on"} ${canvasUnitsToPoints(length).toFixed(2)}pt`).join(" ")}` : "solid");
+
+export function graphColorFor(object: CanvasObject, index: number) {
+  return object.graph?.colors?.[index] ?? object.style?.stroke ?? "#111111";
+}
 
 export function graphPointSetsFor(object: CanvasObject): Point[][][] {
   const expressions = object.graph?.expressions?.length ? object.graph.expressions : object.graph?.expression ? [object.graph.expression] : [];
