@@ -19,7 +19,7 @@ import { scientificSceneFor, type ScientificPrimitive } from "./lib/scientific-s
 import { GRAPH_CANVAS_DASHES, graphPathFor, graphPathsFor } from "./lib/graph";
 import { simplifyFreehandPoints } from "./lib/freehand-path";
 import { documentFor, objectsFromLatex, roundTripReport } from "./lib/latex";
-import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
+import { AUTOSAVE_KEY, FAVORITES_KEY, MODE_KEY, downloadText, makeProject, parseProject, promptForDownloadFilename, saveNamedProject, storedProjects, type ProjectFile } from "./lib/project";
 import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
 import { fromWorkingUnit, toWorkingUnit, unitLabel } from "./lib/units";
 import { friendlyPdfError, normalizePdfPageDrawing, restorePdfPageDrawing, validatePdfFile, type PdfPageDrawing } from "./lib/pdf-background";
@@ -825,12 +825,14 @@ function LegacyHome() {
   const exportPdf = async () => {
     const svg = svgRef.current;
     if (!svg) { setNotice("Le canevas n’est pas disponible."); return; }
+    const filename = promptForDownloadFilename("stem-diagram.pdf", ".pdf");
+    if (!filename) return;
     setNotice("Création du PDF du schéma…");
     try {
       const [{ jsPDF }, image] = await Promise.all([import("jspdf"), canvasPdfImage(svg, canvasWidth, canvasHeight)]);
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [canvasWidth, canvasHeight] });
       pdf.addImage(image, "PNG", 0, 0, canvasWidth, canvasHeight, undefined, "FAST");
-      pdf.save("stem-diagram.pdf");
+      pdf.save(filename);
       setNotice("PDF downloaded.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Impossible de compiler le PDF."); }
   };
@@ -1289,7 +1291,11 @@ export default function Home() {
     try { const autosave = localStorage.getItem(AUTOSAVE_KEY); setLatestDraft(autosave ? parseProject(autosave) : undefined); } catch { setLatestDraft(undefined); }
     setSavedProjects(storedProjects()); setLauncherOpen(true);
   };
-  const exportProject = () => downloadText(`${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "schema"}.sketch2latex.json`, JSON.stringify(makeProject(projectName, objects, settings), null, 2), "application/json");
+  const exportProject = () => {
+    const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "schema"}.sketch2latex.json`;
+    const filename = promptForDownloadFilename(suggestedName, ".sketch2latex.json");
+    if (filename) downloadText(filename, JSON.stringify(makeProject(projectName, objects, settings), null, 2), "application/json");
+  };
   const importProject = async (file: File) => { try { const project = parseProject(await file.text()); if (objects.length && !window.confirm("Replace the canvas with the imported project?")) return; commitObjects(project.objects, `Project “${project.name}” imported.`); setProjectName(project.name); setSettings(project.settings); setSelectedIds([]); } catch (error) { setNotice(error instanceof Error ? error.message : "Import failed."); } };
 
   const switchWorkspaceMode = (next: WorkspaceMode) => {
@@ -1363,13 +1369,13 @@ export default function Home() {
 
   const applyLatexToCanvas = () => { try { const result = objectsFromLatex(latexSource, objects); const protectedCount = result.objects.filter((object) => object.kind === "raw-tikz").length; commitObjects(result.objects, `${result.applied} object${result.applied > 1 ? "s" : ""} applied from TikZ${protectedCount ? ` · ${protectedCount} unrecognized block(s) preserved without loss` : ""}.`); setSelectedIds([]); setLatexDraft(undefined); } catch (error) { setNotice(error instanceof Error ? error.message : "Invalid TikZ."); } };
   const copyLatex = async () => { await navigator.clipboard.writeText(latexSource); setNotice("LaTeX copied."); };
-  const downloadLatex = () => { downloadText(`${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.tex`, latexSource, "application/x-tex"); setNotice("LaTeX downloaded."); };
-  const exportSvg = async () => { if (!svgRef.current) return; try { const copy = await cleanSvg(svgRef.current, settings.width, settings.height); downloadText("stem-diagram.svg", new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("Vector SVG exported."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export SVG."); } };
+  const downloadLatex = () => { const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.tex`; const filename = promptForDownloadFilename(suggestedName, ".tex"); if (!filename) return; downloadText(filename, latexSource, "application/x-tex"); setNotice("LaTeX downloaded."); };
+  const exportSvg = async () => { if (!svgRef.current) return; const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.svg`; const filename = promptForDownloadFilename(suggestedName, ".svg"); if (!filename) return; try { const copy = await cleanSvg(svgRef.current, settings.width, settings.height); downloadText(filename, new XMLSerializer().serializeToString(copy), "image/svg+xml"); setNotice("Vector SVG exported."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export SVG."); } };
   const exportPdf = async () => {
     const pageWidth = canvasUnitsToPoints(settings.width); const pageHeight = canvasUnitsToPoints(settings.height);
-    if (!svgRef.current) return; setNotice("Creating vector PDF…");
-    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); const svg = await cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: pageWidth, height: pageHeight }); pdf.save("stem-diagram.pdf"); setNotice("Vector PDF exported without selection handles."); }
-    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(await cleanSvg(svgRef.current!, settings.width, settings.height), settings.width, settings.height); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); pdf.addImage(image, "PNG", 0, 0, pageWidth, pageHeight); pdf.save("stem-diagram.pdf"); setNotice("PDF exported in compatibility mode."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export PDF."); } }
+    if (!svgRef.current) return; const suggestedName = `${projectName.replace(/[^a-z0-9_-]+/gi, "-") || "stem-diagram"}.pdf`; const filename = promptForDownloadFilename(suggestedName, ".pdf"); if (!filename) return; setNotice("Creating vector PDF…");
+    try { const [{ jsPDF }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); const svg = await cleanSvg(svgRef.current, settings.width, settings.height); await (pdf as unknown as { svg: (element: SVGElement, options: Record<string, number>) => Promise<unknown> }).svg(svg, { x: 0, y: 0, width: pageWidth, height: pageHeight }); pdf.save(filename); setNotice("Vector PDF exported without selection handles."); }
+    catch { try { const { jsPDF } = await import("jspdf"); const image = await canvasPdfImage(await cleanSvg(svgRef.current!, settings.width, settings.height), settings.width, settings.height); const pdf = new jsPDF({ orientation: settings.orientation, unit: "pt", format: [pageWidth, pageHeight] }); pdf.addImage(image, "PNG", 0, 0, pageWidth, pageHeight); pdf.save(filename); setNotice("PDF exported in compatibility mode."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export PDF."); } }
   };
 
   const clearCanvas = () => { if (!objects.length || !window.confirm(workspaceMode === "pdf" ? `Clear the drawing on PDF page ${pdfPageIndex + 1}? You can still use Undo.` : "Clear the entire canvas? You can still use Undo.")) return; commitObjects([], workspaceMode === "pdf" ? `Drawing cleared from PDF page ${pdfPageIndex + 1}. Use Undo to restore it.` : "Canvas cleared. Use Undo to restore it."); setSelectedIds([]); };

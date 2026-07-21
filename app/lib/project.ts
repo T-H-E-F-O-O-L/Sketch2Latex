@@ -69,6 +69,23 @@ export function saveNamedProject(project: ProjectFile) {
   localStorage.setItem(PROJECTS_KEY, JSON.stringify([project, ...projects].slice(0, 20)));
 }
 
+export function normalizeDownloadFilename(value: string, fallback: string, extension: string) {
+  const suffix = extension.startsWith(".") ? extension : `.${extension}`;
+  const sanitize = (name: string) => name
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/[. ]+$/g, "");
+  const candidate = sanitize(value) || sanitize(fallback) || "download";
+  return candidate.toLocaleLowerCase("en").endsWith(suffix.toLocaleLowerCase("en"))
+    ? candidate
+    : `${candidate}${suffix}`;
+}
+
+export function promptForDownloadFilename(suggestedName: string, extension: string) {
+  const value = window.prompt("Download file as", suggestedName);
+  return value === null ? undefined : normalizeDownloadFilename(value, suggestedName, extension);
+}
+
 export function downloadText(filename: string, contents: string, type = "text/plain") {
   const url = URL.createObjectURL(new Blob([contents], { type }));
   const link = document.createElement("a");
