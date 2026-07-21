@@ -24,6 +24,7 @@ import { cloneTemplateObjects, diagramTemplates } from "./lib/templates";
 import { fromWorkingUnit, toWorkingUnit, unitLabel } from "./lib/units";
 import { friendlyPdfError, normalizePdfPageDrawing, restorePdfPageDrawing, validatePdfFile, type PdfPageDrawing } from "./lib/pdf-background";
 import { documentPresetById, documentPresets, matchingDocumentPresetId } from "./lib/document-presets";
+import { scaleObjectFromAnchor, selectionAfterPick } from "./lib/selection-transforms";
 
 const canvasWidth = 900;
 const canvasHeight = 560;
@@ -74,7 +75,7 @@ type HistoryAction =
 type DragMode = "move" | "resize" | "rotate" | "endpoint-start" | "endpoint-end" | "control" | "free-point";
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 type CanvasBounds = { x: number; y: number; width: number; height: number };
-type DragState = { id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode; corner?: ResizeCorner; pointIndex?: number };
+type DragState = { id: string; start: Point; original: CanvasObject; snapshot: CanvasObject[]; mode: DragMode; corner?: ResizeCorner; pointIndex?: number; selectionIds?: string[]; groupBounds?: CanvasBounds };
 
 const keepHistory = (items: CanvasObject[][]) => items.slice(-100);
 
@@ -145,9 +146,19 @@ function boundsFor(object: CanvasObject): CanvasBounds {
     const x = Math.min(...xs); const y = Math.min(...ys);
     return { x: x - 8, y: y - 8, width: Math.max(16, Math.max(...xs) - x + 16), height: Math.max(16, Math.max(...ys) - y + 16) };
   }
-  if (object.kind === "text") return { x: object.x - 6, y: object.y - 23, width: Math.max(58, (object.text?.length ?? 8) * 9), height: 29 };
+  if (object.kind === "text") {
+    const lines = (object.text ?? "").split("\n"); const fontSize = object.style?.fontSize ?? 17; const longest = Math.max(1, ...lines.map((line) => Array.from(line).length));
+    return { x: object.x - 6, y: object.y - fontSize - 6, width: Math.max(30, longest * fontSize * .58 + 12), height: Math.max(fontSize + 12, lines.length * fontSize * 1.25 + 8) };
+  }
   const width = object.width ?? 0; const height = object.height ?? 0;
   return { x: Math.min(object.x, object.x + width) - 5, y: Math.min(object.y, object.y + height) - 5, width: Math.max(16, Math.abs(width) + 10), height: Math.max(16, Math.abs(height) + 10) };
+}
+
+function boundsForObjects(objects: CanvasObject[]): CanvasBounds {
+  if (!objects.length) return { x: 0, y: 0, width: 0, height: 0 };
+  const bounds = objects.map(boundsFor); const x = Math.min(...bounds.map((value) => value.x)); const y = Math.min(...bounds.map((value) => value.y));
+  const right = Math.max(...bounds.map((value) => value.x + value.width)); const bottom = Math.max(...bounds.map((value) => value.y + value.height));
+  return { x, y, width: right - x, height: bottom - y };
 }
 
 function objectCenter(object: CanvasObject): Point {
@@ -483,7 +494,10 @@ function preview(object: CanvasObject, selected: boolean) {
   if (object.kind === "circle") return <circle {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} r={Math.abs(object.width ?? 0) / 2} />;
   if (object.kind === "ellipse") return <ellipse {...common} cx={object.x + (object.width ?? 0) / 2} cy={object.y + (object.height ?? 0) / 2} rx={Math.abs(object.width ?? 0) / 2} ry={Math.abs(object.height ?? 0) / 2} />;
   if (object.kind === "freehand") return <polyline {...common} points={simplifyFreehandPoints(object.points ?? []).map((point) => `${point.x},${point.y}`).join(" ")} />;
-  if (object.kind === "text") return <text x={object.x} y={object.y} fill={color} fontSize="17" pointerEvents="all">{object.text}</text>;
+  if (object.kind === "text") {
+    const fontSize = object.style?.fontSize ?? 17; const lines = (object.text ?? "").split("\n");
+    return <text x={object.x} y={object.y} fill={color} fontSize={fontSize} fontWeight={object.style?.fontWeight ?? "normal"} pointerEvents="all">{lines.map((line, index) => <tspan key={index} x={object.x} dy={index === 0 ? 0 : fontSize * 1.25}>{line || "\u00a0"}</tspan>)}</text>;
+  }
   if (object.kind === "axes") return concoursGraphPreview(object, selected);
   return stampPreview(object, selected);
 }
@@ -498,12 +512,40 @@ function selectionOverlay(object: CanvasObject) {
   </g>;
 }
 
-const deepCloneObjects = (objects: CanvasObject[]) => objects.map((object) => ({ ...object, style: object.style ? { ...object.style } : undefined, annotations: object.annotations ? { ...object.annotations } : undefined, graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined, points: object.points?.map((point) => ({ ...point })), control: object.control ? { ...object.control } : undefined, bindings: object.bindings ? { ...object.bindings } : undefined }));
+const deepCloneObjects = (objects: CanvasObject[]) => objects.map((object) => ({
+  ...object,
+  style: object.style ? { ...object.style } : undefined,
+  annotations: object.annotations ? { ...object.annotations } : undefined,
+  graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined,
+  points: object.points?.map((point) => ({ ...point })),
+  control: object.control ? { ...object.control } : undefined,
+  bindings: object.bindings ? { ...object.bindings, startAnchor: object.bindings.startAnchor ? { ...object.bindings.startAnchor } : undefined, endAnchor: object.bindings.endAnchor ? { ...object.bindings.endAnchor } : undefined } : undefined,
+}));
 
-type ConnectionTarget = { object: CanvasObject; port?: ConnectionPortName; ratio?: number };
+type ConnectionTarget = { object: CanvasObject; port?: ConnectionPortName; ratio?: number; anchor?: Point };
 
-function connectionPoint(object: CanvasObject, toward: Point, port?: ConnectionPortName, ratio?: number): Point {
+function anchorBoundsFor(object: CanvasObject): CanvasBounds {
+  if (object.width !== undefined && object.height !== undefined) return { x: Math.min(object.x, object.x + object.width), y: Math.min(object.y, object.y + object.height), width: Math.abs(object.width), height: Math.abs(object.height) };
+  return boundsFor(object);
+}
+
+function normalizedAnchorAt(object: CanvasObject, point: Point): { anchor: Point; point: Point; distance: number } {
+  const bounds = anchorBoundsFor(object); const right = bounds.x + bounds.width; const bottom = bounds.y + bounds.height;
+  let x = clamp(point.x, bounds.x, right); let y = clamp(point.y, bounds.y, bottom);
+  if (point.x >= bounds.x && point.x <= right && point.y >= bounds.y && point.y <= bottom) {
+    const edges = [{ x: bounds.x, y: point.y }, { x: right, y: point.y }, { x: point.x, y: bounds.y }, { x: point.x, y: bottom }];
+    const nearest = edges.toSorted((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y))[0]; x = nearest.x; y = nearest.y;
+  }
+  if (object.kind === "circle" || object.kind === "ellipse") {
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }; const rx = Math.max(1, bounds.width / 2); const ry = Math.max(1, bounds.height / 2); const dx = point.x - center.x; const dy = point.y - center.y; const factor = 1 / Math.max(.0001, Math.hypot(dx / rx, dy / ry));
+    x = center.x + dx * factor; y = center.y + dy * factor;
+  }
+  return { anchor: { x: bounds.width ? (x - bounds.x) / bounds.width : .5, y: bounds.height ? (y - bounds.y) / bounds.height : .5 }, point: { x, y }, distance: Math.hypot(x - point.x, y - point.y) };
+}
+
+function connectionPoint(object: CanvasObject, toward: Point, port?: ConnectionPortName, ratio?: number, anchor?: Point): Point {
   if (port === "segment" && ratio !== undefined) return pointOnSegmentAt(object, ratio) ?? toward;
+  if (port === "anchor" && anchor) { const bounds = anchorBoundsFor(object); return { x: bounds.x + bounds.width * anchor.x, y: bounds.y + bounds.height * anchor.y }; }
   const terminal = portFor(object, port, toward);
   if (terminal) return { x: terminal.x, y: terminal.y };
   const bounds = boundsFor(object); const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
@@ -525,9 +567,13 @@ function bindableAt(objects: CanvasObject[], point: Point, excludeId?: string): 
         if (ratio > .08 && ratio < .92) candidates.push({ object, port: "segment", ratio, distance: Math.hypot(projected.x - point.x, projected.y - point.y) });
       }
     }
+    if (!connectorKinds.includes(object.kind)) {
+      const attachment = normalizedAnchorAt(object, point);
+      candidates.push({ object, port: "anchor", anchor: attachment.anchor, distance: attachment.distance });
+    }
   }
   const nearest = candidates.filter((target) => target.distance <= 18).toSorted((a, b) => a.distance - b.distance)[0];
-  if (nearest) return { object: nearest.object, port: nearest.port, ratio: nearest.ratio };
+  if (nearest) return { object: nearest.object, port: nearest.port, ratio: nearest.ratio, anchor: nearest.anchor };
   const object = [...objects].reverse().find((candidate) => candidate.id !== excludeId && !connectorKinds.includes(candidate.kind) && portsFor(candidate).length === 0 && !candidate.hidden && !candidate.locked && (() => {
     const bounds = boundsFor(candidate); const dx = Math.max(bounds.x - point.x, 0, point.x - bounds.x - bounds.width); const dy = Math.max(bounds.y - point.y, 0, point.y - bounds.y - bounds.height);
     return Math.hypot(dx, dy) <= 28;
@@ -535,13 +581,20 @@ function bindableAt(objects: CanvasObject[], point: Point, excludeId?: string): 
   return object ? { object } : undefined;
 }
 
+function groupSelectionOverlay(bounds: CanvasBounds, id: string) {
+  return <g data-id={id} data-group-selection="true" data-export-ignore="true" className="selection-overlay">
+    <rect className="selection-frame" x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} />
+    {cornersFor(bounds).map(([corner, point]) => <rect key={corner} className="resize-handle" data-handle="group-resize" data-corner={corner} x={point.x - 7} y={point.y - 7} width="14" height="14" rx="2" aria-label="Resize selected objects proportionally" />)}
+  </g>;
+}
+
 function resolveConnections(objects: CanvasObject[]): CanvasObject[] {
   const lookup = new Map(objects.map((object) => [object.id, object]));
   return objects.map((object) => {
     if (!connectorKinds.includes(object.kind) || !object.bindings) return object;
     let next = object; const start = object.bindings.startId ? lookup.get(object.bindings.startId) : undefined; const end = object.bindings.endId ? lookup.get(object.bindings.endId) : undefined;
-    if (start) { const point = connectionPoint(start, { x: object.x2 ?? object.x, y: object.y2 ?? object.y }, object.bindings.startPort, object.bindings.startRatio); next = { ...next, x: point.x, y: point.y }; }
-    if (end) { const point = connectionPoint(end, { x: next.x, y: next.y }, object.bindings.endPort, object.bindings.endRatio); next = { ...next, x2: point.x, y2: point.y }; }
+    if (start) { const point = connectionPoint(start, { x: object.x2 ?? object.x, y: object.y2 ?? object.y }, object.bindings.startPort, object.bindings.startRatio, object.bindings.startAnchor); next = { ...next, x: point.x, y: point.y }; }
+    if (end) { const point = connectionPoint(end, { x: next.x, y: next.y }, object.bindings.endPort, object.bindings.endRatio, object.bindings.endAnchor); next = { ...next, x2: point.x, y2: point.y }; }
     return next;
   });
 }
@@ -1002,7 +1055,7 @@ export default function Home() {
 
   const deleteSelected = useCallback(() => {
     if (!selectedIds.length) return;
-    const ids = new Set(selectedIds); commitObjects(objects.filter((object) => !ids.has(object.id)).map((object) => object.bindings ? { ...object, bindings: { startId: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startId, startPort: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startPort, startRatio: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startRatio, endId: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endId, endPort: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endPort, endRatio: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endRatio } } : object), "Selection deleted. Use Undo to restore it."); setSelectedIds([]);
+    const ids = new Set(selectedIds); commitObjects(objects.filter((object) => !ids.has(object.id)).map((object) => object.bindings ? { ...object, bindings: { startId: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startId, startPort: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startPort, startRatio: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startRatio, startAnchor: ids.has(object.bindings.startId ?? "") ? undefined : object.bindings.startAnchor, endId: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endId, endPort: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endPort, endRatio: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endRatio, endAnchor: ids.has(object.bindings.endId ?? "") ? undefined : object.bindings.endAnchor } } : object), "Selection deleted. Use Undo to restore it."); setSelectedIds([]);
   }, [commitObjects, objects, selectedIds]);
 
   const copySelection = useCallback(() => {
@@ -1012,7 +1065,7 @@ export default function Home() {
   const pasteSelection = useCallback(() => {
     if (!clipboardRef.current.length) return;
     const idMap = new Map(clipboardRef.current.map((object) => [object.id, objectId()]));
-    const pasted = clipboardRef.current.map((object) => ({ ...translateObject(object, 24, 24), id: idMap.get(object.id)!, groupId: object.groupId ? `group-${objectId()}` : undefined, bindings: object.bindings ? { startId: idMap.get(object.bindings.startId ?? ""), startPort: idMap.has(object.bindings.startId ?? "") ? object.bindings.startPort : undefined, startRatio: idMap.has(object.bindings.startId ?? "") ? object.bindings.startRatio : undefined, endId: idMap.get(object.bindings.endId ?? ""), endPort: idMap.has(object.bindings.endId ?? "") ? object.bindings.endPort : undefined, endRatio: idMap.has(object.bindings.endId ?? "") ? object.bindings.endRatio : undefined } : undefined }));
+    const pasted = clipboardRef.current.map((object) => ({ ...translateObject(object, 24, 24), id: idMap.get(object.id)!, groupId: object.groupId ? `group-${objectId()}` : undefined, bindings: object.bindings ? { startId: idMap.get(object.bindings.startId ?? ""), startPort: idMap.has(object.bindings.startId ?? "") ? object.bindings.startPort : undefined, startRatio: idMap.has(object.bindings.startId ?? "") ? object.bindings.startRatio : undefined, startAnchor: idMap.has(object.bindings.startId ?? "") ? object.bindings.startAnchor : undefined, endId: idMap.get(object.bindings.endId ?? ""), endPort: idMap.has(object.bindings.endId ?? "") ? object.bindings.endPort : undefined, endRatio: idMap.has(object.bindings.endId ?? "") ? object.bindings.endRatio : undefined, endAnchor: idMap.has(object.bindings.endId ?? "") ? object.bindings.endAnchor : undefined } : undefined }));
     commitObjects([...objects, ...pasted], "Copy pasted with a 24 px offset."); setSelectedIds(pasted.map((object) => object.id));
   }, [commitObjects, objects]);
   const duplicateSelection = useCallback(() => { copySelection(); window.setTimeout(pasteSelection, 0); }, [copySelection, pasteSelection]);
@@ -1037,21 +1090,21 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown, true); return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [copySelection, deleteSelected, duplicateSelection, objects, pasteSelection, redo, selectedIds, undo, commitObjects]);
 
-  const makeObject = (point: Point): CanvasObject => {
+  const makeObject = (point: Point, hitPoint = point): CanvasObject => {
     const kind = tool as ObjectKind;
     if (kind === "equation") return { id: objectId(), kind, x: point.x - 110, y: point.y - 35, width: 220, height: 70, text: "\\vec{F}=m\\vec{a}", style: drawingStyle };
     if (stampKinds.includes(kind)) { const size = stampSize(kind); return { id: objectId(), kind, x: point.x - size.width / 2, y: point.y - size.height / 2, annotations: defaultAnnotations(kind), style: drawingStyle, ...size }; }
-    if (kind === "text") return { id: objectId(), kind, x: point.x, y: point.y, text: "Label", style: drawingStyle };
+    if (kind === "text") return { id: objectId(), kind, x: point.x, y: point.y, text: "Text", style: { ...drawingStyle, fontSize: 17, fontWeight: "normal" } };
     if (kind === "axes") return { id: objectId(), kind, x: point.x, y: point.y, width: 300, height: 210, graph: { expression: "", expressions: [], xMin: -5, xMax: 5, yMin: -5, yMax: 5, xLabel: "x", yLabel: "y", showGrid: false }, style: drawingStyle };
     if (kind === "freehand") return { id: objectId(), kind, x: point.x, y: point.y, points: [point], style: drawingStyle };
-    if (connectorKinds.includes(kind)) { const startTarget = bindableAt(objects, point); const start = startTarget ? connectionPoint(startTarget.object, point, startTarget.port, startTarget.ratio) : point; return { id: objectId(), kind, x: start.x, y: start.y, x2: start.x, y2: start.y, annotations: defaultAnnotations(kind), bindings: startTarget ? { startId: startTarget.object.id, startPort: startTarget.port, startRatio: startTarget.ratio } : undefined, style: drawingStyle }; }
+    if (connectorKinds.includes(kind)) { const startTarget = bindableAt(objects, hitPoint); const start = startTarget ? connectionPoint(startTarget.object, hitPoint, startTarget.port, startTarget.ratio, startTarget.anchor) : point; return { id: objectId(), kind, x: start.x, y: start.y, x2: start.x, y2: start.y, annotations: defaultAnnotations(kind), bindings: startTarget ? { startId: startTarget.object.id, startPort: startTarget.port, startRatio: startTarget.ratio, startAnchor: startTarget.anchor } : undefined, style: drawingStyle }; }
     return { id: objectId(), kind, x: point.x, y: point.y, width: 0, height: 0, style: drawingStyle };
   };
 
   const chooseObject = (id: string, additive: boolean) => {
     const object = objects.find((item) => item.id === id); if (!object || object.hidden || object.locked) return;
     const groupIds = object.groupId ? objects.filter((item) => item.groupId === object.groupId).map((item) => item.id) : [id];
-    setSelectedIds((current) => additive ? (current.includes(id) ? current.filter((value) => !groupIds.includes(value)) : [...new Set([...current, ...groupIds])]) : groupIds);
+    const next = selectionAfterPick(selectedIds, id, groupIds, additive); setSelectedIds(next); return next;
   };
 
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
@@ -1067,14 +1120,15 @@ export default function Home() {
     }
     if (tool === "select" && targetId) {
       const original = objects.find((object) => object.id === targetId); if (!original) return;
-      chooseObject(targetId, event.shiftKey);
-      const mode: DragMode = handle === "rotate" ? "rotate" : handle === "resize" ? "resize" : handle === "endpoint-start" ? "endpoint-start" : handle === "endpoint-end" ? "endpoint-end" : handle === "control" ? "control" : handle === "free-point" ? "free-point" : "move";
-      dragChangedRef.current = false; setDrag({ id: targetId, start: point, original, snapshot: deepCloneObjects(objects), mode, corner, pointIndex: Number.isFinite(pointIndex) ? pointIndex : undefined }); event.currentTarget.setPointerCapture(event.pointerId); return;
+      const activeSelection = chooseObject(targetId, event.shiftKey) ?? [targetId];
+      const mode: DragMode = handle === "rotate" ? "rotate" : handle === "resize" || handle === "group-resize" ? "resize" : handle === "endpoint-start" ? "endpoint-start" : handle === "endpoint-end" ? "endpoint-end" : handle === "control" ? "control" : handle === "free-point" ? "free-point" : "move";
+      const groupBounds = handle === "group-resize" ? boundsForObjects(objects.filter((object) => activeSelection.includes(object.id))) : undefined;
+      dragChangedRef.current = false; setDrag({ id: targetId, start: point, original, snapshot: deepCloneObjects(objects), mode, corner, pointIndex: Number.isFinite(pointIndex) ? pointIndex : undefined, selectionIds: activeSelection, groupBounds }); event.currentTarget.setPointerCapture(event.pointerId); return;
     }
     if (tool === "select") { setSelectedIds([]); if (marqueeEnabled) { setMarquee({ start: raw, end: raw }); event.currentTarget.setPointerCapture(event.pointerId); } return; }
     const activeKind = tool as ObjectKind;
     if (isCompleteAopConfiguration(activeKind)) { const circuit = makeAopCircuit(activeKind, point, drawingStyle); commitObjects([...objects, ...circuit], `Complete ${labels[activeKind]} added. Use “Ungroup” to edit components separately.`); setSelectedIds(circuit.map((object) => object.id)); setTool("select"); return; }
-    const created = makeObject(point);
+    const created = makeObject(point, raw);
     if (stampKinds.includes(created.kind) || created.kind === "text" || created.kind === "axes" || created.kind === "point") { commitObjects([...objects, created], `${labels[created.kind]} added.`); setSelectedIds([created.id]); if (!standardDrawingTools.includes(created.kind)) setTool("select"); return; }
     setDraft(created); event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -1087,12 +1141,18 @@ export default function Home() {
     if (drag) {
       dragChangedRef.current = true; const original = drag.original; const dx = point.x - drag.start.x; const dy = point.y - drag.start.y; const center = objectCenter(original);
       let nextObjects = drag.snapshot.map((object) => {
-        if (drag.mode === "move" && selectedIds.includes(object.id) && !object.locked) return translateObject(object, dx, dy);
+        if (drag.mode === "move" && (drag.selectionIds ?? selectedIds).includes(object.id) && !object.locked) return translateObject(object, dx, dy);
+        if (drag.mode === "resize" && drag.groupBounds && drag.corner && (drag.selectionIds ?? []).includes(object.id) && !object.locked) {
+          const oppositeCorner: Record<ResizeCorner, ResizeCorner> = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" };
+          const anchor = cornersFor(drag.groupBounds).find(([name]) => name === oppositeCorner[drag.corner!])?.[1]; const draggedCorner = cornersFor(drag.groupBounds).find(([name]) => name === drag.corner)?.[1];
+          if (!anchor || !draggedCorner) return object; const initialDistance = Math.hypot(draggedCorner.x - anchor.x, draggedCorner.y - anchor.y); const factor = clamp(Math.hypot(point.x - anchor.x, point.y - anchor.y) / Math.max(1, initialDistance), .1, 10);
+          return scaleObjectFromAnchor(object, anchor, factor, factor);
+        }
         if (object.id !== drag.id) return object;
         if (drag.mode === "resize" && drag.corner) return resizeFromCorner(original, drag.corner, point, event.shiftKey);
         if (drag.mode === "rotate") return { ...original, rotation: Math.round(((original.rotation ?? 0) + (Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(drag.start.y - center.y, drag.start.x - center.x)) * 180 / Math.PI) * 10) / 10 };
-        if (drag.mode === "endpoint-start") return { ...original, x: point.x, y: point.y, bindings: { ...original.bindings, startId: undefined, startPort: undefined, startRatio: undefined } };
-        if (drag.mode === "endpoint-end") return { ...original, x2: point.x, y2: point.y, bindings: { ...original.bindings, endId: undefined, endPort: undefined, endRatio: undefined } };
+        if (drag.mode === "endpoint-start") return { ...original, x: point.x, y: point.y, bindings: { ...original.bindings, startId: undefined, startPort: undefined, startRatio: undefined, startAnchor: undefined } };
+        if (drag.mode === "endpoint-end") return { ...original, x2: point.x, y2: point.y, bindings: { ...original.bindings, endId: undefined, endPort: undefined, endRatio: undefined, endAnchor: undefined } };
         if (drag.mode === "control") return { ...original, control: point };
         if (drag.mode === "free-point" && original.points && drag.pointIndex !== undefined) return { ...original, points: original.points.map((value, index) => index === drag.pointIndex ? point : value) };
         return object;
@@ -1110,10 +1170,10 @@ export default function Home() {
     const svg = svgRef.current; const point = svg ? canvasPoint(event, svg, settings.width, settings.height) : { x: 0, y: 0 };
     if (panDragRef.current) panDragRef.current = undefined;
     if (marquee) { const x = Math.min(marquee.start.x, marquee.end.x); const y = Math.min(marquee.start.y, marquee.end.y); const width = Math.abs(marquee.end.x - marquee.start.x); const height = Math.abs(marquee.end.y - marquee.start.y); if (width > 4 || height > 4) setSelectedIds(objects.filter((object) => { const bounds = boundsFor(object); return !object.hidden && !object.locked && bounds.x >= x && bounds.y >= y && bounds.x + bounds.width <= x + width && bounds.y + bounds.height <= y + height; }).map((object) => object.id)); setMarquee(undefined); }
-    if (draft && tool !== "curve") { let complete = draft; if (connectorKinds.includes(draft.kind)) { const target = bindableAt(objects, point); if (target) { const end = connectionPoint(target.object, { x: draft.x, y: draft.y }, target.port, target.ratio); complete = { ...draft, x2: end.x, y2: end.y, bindings: { ...draft.bindings, endId: target.object.id, endPort: target.port, endRatio: target.ratio } }; } } commitObjects([...objects, complete], `${labels[complete.kind]} added.`); setSelectedIds([complete.id]); setDraft(undefined); if (!standardDrawingTools.includes(complete.kind)) setTool("select"); }
+    if (draft && tool !== "curve") { let complete = draft; if (connectorKinds.includes(draft.kind)) { const target = bindableAt(objects, point); if (target) { const end = connectionPoint(target.object, { x: draft.x, y: draft.y }, target.port, target.ratio, target.anchor); complete = { ...draft, x2: end.x, y2: end.y, bindings: { ...draft.bindings, endId: target.object.id, endPort: target.port, endRatio: target.ratio, endAnchor: target.anchor } }; } } commitObjects([...objects, complete], `${labels[complete.kind]} added.`); setSelectedIds([complete.id]); setDraft(undefined); if (!standardDrawingTools.includes(complete.kind)) setTool("select"); }
     else if (drag && dragChangedRef.current) {
       let finalObjects = objects;
-      if (drag.mode === "endpoint-start" || drag.mode === "endpoint-end") { const target = bindableAt(objects, point, drag.id); if (target) finalObjects = objects.map((object) => object.id !== drag.id ? object : drag.mode === "endpoint-start" ? { ...object, bindings: { ...object.bindings, startId: target.object.id, startPort: target.port, startRatio: target.ratio } } : { ...object, bindings: { ...object.bindings, endId: target.object.id, endPort: target.port, endRatio: target.ratio } }); }
+      if (drag.mode === "endpoint-start" || drag.mode === "endpoint-end") { const target = bindableAt(objects, point, drag.id); if (target) finalObjects = objects.map((object) => object.id !== drag.id ? object : drag.mode === "endpoint-start" ? { ...object, bindings: { ...object.bindings, startId: target.object.id, startPort: target.port, startRatio: target.ratio, startAnchor: target.anchor } } : { ...object, bindings: { ...object.bindings, endId: target.object.id, endPort: target.port, endRatio: target.ratio, endAnchor: target.anchor } }); }
       dispatchHistory({ type: "transient", objects: resolveConnections(finalObjects) }); dispatchHistory({ type: "finishTransient", snapshot: drag.snapshot });
     }
     setDrag(undefined); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -1134,6 +1194,10 @@ export default function Home() {
   const alignSelection = (mode: "left" | "center" | "top" | "middle") => {
     if (selectedObjects.length < 2) return; const bounds = selectedObjects.map(boundsFor); const target = mode === "left" ? Math.min(...bounds.map((value) => value.x)) : mode === "top" ? Math.min(...bounds.map((value) => value.y)) : mode === "center" ? bounds.reduce((sum, value) => sum + value.x + value.width / 2, 0) / bounds.length : bounds.reduce((sum, value) => sum + value.y + value.height / 2, 0) / bounds.length;
     commitObjects(objects.map((object) => { const index = selectedObjects.findIndex((value) => value.id === object.id); if (index < 0) return object; const boundsValue = bounds[index]; const dx = mode === "left" ? target - boundsValue.x : mode === "center" ? target - boundsValue.x - boundsValue.width / 2 : 0; const dy = mode === "top" ? target - boundsValue.y : mode === "middle" ? target - boundsValue.y - boundsValue.height / 2 : 0; return translateObject(object, dx, dy); }), "Selection aligned.");
+  };
+  const scaleSelection = (factor: number) => {
+    if (selectedObjects.length < 2) return; const bounds = boundsForObjects(selectedObjects); const anchor = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    commitObjects(objects.map((object) => selectedIds.includes(object.id) && !object.locked ? scaleObjectFromAnchor(object, anchor, factor, factor) : object), `Selection scaled to ${Math.round(factor * 100)}%.`);
   };
   const reorder = (front: boolean) => { const selectedSet = new Set(selectedIds); const moving = objects.filter((object) => selectedSet.has(object.id)); const rest = objects.filter((object) => !selectedSet.has(object.id)); commitObjects(front ? [...rest, ...moving] : [...moving, ...rest], front ? "Moved to front." : "Moved to back."); };
 
@@ -1295,6 +1359,8 @@ export default function Home() {
       </aside>
       <section className="canvas-column">
         {selectedIds.length > 1 && <div className="selection-toolbar"><strong>{selectedIds.length} objects</strong><button onClick={groupSelection}>Group</button><button onClick={ungroupSelection}>Ungroup</button><button onClick={() => alignSelection("left")}>Align left</button><button onClick={() => alignSelection("center")}>Centre horizontally</button><button onClick={() => alignSelection("top")}>Align top</button><button onClick={() => alignSelection("middle")}>Centre vertically</button><button onClick={() => reorder(true)}>Bring to front</button><button onClick={() => reorder(false)}>Send to back</button></div>}
+        {selected?.kind === "text" && <div className="selection-toolbar text-format-controls"><strong>Text</strong><label>Color <input type="color" value={selected.style?.stroke ?? "#111111"} onChange={(event) => updateSelected({ style: { ...selected.style, stroke: event.target.value } })} /></label><label>Size <input type="number" min="8" max="96" value={selected.style?.fontSize ?? 17} onChange={(event) => updateSelected({ style: { ...selected.style, fontSize: clamp(Number(event.target.value), 8, 96) } })} /></label><button className={selected.style?.fontWeight === "bold" ? "active" : ""} onClick={() => updateSelected({ style: { ...selected.style, fontWeight: selected.style?.fontWeight === "bold" ? "normal" : "bold" } })} aria-pressed={selected.style?.fontWeight === "bold"}><strong>B</strong> Bold</button><span>Use Enter in the Text field for a new line.</span></div>}
+        {selectedIds.length > 1 && <div className="selection-toolbar group-scale-controls"><strong>Group scale</strong><button onClick={() => scaleSelection(.9)}>−10%</button><button onClick={() => scaleSelection(1.1)}>+10%</button><span>Or drag a corner of the shared selection box.</span></div>}
         <div ref={workspaceMode === "pdf" ? pdfStageRef : undefined} className={`canvas-wrap tool-${tool}${workspaceMode === "pdf" ? " pdf-canvas-wrap" : ""}`} style={workspaceMode === "pdf" && pdfPageSize ? { aspectRatio: `${pdfPageSize.width} / ${pdfPageSize.height}` } : undefined}>
           {workspaceMode === "pdf" && !pdfDocument && <div className="pdf-empty-state"><strong>Draw on a PDF</strong><p>Upload one compiled PDF, choose a page, then draw with the existing tools.</p><button onClick={() => pdfInputRef.current?.click()} disabled={pdfLoading}>{pdfLoading ? "Opening PDF…" : "Upload PDF"}</button><small>Your PDF stays in your browser and is not uploaded.</small></div>}
           {workspaceMode === "pdf" && pdfDocument && <canvas ref={pdfCanvasRef} className="pdf-background-canvas" style={{ opacity: pdfVisible ? pdfOpacity : 0 }} aria-hidden="true" />}
@@ -1304,7 +1370,7 @@ export default function Home() {
           {objects.map((object) => object.hidden ? null : <g key={object.id} data-id={object.id} className={`diagram-object${object.locked ? " editor-locked" : ""}`} transform={transformFor(object)}>{preview(object, selectedIds.includes(object.id))}</g>)}
           {junctionPointsFor(objects).map((point, index) => <circle key={`junction-${index}`} className="circuit-junction" cx={point.x} cy={point.y} r={JUNCTION_RADIUS} />)}
           {(connectorKinds.includes(tool as ObjectKind) || drag?.mode === "endpoint-start" || drag?.mode === "endpoint-end") && <g data-export-ignore="true">{objects.filter((object) => !object.hidden && !object.locked).flatMap((object) => portsFor(object).map((port) => <circle key={`port-${object.id}-${port.name}`} className="snap-port" cx={port.x} cy={port.y} r="5" />))}</g>}
-          {selectedObjects.map(renderSelectionHandles)}
+          {selectedObjects.length > 1 ? groupSelectionOverlay(boundsForObjects(selectedObjects), selectedObjects[0].id) : selectedObjects.map(renderSelectionHandles)}
           {draft && <g opacity=".6" transform={transformFor(draft)}>{preview(draft, true)}</g>}
           {marquee && <rect data-export-ignore="true" className="marquee" x={Math.min(marquee.start.x, marquee.end.x)} y={Math.min(marquee.start.y, marquee.end.y)} width={Math.abs(marquee.end.x - marquee.start.x)} height={Math.abs(marquee.end.y - marquee.start.y)} />}
         </svg>}

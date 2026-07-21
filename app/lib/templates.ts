@@ -945,7 +945,7 @@ export const cloneTemplateObjects = (template: DiagramTemplate) => {
     ...object,
     id: ids.get(object.id)!,
     groupId: object.groupId ? groups.get(object.groupId) : undefined,
-    bindings: object.bindings ? { startId: ids.get(object.bindings.startId ?? ""), startPort: object.bindings.startPort, startRatio: object.bindings.startRatio, endId: ids.get(object.bindings.endId ?? ""), endPort: object.bindings.endPort, endRatio: object.bindings.endRatio } : undefined,
+    bindings: object.bindings ? { startId: ids.get(object.bindings.startId ?? ""), startPort: object.bindings.startPort, startRatio: object.bindings.startRatio, startAnchor: object.bindings.startAnchor ? { ...object.bindings.startAnchor } : undefined, endId: ids.get(object.bindings.endId ?? ""), endPort: object.bindings.endPort, endRatio: object.bindings.endRatio, endAnchor: object.bindings.endAnchor ? { ...object.bindings.endAnchor } : undefined } : undefined,
     style: object.style ? { ...object.style } : undefined,
     graph: object.graph ? { ...object.graph, expressions: object.graph.expressions ? [...object.graph.expressions] : undefined } : undefined,
     annotations: object.annotations ? { ...object.annotations } : undefined,

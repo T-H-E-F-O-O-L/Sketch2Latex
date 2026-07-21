@@ -31,11 +31,11 @@ function vectorComponentLabel(value: string) {
   return scientificLabelToLatex(value, true);
 }
 
-function labelNodeOptions(anchor = "base", fontSize = 14) {
+function labelNodeOptions(anchor = "base", fontSize = 14, bold = false) {
   const options = [`anchor=${anchor}`, "inner sep=0pt", "outer sep=0pt"];
-  if (fontSize !== 14) {
+  if (fontSize !== 14 || bold) {
     const size = canvasUnitsToPoints(fontSize); const leading = size * 1.2;
-    options.push(`font=\\fontsize{${size.toFixed(2)}pt}{${leading.toFixed(2)}pt}\\selectfont`);
+    options.push(`font=${bold ? "\\bfseries" : ""}\\fontsize{${size.toFixed(2)}pt}{${leading.toFixed(2)}pt}\\selectfont`);
   }
   return options.join(",");
 }
@@ -243,7 +243,10 @@ function objectToLatexBase(object: CanvasObject): string {
     case "rect": return `\\draw ${origin} rectangle ${point(object.x + (object.width ?? 0), object.y + (object.height ?? 0))};`;
     case "circle": return `\\draw ${point(object.x + (object.width ?? 0) / 2, object.y + (object.height ?? 0) / 2)} circle (${n(Math.abs(object.width ?? 0) / 2)});`;
     case "ellipse": return `\\draw ${point(object.x + (object.width ?? 0) / 2, object.y + (object.height ?? 0) / 2)} ellipse (${n(Math.abs(object.width ?? 0) / 2)} and ${n(Math.abs(object.height ?? 0) / 2)});`;
-    case "text": return `\\node[${labelNodeOptions("base west", 17)}] at ${origin} {${safeText(object.text)}};`;
+    case "text": {
+      const fontSize = object.style?.fontSize ?? 17; const bold = object.style?.fontWeight === "bold"; const lines = (object.text ?? "").split("\n").map((line) => safeText(line) || "\\strut"); const content = lines.length > 1 ? `\\shortstack[l]{${lines.join("\\\\")}}` : lines[0];
+      return `\\node[${labelNodeOptions("base west", fontSize, bold)}${lines.length > 1 ? ",align=left" : ""}] at ${origin} {${content}};`;
+    }
     case "equation": { const formula = latexFormula((object.text ?? "").trim().replace(/^\$|\$$/g, "")); return `\\node at ${point(object.x + (object.width ?? 220) / 2, object.y + (object.height ?? 70) / 2)} {$${formula}$};`; }
     case "raw-tikz": return object.rawTikz?.trim() ?? "";
     case "freehand": { const points = simplifyFreehandPoints(object.points ?? []); return points.length > 1 ? `\\draw ${points.map((value) => point(value.x, value.y)).join(" -- ")};` : ""; }
@@ -371,8 +374,10 @@ function pointsFromLatex(source: string) {
   });
 }
 
-function textFromLatex(value: string) {
-  return value.trim().replace(/\\textbackslash\{\}\s?/g, "\\").replace(/\\([#%&_{}])/g, "$1");
+function textFromLatex(value: string): string {
+  const trimmed = value.trim(); const shortStack = trimmed.match(/^\\shortstack(?:\[l\])?\{([\s\S]*)\}$/);
+  if (shortStack) return shortStack[1].split(/\\\\/).map((line) => textFromLatex(line).replace(/^\\strut$/, "")).join("\n");
+  return trimmed.replace(/\\textbackslash\{\}\s?/g, "\\").replace(/\\([#%&_{}])/g, "$1");
 }
 
 function nodeContentsFromLatex(block: string): string[] {

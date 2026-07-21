@@ -24,7 +24,7 @@ export type ObjectKind =
   | "beaker" | "flask" | "round-bottom-flask" | "distillation-flask" | "test-tube" | "graduated-cylinder" | "burette" | "volumetric-flask" | "separatory-funnel" | "pipette" | "filter-funnel" | "wash-bottle" | "liebig-condenser" | "support-stand" | "magnetic-stirrer" | "thermometer" | "bunsen-burner";
 
 export type Point = { x: number; y: number };
-export type ConnectionPortName = "start" | "end" | "segment" | "ground" | "input" | "input-left" | "input-top" | "input-bottom" | "output" | "branch" | "top" | "right" | "bottom" | "left" | "inverting" | "non-inverting" | "primary-top" | "primary-bottom" | "secondary-top" | "secondary-bottom" | "coil-start" | "coil-end" | "electrical-plus" | "electrical-minus" | "mechanical" | "solid-1" | "solid-2" | "worm" | "wheel" | "sun" | "carrier" | "ring" | "cam" | "follower" | "electrical" | "shaft" | "frame" | "rod" | "cap" | "rod-side" | "A" | "B" | "P" | "T" | "R" | "S" | "1" | "2" | "3" | "4" | "5" | "12" | "14";
+export type ConnectionPortName = "start" | "end" | "segment" | "anchor" | "ground" | "input" | "input-left" | "input-top" | "input-bottom" | "output" | "branch" | "top" | "right" | "bottom" | "left" | "inverting" | "non-inverting" | "primary-top" | "primary-bottom" | "secondary-top" | "secondary-bottom" | "coil-start" | "coil-end" | "electrical-plus" | "electrical-minus" | "mechanical" | "solid-1" | "solid-2" | "worm" | "wheel" | "sun" | "carrier" | "ring" | "cam" | "follower" | "electrical" | "shaft" | "frame" | "rod" | "cap" | "rod-side" | "A" | "B" | "P" | "T" | "R" | "S" | "1" | "2" | "3" | "4" | "5" | "12" | "14";
 export type StrokePattern = "solid" | "dashed" | "dotted" | "dash-dot";
 
 export type CanvasObject = {
@@ -45,9 +45,9 @@ export type CanvasObject = {
   text?: string;
   rawTikz?: string;
   annotations?: Record<string, string>;
-  style?: { stroke?: string; strokeWidth?: number; strokePattern?: StrokePattern; fill?: string };
+  style?: { stroke?: string; strokeWidth?: number; strokePattern?: StrokePattern; fill?: string; fontSize?: number; fontWeight?: "normal" | "bold" };
   graph?: { expression: string; expressions?: string[]; xMin: number; xMax: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string; showGrid?: boolean };
-  bindings?: { startId?: string; endId?: string; startPort?: ConnectionPortName; endPort?: ConnectionPortName; startRatio?: number; endRatio?: number };
+  bindings?: { startId?: string; endId?: string; startPort?: ConnectionPortName; endPort?: ConnectionPortName; startRatio?: number; endRatio?: number; startAnchor?: Point; endAnchor?: Point };
   groupId?: string;
   locked?: boolean;
   hidden?: boolean;

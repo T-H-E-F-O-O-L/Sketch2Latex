@@ -874,6 +874,16 @@ test("keeps spaces when a plain-text formula is exported", () => {
   assert.match(output, /\\text\{Texte avec espaces\}/);
 });
 
+test("exports multiline colored bold text without flattening paragraphs", () => {
+  const object: CanvasObject = { id: "paragraph", kind: "text", x: 100, y: 120, text: "First paragraph\nSecond line", style: { stroke: "#1769aa", fontSize: 22, fontWeight: "bold" } };
+  const output = objectToLatex(object);
+  assert.match(output, /shortstack\[l\]/);
+  assert.match(output, /First paragraph\\\\Second line/);
+  assert.match(output, /\\bfseries/);
+  assert.match(output, /color=\{rgb,255:red,23;green,105;blue,170\}/);
+  assert.equal(objectsFromLatex(documentFor([object]), [object]).objects[0].text, object.text);
+});
+
 test("exports complex multi-line mathematical demonstrations", () => {
   const text = String.raw`\begin{aligned}E&=u_R+u_C\\&=RC\frac{du_C}{dt}+u_C\\\Rightarrow u_C(t)&=E\left(1-e^{-t/(RC)}\right)\end{aligned}`;
   const equation: CanvasObject = { id: "proof", kind: "equation", x: 40, y: 50, width: 520, height: 220, text };
